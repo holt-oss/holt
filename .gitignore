@@ -2,12 +2,18 @@ __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
+.ruff_cache/
 .env
 data/
 AUDIT-*.md
+build/
+dist/
+*.egg-info/
+node_modules/
 
 # Worktrees are checkouts, not content. `git add -A` swept one in once.
 .claude/worktrees/
+.claude/settings.local.json
 
 # Live TUI runs record here, deliberately outside fixtures/trajectories/ so a
 # session can never rewrite the recordings the eval harness replays.

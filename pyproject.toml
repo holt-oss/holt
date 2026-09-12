@@ -1,8 +1,33 @@
 [project]
-name = "holt"
+name = "holt-cli"
 version = "0.1.0"
 description = "Evidence-backed assessment of whether a GitHub repository is a viable opportunity for an external contributor."
+readme = "README.md"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+    { name = "Aahil Khan", email = "aahilminookhan@gmail.com" },
+]
+maintainers = [
+    { name = "Aahil Khan", email = "aahilminookhan@gmail.com" },
+]
+keywords = [
+    "open-source",
+    "github",
+    "contributors",
+    "repository-analysis",
+    "cli",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development",
+]
 dependencies = [
     "anthropic>=0.60",
     "httpx>=0.27",
@@ -19,6 +44,14 @@ tui = ["textual>=0.80"]
 [project.scripts]
 holt = "holt.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/holt-oss/holt"
+Documentation = "https://github.com/holt-oss/holt/tree/main/docs"
+Repository = "https://github.com/holt-oss/holt.git"
+Issues = "https://github.com/holt-oss/holt/issues"
+Changelog = "https://github.com/holt-oss/holt/blob/main/CHANGELOG.md"
+Security = "https://github.com/holt-oss/holt/security/policy"
+
 [dependency-groups]
 dev = ["pytest>=8.0"]
 
@@ -28,6 +61,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/holt"]
+
+# The Git repository carries large reproducibility fixtures. They belong in a
+# clone, not in the package uploaded to an index. An explicit source allowlist
+# also prevents ignored or untracked workspace files from entering a release.
+[tool.hatch.build.targets.sdist]
+only-include = ["src/holt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "eval"]
