@@ -1,0 +1,53 @@
+name: Feature request
+description: Propose a user problem Holt should solve.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Lead with the contributor decision or workflow problem. A proposed
+        implementation is welcome, but it should not substitute for the use case.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who encounters this, and what can they not do with Holt today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior rather than an internal implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or examples
+      description: Link public examples, user reports, or measurements that show the need.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: How do people handle this now, and why is that insufficient?
+
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Evidence and safety boundaries
+      description: Could this change read new data, affect the verdict, write to GitHub, or weaken reproducibility?
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues and pull requests for this proposal.
+          required: true
+        - label: I have described the user problem, not only a preferred implementation.
+          required: true

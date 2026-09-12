@@ -12,7 +12,7 @@ numbers, you want [REPRODUCTION.md](REPRODUCTION.md) instead.
 ## Install
 
 ```sh
-git clone <repository-url> holt
+git clone https://github.com/holt-oss/holt.git
 cd holt
 uv sync
 ```

@@ -1,0 +1,3 @@
+# Keep ownership explicit while Holt has one maintainer. Repository rules can
+# later require review from this file without changing contributor workflow.
+* @aahil-khan

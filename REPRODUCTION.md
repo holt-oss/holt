@@ -14,7 +14,7 @@ headline result, because the harness scores against the committed
 (re-running the labels) and the ground-truth sensitivity table
 (`eval/sensitivity.py`, plus `eval/run_l0.py`, `eval/pathfinder_harness.py` and
 `eval/progression_harness.py`) recompute ground truth from those files and need
-the full clone: `git clone https://github.com/aahil-khan/holt`.
+the full clone: `git clone https://github.com/holt-oss/holt`.
 
 ---
 
@@ -34,7 +34,7 @@ Nothing else. No API key for the headline number.
 ## 1. Clone and install
 
 ```sh
-git clone <repository-url> holt
+git clone https://github.com/holt-oss/holt.git
 cd holt
 uv sync
 ```

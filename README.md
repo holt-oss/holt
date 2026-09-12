@@ -1,6 +1,6 @@
 # Holt
 
-![Holt](assets/holt.png)
+![Holt terminal interface](https://raw.githubusercontent.com/holt-oss/holt/main/assets/holt.png)
 
 **Is this repository worth an outside contributor's week?**
 
@@ -11,6 +11,9 @@ pull request, review or comment.
 
 Named after Captain Holt: procedure, and refusing to state anything the evidence
 does not support.
+
+Holt is open source under the [Apache License 2.0](LICENSE). Contributions are
+welcome; [CONTRIBUTING.md](CONTRIBUTING.md) explains how to get started.
 
 ---
 
@@ -33,6 +36,7 @@ product in one page. The rest of this file is the argument and the measurement.
 | | |
 |---|---|
 | [USAGE.md](USAGE.md) | **start here if you want to use it**: install, ask about a repository, read the answer |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | development setup, project invariants, tests, fixtures, and pull-request expectations |
 | [REPRODUCTION.md](REPRODUCTION.md) | every command, from a clean machine: tests, the headline result, both solutions, the pool draw, the labels |
 | [docs/COMMANDS.md](docs/COMMANDS.md) | what each command does, and what the report says that GitHub does not |
 | [trajectories/](trajectories/) | one run end to end for every agent: the instructions it was given, what its tools returned, what it concluded |
@@ -338,3 +342,14 @@ guarantees are worth exactly as much as the tests on the claims you make about
 them.
 
 The full story, iteration by iteration: [CHANGELOG.md](CHANGELOG.md).
+
+---
+
+## Community and license
+
+Holt is maintained by the [`holt-oss`](https://github.com/holt-oss)
+organization. Bug reports, documentation, evaluation work, and focused feature
+contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), the
+[Code of Conduct](CODE_OF_CONDUCT.md), and [governance](GOVERNANCE.md).
+
+Licensed under the [Apache License, Version 2.0](LICENSE).
