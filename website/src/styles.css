@@ -408,7 +408,10 @@ h1 {
 .cat-mouth { margin-inline: 0.07em; }
 .cat-ear { transform-origin: center bottom; }
 
-.product { padding: 85px 0 110px; }
+.product { padding: 92px 0 110px; }
+
+.product__intro { margin-bottom: 42px; }
+.product__intro .section-intro { margin-bottom: 0; }
 
 .screen {
   position: relative;
@@ -470,7 +473,8 @@ h1 {
   border-top: 1px solid var(--line);
 }
 
-.section h2 {
+.section h2,
+.product h2 {
   max-width: 770px;
   margin-bottom: 30px;
   font-size: clamp(2rem, 4vw, 3.4rem);

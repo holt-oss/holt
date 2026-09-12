@@ -1,7 +1,6 @@
 # Holt website
 
-Production landing page for Holt. This is separate from `website-mockup/`,
-which remains the approved static design artifact.
+Production landing page for Holt.
 
 ```sh
 cd website
