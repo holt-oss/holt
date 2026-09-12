@@ -6,15 +6,9 @@ Holt on a repository, [USAGE.md](USAGE.md) is the shorter page.**
 
 **The headline result needs no API key, no GitHub token, and no money.**
 
-**Working from the uploaded zip rather than a clone?** The zip omits
-`fixtures/post_t/` — 32 MB of label-side evidence — to fit the submission form's
-50 MB limit. Everything in sections 1 to 5 below works without it, including the
-headline result, because the harness scores against the committed
-`eval/results_labels*.json` and reads no post-cutoff fixture. Section 6
-(re-running the labels) and the ground-truth sensitivity table
-(`eval/sensitivity.py`, plus `eval/run_l0.py`, `eval/pathfinder_harness.py` and
-`eval/progression_harness.py`) recompute ground truth from those files and need
-the full clone: `git clone https://github.com/holt-oss/holt`.
+Use a full clone for reproduction. It includes the frozen evidence fixtures,
+recorded model calls, pool definitions, labels, and result files needed to
+verify the published measurements without making live API calls.
 
 ---
 
@@ -47,7 +41,7 @@ uv sync
 uv run pytest -rs
 ```
 
-**Expected after a plain `uv sync`:** `298 passed`, `1 skipped`. The skip is the
+**Expected after a plain `uv sync`:** `296 passed`, `1 skipped`. The skip is the
 terminal-interface suite, and it is honest rather than incidental: `tui` is an
 optional extra precisely so that every reproduction command works on a machine
 that has never installed Textual. To run the interface tests too:
@@ -57,7 +51,7 @@ uv sync --extra tui
 uv run pytest -rs
 ```
 
-**Expected:** `390 passed`, no skips. **Runtime:** about two minutes either way.
+**Expected:** `388 passed`, no skips. **Runtime:** about two minutes either way.
 
 The `-rs` flag reports skipped tests explicitly — a skipped test is not a
 passing one, which is why the count above says which one it is.
@@ -129,7 +123,7 @@ See the changelog.
 
 ## 4. Run both solutions on one repository — still no key
 
-The competition requires a baseline solution and an advanced solution. Both are
+The benchmark compares Holt with a one-prompt baseline. Both are
 runnable, on the same repository, from the same evidence:
 
 ```sh

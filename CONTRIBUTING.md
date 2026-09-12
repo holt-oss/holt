@@ -76,7 +76,7 @@ sampling, or headline metrics.
 
 Do not edit frozen evaluation pools after observing results. New experiments
 must record their design and outcome when they happen, including unsuccessful
-experiments. Do not rewrite historical challenge documents to make a later
+experiments. Do not rewrite historical evaluation records to make a later
 result appear pre-registered.
 
 ## Fixtures and recordings

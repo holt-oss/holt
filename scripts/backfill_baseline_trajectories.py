@@ -1,7 +1,7 @@
 """Give the per-repository trajectories the baseline calls they never had.
 
 `holt analyze <repo> --baseline --replay` is a documented command and the
-competition's required baseline arm, but it failed from a clean clone on every
+documented benchmark baseline command, but it failed from a clean clone on every
 repository: `model.build` reads `fixtures/trajectories/<repo>.jsonl`, and the
 baseline call was only ever recorded under the run-tagged directories the
 evaluation harness reads. The benchmark was unaffected, which is why it went

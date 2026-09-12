@@ -28,7 +28,7 @@ import pytest
 
 from holt.cli import main
 
-README = Path("README.md")
+EVALUATION = Path("docs/EVALUATION.md")
 REPRODUCTION = Path("REPRODUCTION.md")
 USAGE = Path("USAGE.md")
 
@@ -57,26 +57,26 @@ def stability(paths: list[Path], method: str) -> tuple[int, int]:
 # --- the numbers -----------------------------------------------------------
 
 
-def test_readme_states_the_measured_verdict_stability():
+def test_evaluation_states_the_measured_verdict_stability():
     """The claim that broke: 21/22 and 13/22 outlived the runs behind them."""
     holt_same, total = stability(POOL1, "holt")
     base_same, _ = stability(POOL1, "baseline")
-    text = README.read_text()
+    text = EVALUATION.read_text()
     assert f"**{holt_same} of {total}**" in text, (
-        f"README should say Holt is stable on {holt_same} of {total} pool-1 repositories"
+        f"EVALUATION should say Holt is stable on {holt_same} of {total} pool-1 repositories"
     )
     assert f"**{base_same} of {total}**" in text, (
-        f"README should say the baseline is stable on {base_same} of {total}"
+        f"EVALUATION should say the baseline is stable on {base_same} of {total}"
     )
 
 
-def test_readme_states_the_combined_stability_across_both_pools():
+def test_evaluation_states_the_combined_stability_across_both_pools():
     h1, n1 = stability(POOL1, "holt")
     h2, n2 = stability(POOL2, "holt")
     b1, _ = stability(POOL1, "baseline")
     b2, _ = stability(POOL2, "baseline")
     moved = (n1 - b1) + (n2 - b2)
-    text = README.read_text()
+    text = EVALUATION.read_text()
     assert f"**{h1 + h2} of {n1 + n2}**" in text
     assert f"changed its answer on {moved} of {n1 + n2}" in text
 
@@ -86,11 +86,11 @@ def test_readme_states_the_combined_stability_across_both_pools():
     (POOL2, "holt"), (POOL2, "baseline"), (POOL2, "name_only"),
     (POOL2, "baseline_matched"),
 ])
-def test_readme_headline_mcc_matches_the_committed_runs(paths, method):
+def test_evaluation_headline_mcc_matches_the_committed_runs(paths, method):
     """Every MCC in the two headline tables is recomputed and must be on the page."""
     value = mean_metric(paths, method, "mcc")
-    assert f"{value:.2f}" in README.read_text(), (
-        f"{method} MCC {value:.2f} is not stated in README.md"
+    assert f"{value:.2f}" in EVALUATION.read_text(), (
+        f"{method} MCC {value:.2f} is not stated in docs/EVALUATION.md"
     )
 
 
@@ -124,7 +124,11 @@ def documented_holt_commands() -> list[list[str]]:
     for doc in (REPRODUCTION, USAGE):
         for line in doc.read_text().splitlines():
             line = line.strip()
-            m = re.match(r"^(?:PYTHONPATH=\. )?uv run holt (.+)$", line)
+            m = re.match(
+                r"^(?:(?:PYTHONPATH=\. )?uv run )?holt "
+                r"((?:analyze|compare|next|profile|discover|models|tui)(?: .*)?)$",
+                line,
+            )
             if not m:
                 continue
             # The guides annotate some commands with the verdict they produce

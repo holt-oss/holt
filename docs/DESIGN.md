@@ -198,18 +198,6 @@ is the one that looks worst:
 | `tests/` | 4,696 | |
 | `eval/` — harnesses, labels, baselines, statistics | 2,409 | |
 
-**The interface is the biggest single component and it is not the product.**
-That is a real imbalance and it is stated rather than hidden. What keeps it
-honest is that it is *severable*: `textual` is an optional extra
-(`pyproject.toml`), `holt tui` is the only entry point that imports it and does
-so lazily, and every reproduction command in [REPRODUCTION.md](../REPRODUCTION.md)
-runs after a plain `uv sync` on a machine that has never installed it. The test
-suite skips the TUI tests when the extra is absent and still runs 281 tests.
-
-The number that decides whether the assessment is any good is the one below it:
-`agent/` + `evidence/` + `eval/` is 5,214 lines carrying every claim in the
-Result section, against 4,696 lines of tests. If you are reading this to judge
-the engineering, that is the ratio to judge, and the 6,181 lines of Textual are
-a frontend you can uninstall without changing a single number in this document.
-
-The interface's own design history is in [INTERFACE-LOG.md](INTERFACE-LOG.md).
+The interface remains severable from the analysis engine: Textual is optional,
+the TUI is imported lazily, and non-interface commands work without it. The CLI
+and TUI call the same pipeline and render the same underlying assessment.

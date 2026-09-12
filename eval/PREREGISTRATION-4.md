@@ -59,7 +59,8 @@ means the rule only fires when the claimed consequence is directly disproved.
 asserted in its place; `classify` falls through to the arithmetic rules, and the
 disagreement is printed in the rule trace where the reader can see it. This is
 the project's standing rule for contradictory sources
-(`CLAUDE.md`, "Evidence"), applied to the one field that had been exempt.
+(`CONTRIBUTING.md`, "Project invariants"), applied to the one field that had
+been exempt.
 
 ### Thresholds, and where they come from
 

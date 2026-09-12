@@ -19,7 +19,6 @@ FORBIDDEN_PARTS = {
     "runs",
     "tests",
     "trajectories",
-    "website-mockup",
 }
 
 

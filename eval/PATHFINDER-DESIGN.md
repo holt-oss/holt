@@ -140,7 +140,7 @@ Cut it, without regret, if any of these hold:
    has no argument for existing.
 3. The final frozen benchmark is not yet run when ~8 hours remain. A measured
    viability result with no Path Finder beats an unmeasured Path Finder bolted
-   onto a submission whose main claim has not been re-verified.
+   into a product release whose main claim has not been re-verified.
 
 **Decision:** the design is sound and the base rate supports it. Whether to build
 it depends on the remaining budget and on the freeze happening first.

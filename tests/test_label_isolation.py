@@ -1,6 +1,6 @@
 """Labels must not be able to see the agent that is being graded against them.
 
-`CLAUDE.md` states this rule and three module docstrings claim a test enforces
+`CONTRIBUTING.md` states this rule and three module docstrings claim a test enforces
 it. Until this file existed, none did — the guarantee was documented and
 unenforced, which is worse than an undocumented one, because a reader trusts it.
 

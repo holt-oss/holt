@@ -4,37 +4,33 @@ You have a week and you want to spend it contributing to open source. Holt tells
 you whether a repository is a good place to spend it, and shows you the pull
 request threads it decided from.
 
-This page is the product. If you are reproducing the evaluation or checking the
-numbers, you want [REPRODUCTION.md](REPRODUCTION.md) instead.
+This guide gets you from installation to a current repository assessment. If
+you are reproducing the evaluation or checking benchmark numbers, use
+[REPRODUCTION.md](REPRODUCTION.md) instead.
 
 ---
 
 ## Install
 
+Holt is pre-1.0 and currently installs directly from GitHub:
+
 ```sh
-git clone https://github.com/holt-oss/holt.git
-cd holt
-uv sync
+uv tool install --with textual git+https://github.com/holt-oss/holt.git
 ```
 
-That is all. [`uv`](https://docs.astral.sh/uv/) installs the right Python for
-you: `curl -LsSf https://astral.sh/uv/install.sh | sh`.
+[`uv`](https://docs.astral.sh/uv/) installs the right Python for you. The
+`textual` dependency enables the terminal interface; all commands also work
+without opening it.
 
 ## Ask about a repository
 
-Try it with no keys and no setup — a few well-known repositories ship with their
-evidence already recorded:
-
-```sh
-PYTHONPATH=. uv run holt analyze NixOS/nixpkgs --replay
-```
-
-For a repository you actually care about, read GitHub directly:
+For a repository you care about, read GitHub directly. A classic token with no
+scopes is sufficient for public repositories:
 
 ```sh
 export GITHUB_TOKEN=...      # a classic token with NO scopes is enough
 export OPENAI_API_KEY=...
-PYTHONPATH=. uv run holt analyze pallets/flask --live
+holt analyze pallets/flask --live
 ```
 
 About 40 seconds and about a cent. Holt only reads; it never posts, opens a pull
@@ -44,7 +40,7 @@ request, or contacts anybody.
 
 ```sh
 export GITHUB_TOKEN=...
-PYTHONPATH=. uv run holt analyze pallets/flask --live --no-model
+holt analyze pallets/flask --live --no-model
 ```
 
 You still get the verdict and the counts behind it. You lose the prose and the
@@ -90,8 +86,8 @@ first reply is four days is a different proposition on a 3-day budget than on a
 90-day one:
 
 ```sh
-PYTHONPATH=. uv run holt analyze NixOS/nixpkgs --replay --days 3
-PYTHONPATH=. uv run holt analyze NixOS/nixpkgs --replay --days 90
+holt analyze pallets/flask --live --days 3
+holt analyze pallets/flask --live --days 90
 ```
 
 Changing `--days` costs nothing: the verdict is arithmetic, so no model runs.
@@ -101,7 +97,7 @@ Changing `--days` costs nothing: the verdict is arithmetic, so no model runs.
 Nobody decides about one repository.
 
 ```sh
-PYTHONPATH=. uv run holt compare runelite/plugin-hub NixOS/nixpkgs --replay
+holt compare pallets/flask fastapi/fastapi --live
 ```
 
 One row each, in the order you asked for — verdict, how many outsiders got in,
@@ -113,8 +109,8 @@ them, because sorting would be a claim it has not measured.
 Say once what you want to work on, then let Holt source and screen:
 
 ```sh
-PYTHONPATH=. uv run holt profile --lang python --topic cli --days 7
-PYTHONPATH=. uv run holt discover --live
+holt profile --lang python --topic cli --days 7
+holt discover --live
 ```
 
 `discover` pulls candidates from GitHub search, screens them cheaply, and only
@@ -129,7 +125,7 @@ first.
 Once you have merged work in a repository, ask what to pick up next:
 
 ```sh
-PYTHONPATH=. uv run holt next NixOS/nixpkgs --as mweinelt
+holt next NixOS/nixpkgs --as mweinelt --live
 ```
 
 Open issues that name files or directories you have already touched come first,
@@ -140,8 +136,7 @@ every list, so you can weigh it honestly.
 ## In a terminal interface
 
 ```sh
-uv sync --extra tui
-PYTHONPATH=. uv run holt tui
+holt
 ```
 
 Same commands, same evidence, browsable.

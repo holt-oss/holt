@@ -1,10 +1,9 @@
 # How Holt is evaluated
 
-The design behind the numbers in [README.md](../README.md): where the pool came
-from, how ground truth is computed, what the result is sensitive to, and what it
-does not cover. Exact commands are in [REPRODUCTION.md](../REPRODUCTION.md); the
-iteration-by-iteration record, including the experiments that were removed, is in
-[CHANGELOG.md](../CHANGELOG.md).
+Holt's product output is a recommendation, so its quality has to be inspectable.
+This document explains how the benchmark pool was built, how ground truth is
+computed, what the result is sensitive to, and what it does not cover. Exact
+commands are in [REPRODUCTION.md](../REPRODUCTION.md).
 
 ---
 
@@ -41,6 +40,26 @@ never edited after results were seen.
 **Labels are computed, never hand-judged**, and shipped in two versions. L0 is
 the naive outsider merge rate. L1 adds bot exclusion, a diff-shape filter and a
 human-review requirement. Both are run; the gap between them is in the changelog.
+
+---
+
+## Measured performance
+
+The frozen benchmark compares Holt with progressively stronger one-prompt
+baselines. Scores are mean Matthews correlation coefficient (MCC) across three
+recorded runs; higher is better and `0.00` is chance-level correlation.
+
+| Method | Pool 1 | Pool 2 |
+|---|---:|---:|
+| Repository name only | 0.16 | 0.10 |
+| README, one prompt | 0.09 | 0.21 |
+| Same evidence as Holt, one prompt | — | 0.32 |
+| **Holt** | **0.61** | **0.63** |
+
+Holt returned the same verdict in all three runs for **22 of 22** repositories
+in pool 1, compared with **17 of 22** for the README baseline. Across both
+pools, Holt was stable on **55 of 55** repositories; the baseline changed its answer on 16 of 55. These figures describe the committed benchmark, not a
+guarantee for every repository or model.
 
 ---
 
@@ -101,7 +120,7 @@ after the fact.
 - **Three runs per pool, so the ±0.00 half-ranges measure run-to-run stability
   rather than sampling error.** Sampling error is measured separately, over
   repositories: the Holt−baseline gap is large but not yet formally
-  distinguishable at n=22 — see the Result section of the README.
+  distinguishable at n=22 — see measured performance above.
 - **The memorisation probe reaches 0.71 precision knowing only repository
   names.** Some of every method's score here is recognition rather than reading.
   Its recall is 0.36, which bounds how much.
@@ -120,9 +139,10 @@ after the fact.
 
 ## Provenance
 
-Everything in this repository was written during the competition, apart from the
-problem statement in `docs/`. No credentials ship with it: the headline result
-reproduces with no API key and no GitHub token.
+The benchmark inputs, recorded model calls, pool definitions, and result files
+are committed so the published numbers can be reproduced without an API key or
+GitHub token. Product development continues independently of this frozen
+evaluation boundary.
 
 The evaluation design responds to *The Benchmark Ceiling: Human Judgment,
 Evaluation Scarcity, and the Political Economy of AI Capability Measurement*
