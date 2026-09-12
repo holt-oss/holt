@@ -1,0 +1,69 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+
+      - name: Verify release tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: test "$RELEASE_TAG" = "v$(uv version --short)"
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Check distribution contents
+        run: uv run --no-project python scripts/check_dist.py dist
+
+      - name: Install and smoke-test the wheel
+        run: |
+          uv venv .release-venv
+          uv pip install --python .release-venv/bin/python dist/*.whl
+          .release-venv/bin/python -c "import holt.tui.app"
+          .release-venv/bin/holt --help
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/holt-cli
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v8
+        with:
+          name: python-distributions
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+
+      - name: Publish with trusted authentication
+        run: uv publish --trusted-publishing always dist/*

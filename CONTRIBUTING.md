@@ -28,13 +28,12 @@ version and dependencies through [`uv`](https://docs.astral.sh/uv/).
 ```sh
 git clone https://github.com/holt-oss/holt.git
 cd holt
-uv sync --extra tui
+uv sync
 uv run pytest -rs
 ```
 
-The optional TUI dependency is included above because the complete test suite
-must run without skips. A plain `uv sync` remains a supported user path and has
-its own CI job.
+The default development environment includes the terminal interface and runs
+the complete test suite without skips.
 
 To exercise the two no-key commands shown to users:
 
@@ -70,7 +69,7 @@ sampling, or headline metrics.
 2. Keep the change focused. Avoid unrelated cleanup in the same pull request.
 3. Add or update tests for behavior changes.
 4. Update user documentation when commands, output, or guarantees change.
-5. Run `uv run pytest -rs` with the TUI extra installed.
+5. Run `uv run pytest -rs`.
 6. Open a pull request using the repository template and explain the user-facing
    behavior, evidence, and limitations.
 
@@ -78,6 +77,8 @@ Do not edit frozen evaluation pools after observing results. New experiments
 must record their design and outcome when they happen, including unsuccessful
 experiments. Do not rewrite historical evaluation records to make a later
 result appear pre-registered.
+
+Maintainer releases follow [RELEASING.md](RELEASING.md).
 
 ## Fixtures and recordings
 
