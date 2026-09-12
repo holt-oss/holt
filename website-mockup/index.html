@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Design mockup for Holt, an evidence-backed guide to contributing to open source." />
+    <title>Holt — evidence before effort</title>
+    <style>
+      :root {
+        --bg: #0d0e0e;
+        --panel: #131514;
+        --ink: #e7e5dc;
+        --muted: #85857e;
+        --faint: #5c5d58;
+        --line: #2a2c2a;
+        --line-bright: #3c3e3b;
+        --blue: #83a9ff;
+        --green: #69c7a6;
+        --orange: #ee925d;
+        --amber: #ffb331;
+        --max: 1120px;
+        --rail: 148px;
+        --mono: "SFMono-Regular", "Cascadia Code", "Liberation Mono", Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        border-top: 3px solid var(--blue);
+        color: var(--ink);
+        background: var(--bg);
+        font-family: var(--mono);
+        font-size: 15px;
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      ::selection { color: var(--bg); background: var(--blue); }
+      a { color: inherit; text-decoration: none; }
+      button { font: inherit; }
+
+      .wrap {
+        width: min(calc(100% - 48px), var(--max));
+        margin-inline: auto;
+      }
+
+      .masthead {
+        border-bottom: 1px solid var(--line);
+        background: #121212;
+      }
+
+      .masthead-inner {
+        min-height: 66px;
+        display: grid;
+        grid-template-columns: var(--rail) 1fr;
+        align-items: center;
+        gap: 38px;
+      }
+
+      .brand {
+        width: max-content;
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .brand-logo {
+        display: block;
+        width: 102px;
+        height: 45px;
+        object-fit: contain;
+      }
+
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 26px;
+        color: var(--muted);
+        font-size: 0.78rem;
+        text-transform: lowercase;
+      }
+
+      .nav a { border-bottom: 1px solid transparent; }
+      .nav a:hover, .nav a:focus-visible { color: var(--ink); border-color: currentColor; }
+      .nav .github { color: var(--green); }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: var(--rail) minmax(0, 1fr);
+        gap: 38px;
+      }
+
+      .rail {
+        color: var(--faint);
+        font-size: 0.73rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .rail strong {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--blue);
+        font-weight: 500;
+      }
+
+      .hero { padding: 96px 0 78px; }
+      .hero-main { max-width: 890px; }
+
+      .version {
+        margin: 0 0 24px;
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
+      .cursor {
+        display: inline-block;
+        width: 8px;
+        height: 1.05em;
+        margin-left: 4px;
+        vertical-align: -2px;
+        background: var(--blue);
+        animation: blink 1.2s steps(1) infinite;
+      }
+
+      @keyframes blink { 50% { opacity: 0; } }
+      h1, h2, h3, p { margin-top: 0; }
+
+      h1 {
+        max-width: 860px;
+        margin-bottom: 28px;
+        font-size: clamp(3rem, 6.1vw, 5.25rem);
+        font-weight: 650;
+        letter-spacing: -0.065em;
+        line-height: 1.02;
+      }
+
+      h1 span { color: var(--orange); }
+
+      .lede {
+        max-width: 730px;
+        margin-bottom: 38px;
+        color: #aaa9a2;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: clamp(1.02rem, 1.7vw, 1.22rem);
+        line-height: 1.65;
+      }
+
+      .command {
+        max-width: 760px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        min-height: 57px;
+        border: 1px solid var(--line-bright);
+        background: var(--panel);
+      }
+
+      .prompt { padding-left: 18px; color: var(--amber); }
+
+      .command code {
+        min-width: 0;
+        overflow: hidden;
+        padding: 0 14px;
+        color: var(--ink);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .copy {
+        height: 55px;
+        padding: 0 17px;
+        border: 0;
+        border-left: 1px solid var(--line-bright);
+        color: var(--muted);
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .copy:hover, .copy:focus-visible { color: var(--bg); background: var(--green); }
+
+      .hero-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px 26px;
+        margin-top: 24px;
+        font-size: 0.82rem;
+      }
+
+      .text-link { color: var(--green); border-bottom: 1px solid rgba(105, 199, 166, 0.35); }
+      .text-link:hover, .text-link:focus-visible { border-color: var(--green); }
+      .award-note { color: var(--muted); }
+      .award-note::before { color: var(--orange); content: "● "; }
+      .product { padding-bottom: 108px; }
+
+      .screen { border: 1px solid var(--line-bright); background: #101010; }
+
+      .screen-head {
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 15px;
+        border-bottom: 1px solid var(--line);
+        color: var(--faint);
+        font-size: 0.72rem;
+      }
+
+      .screen-head .live { color: var(--green); }
+      .screen img { display: block; width: 100%; height: auto; }
+
+      .caption {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        margin: 13px 0 0;
+        color: var(--faint);
+        font-size: 0.73rem;
+      }
+
+      .caption em { color: var(--muted); font-style: normal; }
+
+      .section {
+        padding: 104px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .section h2 {
+        max-width: 770px;
+        margin-bottom: 30px;
+        font-size: clamp(2rem, 4vw, 3.4rem);
+        font-weight: 600;
+        letter-spacing: -0.055em;
+        line-height: 1.08;
+      }
+
+      .section-intro {
+        max-width: 740px;
+        margin-bottom: 50px;
+        color: #a1a19a;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1.05rem;
+        line-height: 1.75;
+      }
+
+      .thread-ledger, .trace, .scores { border-top: 1px solid var(--line-bright); }
+
+      .thread {
+        display: grid;
+        grid-template-columns: 110px minmax(0, 1fr) 190px;
+        gap: 24px;
+        align-items: start;
+        padding: 28px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .thread-id { color: var(--faint); font-size: 0.74rem; }
+
+      .thread blockquote {
+        margin: 0;
+        color: #cbc9c0;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1.06rem;
+      }
+
+      .verdict { font-size: 0.78rem; text-align: right; }
+      .verdict.good { color: var(--green); }
+      .verdict.bad { color: var(--orange); }
+
+      .aside-note {
+        margin-top: 24px;
+        color: var(--faint);
+        font-size: 0.75rem;
+      }
+
+      .aside-note span { color: var(--blue); }
+
+      .trace-row {
+        display: grid;
+        grid-template-columns: 62px 170px 1fr 96px;
+        gap: 18px;
+        padding: 19px 0;
+        border-bottom: 1px solid var(--line);
+        align-items: baseline;
+      }
+
+      .trace-index { color: var(--blue); font-size: 0.75rem; }
+      .trace-name { color: var(--ink); }
+      .trace-copy { color: var(--muted); font-size: 0.82rem; }
+
+      .trace-owner {
+        color: var(--faint);
+        font-size: 0.72rem;
+        text-align: right;
+        text-transform: uppercase;
+      }
+
+      .trace-owner.no-model { color: var(--green); }
+
+      .trace-foot {
+        margin: 28px 0 0;
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      .trace-foot strong { color: var(--ink); font-weight: 500; }
+      .scores { margin-top: 12px; }
+
+      .score {
+        display: grid;
+        grid-template-columns: 210px 1fr 64px;
+        gap: 22px;
+        align-items: center;
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .score-label { color: var(--muted); font-size: 0.78rem; }
+      .score-track { height: 7px; background: #202220; }
+      .score-fill { height: 100%; width: var(--score); background: var(--faint); }
+      .score.holt .score-label, .score.holt .score-value { color: var(--green); }
+      .score.holt .score-fill { background: var(--green); }
+      .score-value { color: var(--muted); text-align: right; }
+
+      .measurement {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: 42px;
+        border-block: 1px solid var(--line);
+      }
+
+      .measure { padding: 22px 22px 22px 0; }
+      .measure + .measure { padding-left: 22px; border-left: 1px solid var(--line); }
+
+      .measure strong {
+        display: block;
+        color: var(--ink);
+        font-size: 1.25rem;
+        font-weight: 500;
+      }
+
+      .measure span { color: var(--faint); font-size: 0.72rem; }
+      .opensource { background: var(--panel); }
+
+      .contribute-line {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px 28px;
+        margin-top: 36px;
+      }
+
+      .bracket-link {
+        min-height: 43px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 15px;
+        border: 1px solid var(--green);
+        color: var(--green);
+        font-size: 0.8rem;
+      }
+
+      .bracket-link:hover, .bracket-link:focus-visible { color: var(--bg); background: var(--green); }
+      .license { color: var(--faint); font-size: 0.75rem; }
+
+      footer {
+        padding: 34px 0;
+        border-top: 1px solid var(--line);
+        color: var(--faint);
+        font-size: 0.72rem;
+      }
+
+      .footer-inner { display: flex; justify-content: space-between; gap: 24px; }
+      .footer-inner a:hover { color: var(--ink); }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        .cursor { animation: none !important; }
+      }
+
+      @media (max-width: 780px) {
+        .wrap { width: min(calc(100% - 30px), var(--max)); }
+        .masthead-inner { grid-template-columns: 1fr auto; gap: 16px; }
+        .nav a:not(.github) { display: none; }
+        .section-grid { grid-template-columns: 1fr; gap: 24px; }
+        .rail { display: flex; gap: 10px; }
+        .rail strong { margin: 0; }
+        .hero { padding: 70px 0 58px; }
+        h1 { font-size: clamp(2.75rem, 13vw, 4.5rem); }
+        .product { padding-bottom: 76px; }
+        .section { padding: 76px 0; }
+        .thread { grid-template-columns: 1fr; gap: 9px; }
+        .verdict { text-align: left; }
+        .trace-row { grid-template-columns: 44px 1fr auto; }
+        .trace-copy { grid-column: 2 / -1; }
+        .score { grid-template-columns: 1fr 54px; gap: 12px; }
+        .score-track { grid-column: 1 / -1; grid-row: 2; }
+        .measurement { grid-template-columns: 1fr; }
+        .measure, .measure + .measure { padding: 17px 0; border-left: 0; }
+        .measure + .measure { border-top: 1px solid var(--line); }
+        .caption, .footer-inner { flex-direction: column; gap: 5px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="wrap masthead-inner">
+        <a class="brand" href="#top" aria-label="Holt home">
+          <img class="brand-logo" src="data:image/png;base64,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" alt="" />
+        </a>
+        <nav class="nav" aria-label="Main navigation">
+          <a href="#why">why</a>
+          <a href="#method">method</a>
+          <a href="#proof">proof</a>
+          <a href="#contribute">contribute</a>
+          <a class="github" href="https://github.com/holt-oss/holt">github ↗</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="wrap section-grid">
+          <aside class="rail"><strong>01</strong>the question</aside>
+          <div class="hero-main">
+            <p class="version">holt 0.1.0 / read-only<span class="cursor" aria-hidden="true"></span></p>
+            <h1>Don’t give a repository a week it <span>won’t give back.</span></h1>
+            <p class="lede">Holt reads what happened to outside contributors before you and returns a verdict you can inspect—down to the pull request, review, or comment behind every claim.</p>
+            <div class="command" aria-label="Install Holt command">
+              <span class="prompt" aria-hidden="true">$</span>
+              <code id="install-command">uv tool install holt-cli</code>
+              <button class="copy" type="button" data-copy="uv tool install holt-cli">copy</button>
+            </div>
+            <div class="hero-links">
+              <a class="text-link" href="https://github.com/holt-oss/holt">[ view source ]</a>
+              <a class="text-link" href="https://github.com/holt-oss/holt/blob/main/USAGE.md">[ read usage ]</a>
+              <span class="award-note">Most useful real-world workflow / micro1 Frontier Engineering Challenge</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="product" aria-labelledby="product-caption">
+        <div class="wrap section-grid">
+          <aside class="rail"><strong>02</strong>the tool</aside>
+          <div>
+            <div class="screen">
+              <div class="screen-head"><span>actual interface / no browser chrome</span><span class="live">● read-only</span></div>
+              <img src="../assets/holt.png" alt="Holt terminal interface listing assessed repositories and their verdicts" />
+            </div>
+            <p class="caption" id="product-caption"><span><em>Fig. 01</em> — the shipped terminal interface</span><span>analyze · compare · discover · next</span></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="why">
+        <div class="wrap section-grid">
+          <aside class="rail"><strong>03</strong>why it exists</aside>
+          <div>
+            <h2>GitHub counts both of these as one closed pull request.</h2>
+            <p class="section-intro">Stars, issue counts, and repository activity describe project health. They do not tell you what happens when a stranger tries to contribute. The useful signal lives inside the conversations.</p>
+            <div class="thread-ledger" aria-label="Two pull request outcomes">
+              <article class="thread"><div class="thread-id">PR / 4821</div><blockquote>“Thanks for this! Merged—could you also look at the sibling case?”</blockquote><div class="verdict good">→ route exists</div></article>
+              <article class="thread"><div class="thread-id">PR / 917</div><blockquote>“We’re rewriting this module internally, closing.”</blockquote><div class="verdict bad">→ don’t spend the week</div></article>
+            </div>
+            <p class="aside-note"><span>evidence:</span> same status, opposite contributor outcome.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="method">
+        <div class="wrap section-grid">
+          <aside class="rail"><strong>04</strong>the trace</aside>
+          <div>
+            <h2>The model can write the report. It cannot choose the verdict.</h2>
+            <p class="section-intro">Holt turns repository history into typed findings, verifies every evidence ID, then hands the surviving facts to a plain deterministic function. Verification only removes unsupported claims; narration cannot change the answer.</p>
+            <div class="trace" aria-label="Holt assessment pipeline">
+              <div class="trace-row"><span class="trace-index">A</span><span class="trace-name">classify</span><span class="trace-copy">what kind of repository is this?</span><span class="trace-owner">model</span></div>
+              <div class="trace-row"><span class="trace-index">B</span><span class="trace-name">opportunity</span><span class="trace-copy">is there a real route for outsider work?</span><span class="trace-owner">model</span></div>
+              <div class="trace-row"><span class="trace-index">C</span><span class="trace-name">outcomes</span><span class="trace-copy">what happened to people who tried?</span><span class="trace-owner">model</span></div>
+              <div class="trace-row"><span class="trace-index">D</span><span class="trace-name">verify</span><span class="trace-copy">resolve citations; drop what does not resolve</span><span class="trace-owner no-model">no model</span></div>
+              <div class="trace-row"><span class="trace-index">→</span><span class="trace-name">verdict.py</span><span class="trace-copy">one written rule over verified evidence</span><span class="trace-owner no-model">no model</span></div>
+              <div class="trace-row"><span class="trace-index">E</span><span class="trace-name">narrate</span><span class="trace-copy">explain an answer it cannot override</span><span class="trace-owner">model</span></div>
+            </div>
+            <p class="trace-foot"><strong>median input:</strong> 642 evidence records across 200 pull-request conversations.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="proof">
+        <div class="wrap section-grid">
+          <aside class="rail"><strong>05</strong>the proof</aside>
+          <div>
+            <h2>Measured against what happened after the cutoff.</h2>
+            <p class="section-intro">The second pool was drawn, labelled, and held out after every rule was written. The result below is Matthews correlation on that out-of-sample pool—not an anecdote and not a demo repository chosen after the fact.</p>
+            <div class="scores" aria-label="Out-of-sample Matthews correlation comparison">
+              <div class="score"><span class="score-label">README + metadata prompt</span><div class="score-track"><div class="score-fill" style="--score: 21%"></div></div><span class="score-value">0.21</span></div>
+              <div class="score"><span class="score-label">same evidence, one prompt</span><div class="score-track"><div class="score-fill" style="--score: 32%"></div></div><span class="score-value">0.32</span></div>
+              <div class="score holt"><span class="score-label">Holt</span><div class="score-track"><div class="score-fill" style="--score: 63%"></div></div><span class="score-value">0.63</span></div>
+            </div>
+            <div class="measurement">
+              <div class="measure"><strong>55 / 55</strong><span>verdicts stable across three runs</span></div>
+              <div class="measure"><strong>read-only</strong><span>never writes to GitHub</span></div>
+              <div class="measure"><strong>every claim</strong><span>carries a resolvable evidence ID</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section opensource" id="contribute">
+        <div class="wrap section-grid">
+          <aside class="rail"><strong>06</strong>open source</aside>
+          <div>
+            <h2>The workflow won an award. The project should outgrow the submission.</h2>
+            <p class="section-intro">Holt is becoming a community project under the holt-oss organization. Help improve evidence providers, evaluation, terminal UX, documentation, or the rules that decide when a contributor’s week has a real chance of landing.</p>
+            <div class="contribute-line">
+              <a class="bracket-link" href="https://github.com/holt-oss/holt/blob/main/CONTRIBUTING.md">[ start contributing → ]</a>
+              <a class="text-link" href="mailto:aahilminookhan@gmail.com">aahilminookhan@gmail.com</a>
+              <span class="license">Apache-2.0</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer><div class="wrap footer-inner"><span>(=^ω^=) procedure over persuasion.</span><span><a href="https://github.com/holt-oss">holt-oss</a> / 2026</span></div></footer>
+
+    <script>
+      const copyButton = document.querySelector("[data-copy]");
+      copyButton?.addEventListener("click", async () => {
+        const original = copyButton.textContent;
+        try {
+          await navigator.clipboard.writeText(copyButton.dataset.copy);
+          copyButton.textContent = "copied";
+        } catch {
+          copyButton.textContent = "select";
+          window.getSelection()?.selectAllChildren(document.querySelector("#install-command"));
+        }
+        window.setTimeout(() => { copyButton.textContent = original; }, 1400);
+      });
+    </script>
+  </body>
+</html>

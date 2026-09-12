@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d0e0e" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta
+      name="description"
+      content="Holt reads GitHub contribution history and tells you whether a repository is worth an outside contributor's week."
+    />
+    <meta property="og:title" content="Holt — evidence before effort" />
+    <meta
+      property="og:description"
+      content="An evidence-backed answer to one question: is this repository worth your week?"
+    />
+    <title>Holt — evidence before effort</title>
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <div class="scroll-progress" aria-hidden="true"><span></span></div>
+
+    <header class="masthead" data-header>
+      <div class="wrap masthead__inner">
+        <a class="brand" href="#top" aria-label="Holt home">
+          <img class="brand__logo" data-logo-image src="data:image/png;base64,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" alt="" />
+        </a>
+        <nav class="nav" aria-label="Main navigation">
+          <a href="#why">why</a>
+          <a href="#method">method</a>
+          <a href="#proof">proof</a>
+          <a href="#contribute">contribute</a>
+          <a class="nav__github" href="https://github.com/holt-oss/holt">github <span aria-hidden="true">↗</span></a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="content">
+      <section class="hero" id="top" data-cat-section="ready">
+        <button class="hero__cat" type="button" data-cat-companion aria-label="Play with Holt, the site cat">
+          <div class="cat-character">
+            <div class="cat-face cat-face--hero" data-cat-face>
+              <span class="cat-shell">(=</span><span class="cat-ear">^</span><span class="cat-eye" data-cat-eye>•</span><span class="cat-mouth" data-cat-mouth>ω</span><span class="cat-eye" data-cat-eye>•</span><span class="cat-ear">^</span><span class="cat-shell">=)</span>
+            </div>
+          </div>
+        </button>
+
+        <div class="wrap section-grid">
+          <aside class="rail hero__rail"><strong>01</strong><span>the question</span></aside>
+          <div class="hero__main">
+            <p class="version" data-intro>holt 0.1.0</p>
+            <h1 aria-label="Don’t give a repository a week it won’t give back.">
+              <span class="headline-line"><span>Don’t give a</span></span>
+              <span class="headline-line"><span>repository a week</span></span>
+              <span class="headline-line"><span>it <em>won’t give back.</em></span></span>
+            </h1>
+            <div class="hero__badges" data-intro aria-label="Project recognition">
+              <span class="award-badge">
+                <span class="award-badge__label">micro1 winner</span>
+                <span class="award-badge__value">Most useful real-world workflow</span>
+              </span>
+              <span class="award-context">Frontier Engineering Challenge</span>
+            </div>
+            <p class="lede" data-intro>
+              Holt reads what happened to outside contributors before you and returns a verdict you
+              can inspect—down to the pull request, review, or comment behind every claim.
+            </p>
+            <div class="command" data-command data-intro>
+              <span class="command__prompt" aria-hidden="true">$</span>
+              <code id="install-command">uv tool install holt-cli</code>
+              <button class="copy" type="button" data-copy="uv tool install holt-cli" aria-describedby="copy-status">copy</button>
+            </div>
+            <span class="sr-only" id="copy-status" aria-live="polite"></span>
+            <div class="hero__links" data-intro>
+              <a class="text-link" href="https://github.com/holt-oss/holt">[ view source ]</a>
+              <a class="text-link" href="https://github.com/holt-oss/holt/blob/main/USAGE.md">[ read usage ]</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="product" data-cat-section="observing interface">
+        <div class="wrap section-grid">
+          <aside class="rail" data-rail><strong>02</strong><span>the tool</span></aside>
+          <div>
+            <figure class="screen" data-screen>
+              <div class="screen__head">
+                <span>actual interface / no browser chrome</span>
+                <span class="screen__live">● read-only</span>
+              </div>
+              <div class="screen__viewport">
+                <div class="screen__scan" aria-hidden="true"></div>
+                <img data-product-image alt="Holt terminal interface listing assessed repositories and their verdicts" />
+              </div>
+              <figcaption>
+                <span><em>Fig. 01</em> — the shipped terminal interface</span>
+                <span>analyze · compare · discover · next</span>
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="why" data-cat-section="reading outcomes">
+        <div class="wrap section-grid">
+          <aside class="rail" data-rail><strong>03</strong><span>why it exists</span></aside>
+          <div>
+            <h2 data-reveal>GitHub counts both of these as one closed pull request.</h2>
+            <p class="section-intro" data-reveal>
+              Stars, issue counts, and repository activity describe project health. They do not tell
+              you what happens when a stranger tries to contribute. The useful signal lives inside
+              the conversations.
+            </p>
+            <div class="thread-ledger" aria-label="Two pull request outcomes">
+              <article class="thread" data-thread>
+                <div class="thread__id">PR / 4821</div>
+                <blockquote>“Thanks for this! Merged—could you also look at the sibling case?”</blockquote>
+                <div class="verdict verdict--good">→ route exists</div>
+              </article>
+              <article class="thread" data-thread>
+                <div class="thread__id">PR / 917</div>
+                <blockquote>“We’re rewriting this module internally, closing.”</blockquote>
+                <div class="verdict verdict--bad">→ don’t spend the week</div>
+              </article>
+            </div>
+            <p class="aside-note" data-reveal><span>evidence:</span> same status, opposite contributor outcome.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="method" data-cat-section="checking evidence">
+        <div class="wrap section-grid">
+          <aside class="rail" data-rail><strong>04</strong><span>the trace</span></aside>
+          <div>
+            <h2 data-reveal>The model can write the report. It cannot choose the verdict.</h2>
+            <p class="section-intro" data-reveal>
+              Holt turns repository history into typed findings, verifies every evidence ID, then
+              hands the surviving facts to a plain deterministic function. Verification only removes
+              unsupported claims; narration cannot change the answer.
+            </p>
+            <div class="trace" aria-label="Holt assessment pipeline">
+              <div class="trace__cursor" aria-hidden="true"></div>
+              <div class="trace-row" data-trace-row><span class="trace-row__index">A</span><span class="trace-row__name">classify</span><span class="trace-row__copy">what kind of repository is this?</span><span class="trace-row__owner">model</span></div>
+              <div class="trace-row" data-trace-row><span class="trace-row__index">B</span><span class="trace-row__name">opportunity</span><span class="trace-row__copy">is there a real route for outsider work?</span><span class="trace-row__owner">model</span></div>
+              <div class="trace-row" data-trace-row><span class="trace-row__index">C</span><span class="trace-row__name">outcomes</span><span class="trace-row__copy">what happened to people who tried?</span><span class="trace-row__owner">model</span></div>
+              <div class="trace-row" data-trace-row><span class="trace-row__index">D</span><span class="trace-row__name">verify</span><span class="trace-row__copy">resolve citations; drop what does not resolve</span><span class="trace-row__owner trace-row__owner--fixed">no model</span></div>
+              <div class="trace-row trace-row--decision" data-trace-row><span class="trace-row__index">→</span><span class="trace-row__name">verdict.py</span><span class="trace-row__copy">one written rule over verified evidence</span><span class="trace-row__owner trace-row__owner--fixed">no model</span></div>
+              <div class="trace-row" data-trace-row><span class="trace-row__index">E</span><span class="trace-row__name">narrate</span><span class="trace-row__copy">explain an answer it cannot override</span><span class="trace-row__owner">model</span></div>
+            </div>
+            <p class="trace-foot" data-reveal><strong>median input:</strong> 642 evidence records across 200 pull-request conversations.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section proof" id="proof" data-cat-section="verdict stable">
+        <div class="wrap section-grid">
+          <aside class="rail" data-rail><strong>05</strong><span>the proof</span></aside>
+          <div>
+            <h2 data-reveal>Measured against what happened after the cutoff.</h2>
+            <p class="section-intro" data-reveal>
+              The second pool was drawn, labelled, and held out after every rule was written. The
+              result below is Matthews correlation on that out-of-sample pool—not an anecdote and not
+              a demo repository chosen after the fact.
+            </p>
+            <div class="scores" aria-label="Out-of-sample Matthews correlation comparison">
+              <div class="score" data-score="0.21"><span class="score__label">README + metadata prompt</span><div class="score__track"><div class="score__fill"></div></div><span class="score__value">0.21</span></div>
+              <div class="score" data-score="0.32"><span class="score__label">same evidence, one prompt</span><div class="score__track"><div class="score__fill"></div></div><span class="score__value">0.32</span></div>
+              <div class="score score--holt" data-score="0.63"><span class="score__label">Holt</span><div class="score__track"><div class="score__fill"></div></div><span class="score__value">0.63</span></div>
+            </div>
+            <div class="measurements">
+              <div class="measure" data-measure><strong><span data-count="55">55</span> / 55</strong><span>verdicts stable across three runs</span></div>
+              <div class="measure" data-measure><strong>read-only</strong><span>never writes to GitHub</span></div>
+              <div class="measure" data-measure><strong>every claim</strong><span>carries a resolvable evidence ID</span></div>
+            </div>
+            <p class="proof__link" data-reveal><a class="text-link" href="https://github.com/holt-oss/holt/blob/main/REPRODUCTION.md">[ reproduce the result → ]</a></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section opensource" id="contribute" data-cat-section="open source">
+        <div class="opensource__signal" aria-hidden="true">OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE /</div>
+        <div class="wrap section-grid">
+          <aside class="rail" data-rail><strong>06</strong><span>open source</span></aside>
+          <div>
+            <h2 data-reveal>The workflow won an award. The project should outgrow the submission.</h2>
+            <p class="section-intro" data-reveal>
+              Holt is becoming a community project under the holt-oss organization. Help improve
+              evidence providers, evaluation, terminal UX, documentation, or the rules that decide
+              when a contributor’s week has a real chance of landing.
+            </p>
+            <div class="contribute-line" data-reveal>
+              <a class="bracket-link" href="https://github.com/holt-oss/holt/blob/main/CONTRIBUTING.md">[ start contributing → ]</a>
+              <a class="text-link" href="mailto:aahilminookhan@gmail.com">aahilminookhan@gmail.com</a>
+              <span class="license">Apache-2.0</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap footer__inner">
+        <span>(=^•ω•^=) procedure over persuasion.</span>
+        <span><a href="https://github.com/holt-oss">holt-oss</a> / 2026</span>
+      </div>
+    </footer>
+  </body>
+</html>
