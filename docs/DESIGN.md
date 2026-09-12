@@ -198,6 +198,7 @@ is the one that looks worst:
 | `tests/` | 4,696 | |
 | `eval/` — harnesses, labels, baselines, statistics | 2,409 | |
 
-The interface remains severable from the analysis engine: Textual is optional,
-the TUI is imported lazily, and non-interface commands work without it. The CLI
-and TUI call the same pipeline and render the same underlying assessment.
+The interface remains severable from the analysis engine: Textual ships in the
+default product install because bare `holt` opens the TUI, but it is imported
+lazily and non-interface code does not depend on it. The CLI and TUI call the
+same pipeline and render the same underlying assessment.

@@ -1,8 +1,8 @@
 # Holt
 
 [![CI](https://github.com/holt-oss/holt/actions/workflows/ci.yml/badge.svg)](https://github.com/holt-oss/holt/actions/workflows/ci.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-83a9ff.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-69c7a6.svg)](pyproject.toml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-83a9ff.svg)](https://github.com/holt-oss/holt/blob/main/LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-69c7a6.svg)](https://github.com/holt-oss/holt/blob/main/pyproject.toml)
 
 **Choose an open-source repository that is worth your time.**
 
@@ -24,11 +24,11 @@ review, or comment that supports it.
 
 ## Install
 
-Holt is pre-1.0 and currently installs directly from GitHub. You need
-[`uv`](https://docs.astral.sh/uv/) and Python 3.11 or newer.
+Holt is pre-1.0. You need [`uv`](https://docs.astral.sh/uv/) and Python 3.11 or
+newer.
 
 ```sh
-uv tool install --with textual git+https://github.com/holt-oss/holt.git
+uv tool install holt-cli
 ```
 
 Create a classic GitHub token with no scopes and expose it to Holt:
@@ -98,8 +98,10 @@ making a significant commitment.
 | `holt models` | Inspect or change the model provider. |
 | `holt tui` | Open the interactive terminal interface. |
 
-See [USAGE.md](USAGE.md) for the complete workflow and
-[docs/COMMANDS.md](docs/COMMANDS.md) for command details.
+See [USAGE.md](https://github.com/holt-oss/holt/blob/main/USAGE.md) for the
+complete workflow and
+[docs/COMMANDS.md](https://github.com/holt-oss/holt/blob/main/docs/COMMANDS.md)
+for command details.
 
 ## How it works
 
@@ -123,7 +125,7 @@ the verdict. Unsupported findings are removed before the decision is computed.
 The same verified inputs therefore produce the same verdict.
 
 The architecture and its boundaries are documented in
-[docs/DESIGN.md](docs/DESIGN.md).
+[docs/DESIGN.md](https://github.com/holt-oss/holt/blob/main/docs/DESIGN.md).
 
 ## Evaluation and limitations
 
@@ -138,9 +140,9 @@ periods can look worse than they are, and no benchmark captures whether a
 particular issue matches your skills. Holt is designed to show its work so you
 can disagree with it intelligently.
 
-- [Evaluation design and limitations](docs/EVALUATION.md)
-- [Reproduce the published results](REPRODUCTION.md)
-- [Recorded example analyses](trajectories/README.md)
+- [Evaluation design and limitations](https://github.com/holt-oss/holt/blob/main/docs/EVALUATION.md)
+- [Reproduce the published results](https://github.com/holt-oss/holt/blob/main/REPRODUCTION.md)
+- [Recorded example analyses](https://github.com/holt-oss/holt/blob/main/trajectories/README.md)
 
 ## Contributing
 
@@ -150,14 +152,17 @@ terminal UX, documentation, evaluation, and platform support.
 ```sh
 git clone https://github.com/holt-oss/holt.git
 cd holt
-uv sync --extra tui
+uv sync
 uv run pytest -rs
 ```
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Community
-participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md), and
-security reports follow [SECURITY.md](SECURITY.md).
+Read [CONTRIBUTING.md](https://github.com/holt-oss/holt/blob/main/CONTRIBUTING.md)
+before opening a pull request. Community participation is governed by the
+[Code of Conduct](https://github.com/holt-oss/holt/blob/main/CODE_OF_CONDUCT.md),
+and security reports follow
+[SECURITY.md](https://github.com/holt-oss/holt/blob/main/SECURITY.md).
 
 ## License
 
-Holt is licensed under the [Apache License 2.0](LICENSE).
+Holt is licensed under the
+[Apache License 2.0](https://github.com/holt-oss/holt/blob/main/LICENSE).

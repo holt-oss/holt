@@ -199,10 +199,8 @@ def test_a_chosen_model_does_not_break_a_replay(monkeypatch, tmp_path):
 def test_reproduction_promises_the_real_test_count():
     """`128 passed` sat on the page while the suite was elsewhere entirely.
 
-    The guide documents two setups -- a plain `uv sync`, which leaves the
-    optional TUI extra out, and `uv sync --extra tui`, which does not -- so it
-    states two counts. Whichever environment this runs in, the count in front of
-    the reader has to be one of them.
+    The default install includes the product's terminal interface, so the guide
+    states one complete count. The number in front of the reader must match it.
     """
     promised = [int(n) for n in re.findall(r"`(\d+) passed", REPRODUCTION.read_text())]
     assert promised, "REPRODUCTION.md no longer states an expected test count"

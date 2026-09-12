@@ -19,7 +19,7 @@ PYTHONPATH=. uv run holt analyze NixOS/nixpkgs --replay
 | `holt next <repo> --as <login>` | rank open issues for someone who has landed work | 0 |
 | `holt profile` | say once what you want to work on; `discover` reads it | 0 |
 | `holt models` | choose a provider for the *product* (never for a reported number) | 0 |
-| `holt tui` | the terminal interface; needs the optional `tui` extra | as above |
+| `holt tui` | open the terminal interface | as above |
 
 Flags worth knowing on `analyze`: `--days N` (how many days you actually have —
 everything time-shaped scales from it, and re-running with a different budget

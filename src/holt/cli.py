@@ -184,9 +184,9 @@ def cmd_compare(args: argparse.Namespace) -> int:
 def cmd_tui(args: argparse.Namespace) -> int:
     """Open the terminal interface.
 
-    Textual is imported here and nowhere else, so a checkout installed with a
-    plain `uv sync` — the one the eval harness runs on — never imports it and
-    never needs it. Every other command works identically without the extra.
+    Textual is imported here and nowhere else. It ships in the default product
+    install because bare `holt` opens this interface, while the lazy boundary
+    keeps non-interface commands independent from UI startup.
 
     The interface runs the same `pipeline.analyze` the CLI runs. It is a way of
     watching a stage, never the only way of running one.
@@ -197,9 +197,8 @@ def cmd_tui(args: argparse.Namespace) -> int:
         from holt.tui.session import RunOptions, missing_credentials
     except ImportError as exc:
         print(
-            f"The terminal interface needs the optional 'tui' extra ({exc}).\n"
-            "  uv sync --extra tui\n"
-            "Every other command, and the whole eval harness, works without it.",
+            f"The terminal interface dependency is unavailable ({exc}).\n"
+            "Reinstall Holt with: uv tool install --force holt-cli",
             file=sys.stderr,
         )
         return 2
@@ -552,8 +551,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tui = sub.add_parser(
         "tui",
-        help="open the terminal interface; also what bare `holt` does "
-             "(needs the 'tui' extra)",
+        help="open the terminal interface; also what bare `holt` does",
     )
     tui.add_argument(
         "repo",

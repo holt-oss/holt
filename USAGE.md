@@ -12,15 +12,14 @@ you are reproducing the evaluation or checking benchmark numbers, use
 
 ## Install
 
-Holt is pre-1.0 and currently installs directly from GitHub:
+Install Holt from PyPI:
 
 ```sh
-uv tool install --with textual git+https://github.com/holt-oss/holt.git
+uv tool install holt-cli
 ```
 
-[`uv`](https://docs.astral.sh/uv/) installs the right Python for you. The
-`textual` dependency enables the terminal interface; all commands also work
-without opening it.
+[`uv`](https://docs.astral.sh/uv/) installs the right Python and keeps Holt in
+an isolated environment. The `holt` command includes the terminal interface.
 
 ## Ask about a repository
 

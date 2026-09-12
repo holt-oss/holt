@@ -8,6 +8,8 @@ versioning once releases are published.
 ### Changed
 
 - Reframed the repository and website around the first-time user journey.
+- Prepared `holt-cli` for versioned installation from PyPI, with the terminal
+  interface included in the default product install.
 - Moved detailed benchmark reporting out of the README and into the evaluation
   documentation.
 - Removed challenge submission files and superseded internal design artifacts.

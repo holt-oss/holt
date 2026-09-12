@@ -1,8 +1,8 @@
 """The screens, driven headlessly against a scripted run.
 
-Skipped entirely when Textual is absent, which is the point of it being an
-optional extra: a checkout that ran a plain `uv sync` runs the rest of the suite
-and reports these as skipped rather than failing. Confirm with `pytest -rs`.
+Textual is a product dependency because bare `holt` opens this interface. A
+plain `uv sync` therefore runs these tests rather than silently omitting the
+primary user experience.
 
 No engine. The events and the `Assessment` come from `tests/fake_run.py`, so a
 prompt change in `holt.agent` cannot break a test about layout or wording. The
@@ -22,8 +22,6 @@ import os
 from pathlib import Path
 
 import pytest
-
-pytest.importorskip("textual", reason="the TUI is an optional extra")
 
 os.environ.setdefault("HOLT_TUI_NO_ANIMATION", "1")
 

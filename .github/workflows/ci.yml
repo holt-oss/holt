@@ -14,10 +14,10 @@ jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10
 
       - name: Build distributions
         run: uv build
@@ -25,35 +25,20 @@ jobs:
       - name: Check distribution contents
         run: uv run --no-project python scripts/check_dist.py dist
 
+      - name: Install and smoke-test the wheel
+        run: |
+          uv venv .release-venv
+          uv pip install --python .release-venv/bin/python dist/*.whl
+          .release-venv/bin/python -c "import holt.tui.app"
+          .release-venv/bin/holt --help
+
   tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      # The extra is installed deliberately: it is the setup REPRODUCTION.md
-      # promises `no skips` for. The plain-sync path is the job below, which
-      # is the one a reader runs first.
-      - name: Install
-        run: uv sync --extra tui
-
-      - name: Tests
-        run: uv run pytest -rs
-
-  # A reader who runs `uv sync` and nothing else must still get a working tool.
-  # This job never installs the TUI extra, so an import of Textual that escapes
-  # into a non-TUI path fails here rather than on their machine.
-  without-the-optional-extra:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
 
@@ -63,9 +48,9 @@ jobs:
       - name: Tests
         run: uv run pytest -rs
 
-      # The two commands the README puts in front of the reader, run the way the
-      # reader runs them. Both must work from committed evidence with no key.
-      - name: The README's headline commands
+      # The no-key paths remain part of the product contract even though PyPI
+      # installs are aimed at live use.
+      - name: No-key smoke tests
         run: |
           PYTHONPATH=. uv run holt analyze NixOS/nixpkgs --replay
           PYTHONPATH=. uv run python eval/harness.py --replay --run-tag run1

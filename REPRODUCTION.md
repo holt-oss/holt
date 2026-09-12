@@ -41,20 +41,10 @@ uv sync
 uv run pytest -rs
 ```
 
-**Expected after a plain `uv sync`:** `296 passed`, `1 skipped`. The skip is the
-terminal-interface suite, and it is honest rather than incidental: `tui` is an
-optional extra precisely so that every reproduction command works on a machine
-that has never installed Textual. To run the interface tests too:
-
-```sh
-uv sync --extra tui
-uv run pytest -rs
-```
-
-**Expected:** `388 passed`, no skips. **Runtime:** about two minutes either way.
+**Expected:** `388 passed`, no skips. **Runtime:** about two minutes.
 
 The `-rs` flag reports skipped tests explicitly — a skipped test is not a
-passing one, which is why the count above says which one it is.
+passing one.
 
 Three of these are load-bearing rather than incidental: `eval/test_independence.py`
 reads the import graph and fails if any label module imports the agent,
