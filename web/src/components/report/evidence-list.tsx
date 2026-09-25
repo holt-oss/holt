@@ -14,7 +14,7 @@ function Item({ e }: { e: EvidenceItem }) {
         href={e.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex min-h-8 items-center self-start text-[0.8rem] text-blue hover:underline"
+        className="inline-flex min-h-11 items-center self-start text-[0.8rem] text-blue hover:underline"
       >
         {evidenceRef(e.url)} <span aria-hidden="true">&nbsp;↗</span>
         <span className="sr-only"> on GitHub</span>

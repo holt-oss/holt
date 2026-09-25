@@ -23,7 +23,7 @@ export async function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-header">
       <div className="wrap flex min-h-[60px] items-center gap-4">
-        <Link href="/" className="mr-auto inline-flex items-center gap-3">
+        <Link href="/" className="mr-auto inline-flex min-h-11 items-center gap-3">
           <CatFace className="text-[1.05rem]" />
           <span className="text-[0.95rem] font-semibold tracking-tight">holt<span className="sr-only"> home</span></span>
         </Link>

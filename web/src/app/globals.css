@@ -375,18 +375,21 @@
   .award-badge {
     display: inline-flex;
     align-items: stretch;
+    max-width: 100%;
     overflow: hidden;
     border: 1px solid color-mix(in oklab, var(--orange) 55%, transparent);
     border-radius: 3px;
     font-size: 0.68rem;
-    line-height: 1;
+    line-height: 1.25;
+  }
+  .award-badge > span:first-child {
     white-space: nowrap;
   }
   .award-badge > span {
     display: inline-flex;
     align-items: center;
     min-height: 25px;
-    padding-inline: 9px;
+    padding: 3px 9px;
   }
   .award-badge > span:first-child {
     color: var(--on-accent);
@@ -552,4 +555,22 @@
    layered ones, so the pill's own `inline-flex` utility can't override it. */
 :root[data-hf-dismissed] .hf-pill {
   display: none;
+}
+
+/* Scroll-driven slide for the OPEN / SOURCE band (see scroll-marquee.tsx).
+   Only when the component opted in, so other engines never overlap. */
+@keyframes marquee-slide {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-18%, 0, 0);
+  }
+}
+@supports (animation-timeline: view()) {
+  .marquee[data-engine="css"] {
+    animation: marquee-slide linear both;
+    animation-timeline: view();
+    animation-range: entry 0% exit 100%;
+  }
 }

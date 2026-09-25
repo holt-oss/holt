@@ -10,8 +10,8 @@ export function CompareShell({ repo, removeHref, children }: { repo: string; rem
       <div className="flex items-center gap-3 border-b border-line p-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`https://github.com/${repo.split("/")[0]}.png?size=64`} alt="" width={28} height={28} className="size-7 rounded border border-line-strong bg-panel-2" />
-        <Link href={`/${repo}`} className="min-w-0 flex-1 truncate text-[0.92rem] font-semibold hover:text-blue">{repo}</Link>
-        <Link href={removeHref} className="grid size-9 place-items-center text-faint hover:text-orange" aria-label={`Remove ${repo} from comparison`}>✕</Link>
+        <Link href={`/${repo}`} className="flex min-h-11 min-w-0 flex-1 items-center truncate text-[0.92rem] font-semibold hover:text-blue">{repo}</Link>
+        <Link href={removeHref} className="grid size-11 place-items-center text-faint hover:text-orange" aria-label={`Remove ${repo} from comparison`}>✕</Link>
       </div>
       <div className="flex-1">{children}</div>
     </li>

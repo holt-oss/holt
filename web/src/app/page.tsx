@@ -4,6 +4,7 @@ import { CatFace } from "@/components/cat-face";
 import { CopyButton } from "@/components/copy-button";
 import { HacktoberfestPill } from "@/components/hacktoberfest-pill";
 import { CatCompanion } from "@/components/motion/cat-companion";
+import { ScrollMarquee } from "@/components/motion/scroll-marquee";
 import { PasteBox } from "@/components/paste-box";
 import { UrlTrick } from "@/components/url-trick";
 import { ExampleSample, LiveSample } from "@/components/sample-report";
@@ -19,7 +20,7 @@ function Rail({ n, label, className = "" }: { n: string; label: string; classNam
 }
 
 function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="wrap grid gap-6 md:grid-cols-[148px_minmax(0,1fr)] md:gap-10">{children}</div>;
+  return <div className="wrap grid grid-cols-1 gap-6 md:grid-cols-[148px_minmax(0,1fr)] md:gap-10">{children}</div>;
 }
 
 export default function Home() {
@@ -37,7 +38,7 @@ export default function Home() {
               {hf && <HacktoberfestPill year={hf.year} short={hf.short} />}
               <p className="text-[0.78rem] text-muted">holt / free / for first-time contributors</p>
             </div>
-            <h1 className="display mb-5 text-[clamp(1.95rem,8.2vw,3.15rem)]">
+            <h1 className="display mb-5 text-[clamp(2rem,8.9vw,3.15rem)]">
               <span className="headline-line"><span>Find an open-source</span></span>
               <span className="headline-line"><span>project that will</span></span>
               <span className="headline-line"><span className="text-orange"><span className="marker">actually merge</span> your first PR.</span></span>
@@ -67,7 +68,7 @@ export default function Home() {
       </section>
 
       {/* 02 — see the answer */}
-      <section data-cat-section="startled" className="py-20 md:py-28">
+      <section data-cat-section="startled" className="py-14 md:py-28">
         <Grid>
           <Rail n="02" label="see the answer" />
           <div>
@@ -85,7 +86,7 @@ export default function Home() {
       </section>
 
       {/* 03 — the URL trick */}
-      <section data-cat-section="determined" className="border-t border-line bg-section-alt py-20 md:py-28">
+      <section data-cat-section="determined" className="border-t border-line bg-section-alt py-14 md:py-28">
         <Grid>
           <Rail n="03" label="the url trick" />
           <div>
@@ -100,7 +101,7 @@ export default function Home() {
       </section>
 
       {/* 04 — what it checks */}
-      <section data-cat-section="heartbroken" className="border-t border-line py-20 md:py-28">
+      <section data-cat-section="heartbroken" className="border-t border-line py-14 md:py-28">
         <Grid>
           <Rail n="04" label="what it checks" />
           <div>
@@ -115,7 +116,7 @@ export default function Home() {
                 { id: "PR / 4821", quote: "Thanks for this! Merged. Could you also look at the sibling case?", verdict: "→ there's a way in", tone: "text-green", bar: "bg-green" },
                 { id: "PR / 917", quote: "We're rewriting this module internally, closing.", verdict: "→ don't spend the week", tone: "text-orange", bar: "bg-orange" },
               ].map((t) => (
-                <article key={t.id} className="relative grid gap-2 border-b border-line py-7 md:grid-cols-[110px_minmax(0,1fr)_200px] md:gap-6" data-reveal>
+                <article key={t.id} className="relative grid grid-cols-1 gap-2 border-b border-line py-7 md:grid-cols-[110px_minmax(0,1fr)_200px] md:gap-6" data-reveal>
                   <span aria-hidden="true" className={`absolute -left-3 inset-y-0 w-0.5 md:-left-5 ${t.bar}`} />
                   <div className="text-[0.74rem] text-faint">{t.id}</div>
                   <blockquote className="m-0 font-sans text-[1.06rem] text-ink">“{t.quote}”</blockquote>
@@ -131,7 +132,7 @@ export default function Home() {
       </section>
 
       {/* 05 — three answers */}
-      <section data-cat-section="celebrating" className="border-t border-line bg-section-alt py-20 md:py-28">
+      <section data-cat-section="celebrating" className="border-t border-line bg-section-alt py-14 md:py-28">
         <Grid>
           <Rail n="05" label="three answers" />
           <div>
@@ -159,13 +160,8 @@ export default function Home() {
       </section>
 
       {/* 06 — open source */}
-      <section data-cat-section="adoring" className="relative overflow-hidden border-t border-line bg-panel py-20 md:py-28">
-        {/* Decorative marquee as generated content, so it isn't read or contrast-checked as text. */}
-        <div
-          aria-hidden="true"
-          data-text="OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE /"
-          className="pointer-events-none absolute left-0 top-5 whitespace-nowrap text-[clamp(2.6rem,7vw,7rem)] font-bold leading-none tracking-[-0.06em] text-blue opacity-[0.09] before:content-[attr(data-text)]"
-        />
+      <section data-cat-section="adoring" className="relative overflow-clip border-t border-line bg-panel py-14 md:py-28">
+        <ScrollMarquee text="OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE /" />
         <div className="relative">
           <Grid>
             <Rail n="06" label="open source" />
@@ -177,12 +173,12 @@ export default function Home() {
               </p>
               <div className="grid max-w-[760px] grid-cols-[auto_1fr_auto] items-center border border-line-strong bg-bg" data-reveal>
                 <span aria-hidden="true" className="pl-4 text-amber">$</span>
-                <code className="overflow-x-auto whitespace-nowrap px-3 py-4 text-[0.9rem]">uv tool install holt-cli</code>
+                <code className="min-w-0 overflow-x-auto whitespace-nowrap px-3 py-4 text-[0.9rem]">uv tool install holt-cli</code>
                 <CopyButton text="uv tool install holt-cli" className="self-stretch border-l border-line-strong px-4 text-[0.85rem] text-muted transition-colors hover:bg-green hover:text-on-accent" />
               </div>
               <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-4" data-reveal>
                 <a className="bracket-link" href={`${GITHUB_REPO_URL}/blob/main/CONTRIBUTING.md`}>[ start contributing → ]</a>
-                <a className="text-link text-[0.85rem]" href={GITHUB_REPO_URL}>[ view source ]</a>
+                <a className="text-link inline-flex min-h-11 items-center text-[0.85rem]" href={GITHUB_REPO_URL}>[ view source ]</a>
                 <span className="text-[0.75rem] text-faint">Apache-2.0</span>
               </div>
             </div>

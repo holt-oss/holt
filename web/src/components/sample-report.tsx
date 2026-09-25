@@ -130,7 +130,7 @@ function SampleFigure({ sample }: { sample: Sample }) {
         <span>
           <em className="not-italic text-muted">Fig. 01</em> — {sample.caption}
         </span>
-        <Link href={`/${sample.repo}`} className="text-green hover:underline">
+        <Link href={`/${sample.repo}`} className="inline-flex min-h-11 items-center text-green hover:underline sm:min-h-0">
           {sample.caption === "an example report" ? "see the live report →" : "open the full report →"}
         </Link>
       </figcaption>

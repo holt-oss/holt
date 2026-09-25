@@ -99,8 +99,8 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
       </section>
 
       <div className="wrap py-10 sm:py-12">
-        <nav aria-label="Language" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <ul className="flex w-max gap-2 sm:w-auto sm:flex-wrap">
+        <nav aria-label="Language">
+          <ul className="flex flex-wrap gap-2">
             {LANGS.map((l) => (
               <li key={l.id}>
                 <Link
@@ -129,7 +129,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
       </div>
 
       <section aria-labelledby="how" className="border-t border-line bg-panel py-14 sm:py-20">
-        <div className="wrap grid gap-12 lg:grid-cols-2">
+        <div className="wrap grid grid-cols-1 gap-12 lg:grid-cols-2">
           <div>
             <h2 id="how" className="h2">How Hacktoberfest works</h2>
             <ol className="mt-8 space-y-6">

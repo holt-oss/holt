@@ -102,11 +102,11 @@ export default async function RepoPage({ params, searchParams }: Props) {
           className="size-10 rounded-md border border-line-strong bg-panel-2"
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[1.05rem] font-semibold tracking-tight sm:text-[1.25rem]">
+          <p className="text-[1.05rem] font-semibold tracking-tight [overflow-wrap:anywhere] sm:text-[1.25rem]">
             <span className="text-muted">{dOwner}/</span>
             {dRepo}
           </p>
-          <a href={`https://github.com/${display}`} target="_blank" rel="noopener noreferrer" className="block truncate text-[0.75rem] text-faint hover:text-blue">
+          <a href={`https://github.com/${display}`} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center truncate text-[0.75rem] text-faint hover:text-blue sm:block sm:min-h-0">
             github.com/{display} ↗
           </a>
         </div>
@@ -116,7 +116,7 @@ export default async function RepoPage({ params, searchParams }: Props) {
             href={`/${display}`}
             prefetch={false}
             aria-current={mode === "rules" ? "page" : undefined}
-            className={`px-3 py-2 ${mode === "rules" ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
+            className={`inline-flex min-h-11 items-center justify-center px-3 ${mode === "rules" ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
           >
             free report
           </Link>
@@ -124,7 +124,7 @@ export default async function RepoPage({ params, searchParams }: Props) {
             href={signedIn ? `/${display}?mode=ai` : `/signin?callbackUrl=${encodeURIComponent(`/${display}?mode=ai`)}`}
             prefetch={false}
             aria-current={mode === "ai" ? "page" : undefined}
-            className={`px-3 py-2 ${mode === "ai" ? "bg-blue text-on-accent" : "text-muted hover:text-ink"}`}
+            className={`inline-flex min-h-11 items-center justify-center px-3 ${mode === "ai" ? "bg-blue text-on-accent" : "text-muted hover:text-ink"}`}
           >
             AI report ✦
           </Link>

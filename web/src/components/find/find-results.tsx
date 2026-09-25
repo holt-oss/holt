@@ -29,7 +29,7 @@ export function FindResults({ results, days }: { results: FindResult[]; days: nu
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`https://github.com/${r.repo.split("/")[0]}.png?size=80`} alt="" width={40} height={40} loading="lazy" className="size-10 rounded-md border border-line-strong bg-panel-2" />
               <div className="min-w-0 flex-1">
-                <h2 className="text-[1.15rem] font-semibold tracking-tight">
+                <h2 className="text-[1.15rem] font-semibold tracking-tight [overflow-wrap:anywhere]">
                   <Link href={`/${r.repo}${days !== 7 ? `?days=${days}` : ""}`} className="hover:text-blue">
                     <span className="text-muted">{r.repo.split("/")[0]}/</span>
                     {r.repo.split("/")[1]}
