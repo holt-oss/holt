@@ -65,13 +65,50 @@ export const VERDICT_HEADLINE: Record<Verdict, string> = {
   insufficient_evidence: "Not enough evidence",
 };
 
-/** One sentence under the headline, for beginners. */
+// Thresholds shared by the stat tiles and the "Your odds" hint, so they agree.
+export function mergeTone(mergedPct: number): Tone {
+  return mergedPct >= 12 ? "good" : mergedPct >= 5 ? "warn" : "bad";
+}
+export function noReplyTone(noReplyPct: number): Tone {
+  return noReplyPct <= 25 ? "good" : noReplyPct <= 50 ? "warn" : "bad";
+}
+
+export type Odds = "good" | "fair" | "long";
+
+/** A newcomer's chances here: the worse of merge rate and reply rate. */
+export function odds(s: Pick<Stats, "outsider_attempts" | "outsider_merged" | "no_reply">): Odds | null {
+  if (!s.outsider_attempts) return null;
+  const tones = [mergeTone(pct(s.outsider_merged, s.outsider_attempts)), noReplyTone(pct(s.no_reply, s.outsider_attempts))];
+  return tones.includes("bad") ? "long" : tones.includes("warn") ? "fair" : "good";
+}
+
+export const ODDS_TONE: Record<Odds, Tone> = { good: "good", fair: "warn", long: "bad" };
+
+/**
+ * One sentence under the headline, for beginners. The verdict comes from the
+ * rules; this sentence must not oversell it. "Worth your time" with a low
+ * merge rate or many ignored PRs says so plainly.
+ */
 export function verdictLine(r: Pick<Report, "verdict" | "stats">): string {
   const s = r.stats;
   const merged = `${s.outsider_merged} of ${s.outsider_attempts}`;
   switch (r.verdict) {
-    case "viable":
-      return `Outside contributors get real replies here, and ${merged} of their recent pull requests were merged.`;
+    case "viable": {
+      const rate = s.outsider_attempts ? s.outsider_merged / s.outsider_attempts : 0;
+      const silent = s.outsider_attempts ? s.no_reply / s.outsider_attempts : 0;
+      const lowMerge = rate < 0.1;
+      const manySilent = silent > 0.4;
+      if (lowMerge || manySilent) {
+        const buts = [
+          lowMerge ? "most pull requests don't land" : "",
+          manySilent ? `${silentPhrase(silent)} get no reply` : "",
+        ].filter(Boolean);
+        return `Newcomers do get merged here (${merged} recently), but ${buts.join(" and ")}, so start with one of the starter issues below.`;
+      }
+      return silent < 0.3
+        ? `Outside contributors get real replies here, and ${merged} of their recent pull requests were merged.`
+        : `Outside contributors get merged here: ${merged} of their recent pull requests landed.`;
+    }
     case "not_viable":
       return s.outsider_merged === 0
         ? `None of the last ${s.outsider_attempts} pull requests from outside contributors were merged.`
@@ -79,6 +116,13 @@ export function verdictLine(r: Pick<Report, "verdict" | "stats">): string {
     default:
       return `Too few outside contributors have tried recently for Holt to say either way.`;
   }
+}
+
+function silentPhrase(share: number): string {
+  if (share >= 0.45 && share <= 0.6) return "about half";
+  if (share > 0.6 && share < 0.72) return "about two in three";
+  if (share >= 0.72) return "most";
+  return `about ${Math.round(share * 100)}%`;
 }
 
 export interface StatLine {
@@ -98,7 +142,7 @@ export function statLines(s: Partial<Stats>): StatLine[] {
       key: "merged",
       big: `${s.outsider_merged} of ${s.outsider_attempts}`,
       label: `pull requests from outside contributors were merged (${p}%)`,
-      tone: p >= 12 ? "good" : p >= 5 ? "warn" : "bad",
+      tone: mergeTone(p),
       meter: s.outsider_attempts ? s.outsider_merged / s.outsider_attempts : 0,
     });
   }
@@ -125,7 +169,7 @@ export function statLines(s: Partial<Stats>): StatLine[] {
       key: "noreply",
       big: `${p}%`,
       label: `of outside pull requests never got a reply (${s.no_reply})`,
-      tone: p <= 25 ? "good" : p <= 50 ? "warn" : "bad",
+      tone: noReplyTone(p),
       meter: s.no_reply / s.outsider_attempts,
     });
   }
