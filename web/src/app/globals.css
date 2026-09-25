@@ -8,23 +8,33 @@
  * Every text colour below is >= 4.5:1 on --bg and --panel in its theme.
  */
 :root {
-  --bg: #f3f0e7;
-  --header: #ece8dd;
-  --panel: #faf8f2;
-  --panel-2: #e9e5d9;
+  --bg: #f2ecdf;
+  --header: #eae2d0;
+  --panel: #fbf7ee;
+  --panel-2: #e9e0cd;
   --ink: #1b1c1a;
-  --muted: #4f4f4a;
-  --faint: #66665f;
-  --line: #dcd7ca;
-  --line-strong: #c4bfb1;
+  --muted: #4c4a44;
+  --faint: #5f5d56;
+  --line: #ddd3bf;
+  --line-strong: #c6baa2;
   --blue: #2f5bd0;
   --blue-soft: #3d6be0;
   --green: #15755a;
   --orange: #b1470f;
   --amber: #875600;
   --on-accent: #ffffff;
-  --noise-opacity: 0.05;
-  --shadow: 0 1px 0 rgb(0 0 0 / 0.04), 0 12px 32px -18px rgb(60 50 20 / 0.35);
+  --noise-opacity: 0.07;
+  --shadow: 0 1px 2px rgb(70 50 20 / 0.08), 0 16px 36px -16px rgb(90 60 20 / 0.32);
+  --card-shadow: 0 1px 2px rgb(70 50 20 / 0.06), 0 10px 26px -18px rgb(90 60 20 / 0.28);
+  --section-alt: #ebe3d1;
+  --marker: rgb(238 146 93 / 0.3);
+  --dot: rgb(90 65 25 / 0.16);
+  --glow: rgb(238 146 93 / 0.2);
+  --glow-2: rgb(47 91 208 / 0.08);
+  /* Hacktoberfest: a seasonal violet, used only for the event. */
+  --hf: #6a3dd1;
+  --hf-bg: #ece3fb;
+  --hf-line: #c9b5f2;
   color-scheme: light;
 }
 
@@ -46,6 +56,15 @@
   --on-accent: #0d0e0e;
   --noise-opacity: 0.035;
   --shadow: 0 12px 30px rgb(0 0 0 / 0.24);
+  --card-shadow: none;
+  --section-alt: #101211;
+  --marker: rgb(238 146 93 / 0.16);
+  --dot: rgb(131 169 255 / 0.11);
+  --glow: rgb(131 169 255 / 0.1);
+  --glow-2: rgb(238 146 93 / 0.07);
+  --hf: #c6a8ff;
+  --hf-bg: #1c1628;
+  --hf-line: #4a3a6e;
   color-scheme: dark;
 }
 
@@ -68,6 +87,15 @@
     --amber: #ffb331;
     --on-accent: #0d0e0e;
     --noise-opacity: 0.035;
+    --card-shadow: none;
+    --section-alt: #101211;
+    --marker: rgb(238 146 93 / 0.16);
+    --dot: rgb(131 169 255 / 0.11);
+    --glow: rgb(131 169 255 / 0.1);
+    --glow-2: rgb(238 146 93 / 0.07);
+    --hf: #c6a8ff;
+    --hf-bg: #1c1628;
+    --hf-line: #4a3a6e;
     color-scheme: dark;
   }
 }
@@ -91,6 +119,10 @@
   --font-mono: var(--font-jetbrains), "SFMono-Regular", "Cascadia Code", "Liberation Mono", Consolas, monospace;
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --shadow-card: var(--shadow);
+  --color-section-alt: var(--section-alt);
+  --color-hf: var(--hf);
+  --color-hf-bg: var(--hf-bg);
+  --color-hf-line: var(--hf-line);
 }
 
 @layer base {
@@ -218,6 +250,54 @@
   .bracket-link:focus-visible {
     color: var(--on-accent);
     background: var(--green);
+  }
+
+  /* Orange outline: fills on hover with dark-on-orange text. */
+  .bracket-link--orange {
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+  .bracket-link--orange:hover,
+  .bracket-link--orange:focus-visible {
+    color: var(--on-accent);
+    background: var(--orange);
+  }
+
+  .panel {
+    box-shadow: var(--card-shadow);
+  }
+
+  /* Highlighter stroke behind a phrase. */
+  .marker {
+    background: linear-gradient(transparent 62%, var(--marker) 62%, var(--marker) 92%, transparent 92%);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  /* Hero backdrop: a faint dot grid fading out, and a soft glow. Static
+     gradients only, so it's cheap to paint on phones too. */
+  .hero-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(640px 320px at 78% 8%, var(--glow), transparent 70%),
+      radial-gradient(520px 280px at 8% 92%, var(--glow-2), transparent 70%);
+  }
+  .hero-backdrop::before {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(var(--dot) 1px, transparent 1.3px);
+    background-size: 22px 22px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 80% at 60% 30%, #000 20%, transparent 75%);
+    mask-image: radial-gradient(ellipse 70% 80% at 60% 30%, #000 20%, transparent 75%);
+    content: "";
+  }
+
+  /* Hacktoberfest pill: hidden once dismissed (set before paint by the head script). */
+  :root[data-hf-dismissed] .hf-pill {
+    display: none;
   }
 
   .btn-primary {

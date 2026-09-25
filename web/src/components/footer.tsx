@@ -16,7 +16,6 @@ export function Footer() {
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-1 sm:text-right">
           <Link href="/find" className="py-1 hover:text-ink">find a project</Link>
-          <Link href="/hacktoberfest" className="py-1 hover:text-ink">hacktoberfest</Link>
           <Link href="/how-it-works" className="py-1 hover:text-ink">how it works</Link>
           <Link href="/pricing" className="py-1 hover:text-ink">pricing</Link>
           <a href={`${GITHUB_REPO_URL}/blob/main/USAGE.md`} className="py-1 hover:text-ink">the CLI</a>

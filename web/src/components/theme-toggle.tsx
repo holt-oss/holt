@@ -3,9 +3,11 @@
 import { useEffect } from "react";
 
 const KEY = "holt-theme";
+/** Set when the visitor closes the Hacktoberfest pill (per year). */
+export const HF_KEY = `holt-hf-${new Date().getUTCFullYear()}-dismissed`;
 
 /** Runs in <head> before paint so there is never a flash of the wrong theme. */
-export const themeScript = `(function(){try{var t=localStorage.getItem('${KEY}');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.dataset.theme=t}catch(e){}})()`;
+export const themeScript = `(function(){try{var d=document.documentElement,t=localStorage.getItem('${KEY}');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}d.dataset.theme=t;if(localStorage.getItem('${HF_KEY}'))d.dataset.hfDismissed='1'}catch(e){}})()`;
 
 export function ThemeToggle() {
   // Follow the system until the person picks a theme themselves.

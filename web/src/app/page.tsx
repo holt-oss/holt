@@ -2,12 +2,12 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { CatFace } from "@/components/cat-face";
 import { CopyButton } from "@/components/copy-button";
-import { HacktoberfestBanner } from "@/components/hacktoberfest-banner";
+import { HacktoberfestPill } from "@/components/hacktoberfest-pill";
 import { CatCompanion } from "@/components/motion/cat-companion";
 import { PasteBox } from "@/components/paste-box";
 import { UrlTrick } from "@/components/url-trick";
 import { ExampleSample, LiveSample } from "@/components/sample-report";
-import { GITHUB_REPO_URL } from "@/lib/site";
+import { GITHUB_REPO_URL, hacktoberfest } from "@/lib/site";
 
 function Rail({ n, label, className = "" }: { n: string; label: string; className?: string }) {
   return (
@@ -23,38 +23,39 @@ function Grid({ children }: { children: React.ReactNode }) {
 }
 
 export default function Home() {
+  const hf = hacktoberfest();
   return (
     <>
-      <HacktoberfestBanner />
-
       {/* 01 — start here */}
-      <section data-hero data-cat-section="ready" className="relative border-b border-line pb-14 pt-8 md:pb-20 md:pt-10">
+      <section data-hero data-cat-section="ready" className="relative overflow-hidden border-b border-line pb-12 pt-5 md:pb-16 md:pt-7">
+        <div aria-hidden="true" className="hero-backdrop" />
         <CatCompanion />
         <Grid>
-          <Rail n="01" label="start here" className="hidden pt-1 md:block" />
-          <div className="relative z-10 max-w-[880px]">
-            <p className="fade-up mb-6 text-[0.78rem] text-muted" style={{ ["--d" as string]: ".1s" }}>
-              holt / free / for first-time contributors
-            </p>
-            <h1 className="display mb-7 text-[clamp(2.05rem,8.6vw,4.25rem)]">
+          <Rail n="01" label="start here" className="relative hidden pt-2 md:block" />
+          <div className="relative z-10 max-w-[860px]">
+            <div className="fade-up mb-4 flex flex-wrap items-center gap-x-4 gap-y-2" style={{ ["--d" as string]: ".1s" }}>
+              {hf && <HacktoberfestPill year={hf.year} short={hf.short} />}
+              <p className="text-[0.78rem] text-muted">holt / free / for first-time contributors</p>
+            </div>
+            <h1 className="display mb-5 text-[clamp(1.95rem,8.2vw,3.5rem)]">
               <span className="headline-line"><span>Find an open-source</span></span>
               <span className="headline-line"><span>project that will</span></span>
-              <span className="headline-line"><span className="text-orange">actually merge your first PR.</span></span>
+              <span className="headline-line"><span className="text-orange"><span className="marker">actually merge</span> your first PR.</span></span>
             </h1>
-            <p className="prose-sans fade-up mb-8 max-w-[700px] text-[clamp(1.02rem,1.7vw,1.2rem)]" style={{ ["--d" as string]: ".3s" }}>
+            <p className="prose-sans fade-up mb-6 max-w-[680px] text-[clamp(1rem,1.45vw,1.12rem)]" style={{ ["--d" as string]: ".3s" }}>
               Paste any GitHub repo. Holt reads its recent pull requests and tells you, in plain English, whether
               newcomers get replies, get merged, and where your work has a real chance of landing.
             </p>
             <div className="fade-up max-w-[760px]" style={{ ["--d" as string]: ".38s" }}>
               <PasteBox />
             </div>
-            <div className="fade-up mt-8 flex flex-wrap items-center gap-x-5 gap-y-3" style={{ ["--d" as string]: ".45s" }}>
+            <div className="fade-up mt-5 flex flex-wrap items-center gap-x-5 gap-y-3" style={{ ["--d" as string]: ".45s" }}>
               <span className="font-sans text-[0.95rem] text-muted">No repo in mind yet?</span>
-              <Link href="/find" className="bracket-link min-h-12 border-orange px-5 text-[0.9rem] text-orange hover:bg-orange">
+              <Link href="/find" className="bracket-link bracket-link--orange min-h-12 px-5 text-[0.9rem]">
                 [ find my first contribution → ]
               </Link>
             </div>
-            <div className="fade-up mt-10 flex flex-wrap items-center gap-x-3 gap-y-2" style={{ ["--d" as string]: ".5s" }}>
+            <div className="fade-up mt-8 flex flex-wrap items-center gap-x-3 gap-y-2" style={{ ["--d" as string]: ".5s" }}>
               <span className="award-badge">
                 <span>micro1 winner</span>
                 <span>Most useful real-world workflow</span>
@@ -84,7 +85,7 @@ export default function Home() {
       </section>
 
       {/* 03 — the URL trick */}
-      <section data-cat-section="determined" className="border-t border-line py-20 md:py-28">
+      <section data-cat-section="determined" className="border-t border-line bg-section-alt py-20 md:py-28">
         <Grid>
           <Rail n="03" label="the url trick" />
           <div>
@@ -130,7 +131,7 @@ export default function Home() {
       </section>
 
       {/* 05 — three answers */}
-      <section data-cat-section="celebrating" className="border-t border-line py-20 md:py-28">
+      <section data-cat-section="celebrating" className="border-t border-line bg-section-alt py-20 md:py-28">
         <Grid>
           <Rail n="05" label="three answers" />
           <div>
