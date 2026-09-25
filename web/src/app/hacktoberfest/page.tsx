@@ -110,6 +110,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
                   className={`chip min-h-11 whitespace-nowrap px-4 text-[0.85rem] transition-colors ${l.id === tab.id ? "border-hf bg-hf text-bg" : "hover:border-hf hover:text-ink"}`}
                 >
                   {l.label}
+                  {l.id !== "all" && <span className="sr-only"> projects</span>}
                 </Link>
               </li>
             ))}
