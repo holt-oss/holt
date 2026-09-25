@@ -1,0 +1,3544 @@
+{
+ "as_of": "2026-09-25T18:18:21+00:00",
+ "calls": [
+  {
+   "key": "fe9278637198ac89",
+   "response": {
+    "data": {
+     "labelled": {
+      "nodes": [
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "## Description of proposed feature\n\nCurrently, the config is often accessed via\n```py\nconfig[\"some_attribute\"]\n```\n\nI think it would be better to replace all of these with\n```py\nconfig.some_attribute\n```\nas that preserves the attribute type and prevents typos.\n",
+        "closedByPullRequestsReferences": {
+         "nodes": [
+          {
+           "state": "OPEN"
+          }
+         ]
+        },
+        "comments": {
+         "totalCount": 1
+        },
+        "createdAt": "2026-09-25T14:52:31Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          },
+          {
+           "name": "easy"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 5032,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "Aayushsuthar"
+           },
+           "body": "I'd like to take this one. PR is up: #5033 (covers the manim/ package; happy to follow up on tests/docs separately).",
+           "createdAt": "2026-09-25T15:55:05Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          }
+         ]
+        },
+        "title": "Use `config.` instead of `config[\"...\"]` to preserve type",
+        "updatedAt": "2026-09-25T15:55:05Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/5032"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "The class `CurvesAsSubmobjects` throws two custom error messages for when it either has no submobjects or it has no submobjects with points:\nhttps://github.com/ManimCommunity/manim/blob/cafc63919eb03d398d7038a8c82e591b12de8da5/manim/mobject/types/vectorized_mobject.py#L2858-L2874\nThese error messages contain a hardcodes class name, causing issues if `CurvesAsSubmobjects` is subclassed. This should be fixed.\n\nThis implementation was originally a response to a hardcoded class name in the `throw_error_if_no_points` method of `Mobject`, but that has since been made dynamic (#4927) so this override",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 4
+        },
+        "createdAt": "2026-09-01T19:22:44Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 4983,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "nikolajmunk"
+           },
+           "body": "@behackl are the LLMs (including yours) not overcomplicating this? `Mobject` already handles the `throw_error_if_no_points` correctly as of #4927, so it seems like this issue can be solved by simply removing the special case. Or am I missing something?",
+           "createdAt": "2026-09-23T07:02:19Z"
+          },
+          {
+           "author": {
+            "login": "behackl"
+           },
+           "body": "No, it is quite likely it was a bit too late for me yesterday so that I missed that. I'll take another look in a few hours to clean this up. Thanks for the heads-up!",
+           "createdAt": "2026-09-23T07:16:05Z"
+          },
+          {
+           "author": {
+            "login": "nikolajmunk"
+           },
+           "body": "For the record, that was at least my intention with this issue at the beginning - my hope was that a new contributor would spot that `CurvesAsSubmobjects` is basically reimplementing the behavior of its superclass and that they would get to do a nice, clean, negative-LOC diff to boost their confidence \ud83d\ude04",
+           "createdAt": "2026-09-23T07:19:31Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          }
+         ]
+        },
+        "title": "`CurvesAsSubmobjects` error messages contain hardcoded class names",
+        "updatedAt": "2026-09-23T09:52:22Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/4983"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "## Description of proposed feature\nWarnings messages to the user should include the stack trace, so the user knows where it was caused from.\n\n```py\nlogger.warning(\n    \"Don't do ...\",\n    stack_info=True,\n    stacklevel=2,\n)\n```\n",
+        "closedByPullRequestsReferences": {
+         "nodes": [
+          {
+           "state": "OPEN"
+          }
+         ]
+        },
+        "comments": {
+         "totalCount": 5
+        },
+        "createdAt": "2026-09-01T16:04:42Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          },
+          {
+           "name": "new feature"
+          },
+          {
+           "name": "easy"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 4981,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "nikolajmunk"
+           },
+           "body": "IMO such stack traces should mostly occur when the action is performed in userland - if the library itself is doing something stupid, that should ideally be caught by tests.\n\nAlso @RRXXZZYY, I just wanted to mention: reading the phrasing of your comment and looking at your profile, it seems like you have a pretty AI-heavy work flow. If you are intending to submit a (mostly) AI-generated PR for this, could I perhaps suggest that you give someone else a chance to \"hand-build\" a solution first? This seems like a really really good issue for a first-time open source contributor so it would be nice",
+           "createdAt": "2026-09-01T16:58:11Z"
+          },
+          {
+           "author": {
+            "login": "RRXXZZYY"
+           },
+           "body": "That is fair. I use AI in my workflow, and I do not want to crowd out a first-time contributor here, so I will step back from this issue. Thanks for raising it.",
+           "createdAt": "2026-09-02T05:20:28Z"
+          },
+          {
+           "author": {
+            "login": "nikolajmunk"
+           },
+           "body": "Thanks @RRXXZZYY, I really appreciate it! Hope we see you again soon on another issue \ud83d\udc4d ",
+           "createdAt": "2026-09-02T05:23:41Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          }
+         ]
+        },
+        "title": "Add stack trace to warnings",
+        "updatedAt": "2026-09-02T05:23:41Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/4981"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "## Description of proposed feature\n<!-- Add a clear and concise description of the new feature, including a motivation: why do you think this will be useful? -->\n\n### My motivation\n\nHello, I want to be able to select the last object in a group as the target for alignment when using `Mobject.arrange()`, instead of the default first object.\n\nLike this:\n\nhttps://github.com/user-attachments/assets/abd9c835-6a4e-4182-be2c-b71372e7c2a9\n\n### Why\n\n`Mobject.arrange()` always uses the first object as the alignment target:\n\nhttps://github.com/ManimCommunity/manim/blob/2ab99b53d3e8f43b1cd7245208d78c5dd6f9",
+        "closedByPullRequestsReferences": {
+         "nodes": [
+          {
+           "state": "OPEN"
+          },
+          {
+           "state": "OPEN"
+          }
+         ]
+        },
+        "comments": {
+         "totalCount": 10
+        },
+        "createdAt": "2025-03-07T09:29:50Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          },
+          {
+           "name": "new feature"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 4183,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "rotempasharel1"
+           },
+           "body": "Updated the PR to use a `reference` parameter instead of `last`, and fixed the arrange iteration issue. The CI checks are now passing.\n",
+           "createdAt": "2026-04-26T19:20:21Z"
+          },
+          {
+           "author": {
+            "login": "nikolajmunk"
+           },
+           "body": "I think @behackl's suggestion of \"just remember the position of the `reference` mobject, arrange with respect to the first and then shift the arranged group such that the `reference` object is in its original position\" (adjusted here for arbitrary reference objects from the group) makes a lot of sense.\n\nBut it seems to me that having both the `reference` parameter and the `center` parameter causes issues. If we keep the default of `center=True`, then calling something like `group.arrange(RIGHT, reference=group[-1])` will lead to one of two results, depending on implementation:\n\n1. As is curren",
+           "createdAt": "2026-07-31T09:00:25Z"
+          },
+          {
+           "author": {
+            "login": "nikolajmunk"
+           },
+           "body": "On further reflection: Although this would be a highly breaking change to implement, you _could_ make the argument that it is very unusual for a mobject method to center the mobject after performing the actual change; we wouldn't accept this behavior for methods like `scale` or `rotate`, and AFAIK even `arrange_in_grid` only moves the arranged group back to its original center point, not to ORIGIN. It doesn't seem preposterous that the default behavior of `arrange` would be to keep the first element fixed in space.",
+           "createdAt": "2026-07-31T09:14:26Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          },
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          }
+         ]
+        },
+        "title": "Select the last object of the group as the alignment target when using `Mobject.arrange()`",
+        "updatedAt": "2026-07-31T09:14:26Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/4183"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "`pydub` is no longer actively maintained, and is now running into issues with `audioop` being removed in python 3.13. As such, we should try to remove it from our dependencies and implement the needed features ourselves.\r\n\r\nFrom a quick look through the code, the main features needed to implement are:\r\n\r\n- `AudioSegment.silent`\r\n- `AudioSegment.overlay`\r\n- `AudioSegment.from_file`\r\n\r\nhttps://github.com/ManimCommunity/manim/blob/ce1fff645d2b457919933c3f92cb6106fbb9b6a1/manim/scene/scene_file_writer.py#L330-L334\r\n\r\nhttps://github.com/ManimCommunity/manim/blob/ce1fff645d2b457919933c3f92cb6106fbb9",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 7
+        },
+        "createdAt": "2024-10-20T18:56:16Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "enhancement"
+          },
+          {
+           "name": "help wanted"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 3968,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "OliverStrait"
+           },
+           "body": "If dependency to external ffmpeg executable is dropped, this will be broken in that regard too. \r\nPyAv does not share it's ffmpeg through envPATH.",
+           "createdAt": "2024-10-29T23:45:47Z"
+          },
+          {
+           "author": {
+            "login": "behackl"
+           },
+           "body": "The cases where pydub would call ffmpeg via the executable should be taken care of by manual transcoding on our end. Did you find some situation where pyav actually tries to invoke ffmpeg on the current main branch?",
+           "createdAt": "2024-10-30T08:06:50Z"
+          },
+          {
+           "author": {
+            "login": "OliverStrait"
+           },
+           "body": "> The cases where pydub would call ffmpeg via the executable should be taken care of by manual transcoding on our end. Did you find some situation where pyav actually tries to invoke ffmpeg on the current main branch?\r\n\r\nI was pondering solution space and then remembered transition to Pyav. So solution space did shrink to that singular interface structures. (Personally I don't know nothing about pyav interfaces.)\r\n\r\nI was just refering subprocess calls to ffmpeg/libav inside of pydub-packet. As far I understand, those would fail when new user does not have external ffmpeg/libav executable and ",
+           "createdAt": "2024-10-31T12:59:47Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {}
+          },
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          }
+         ]
+        },
+        "title": "Remove `pydub` from dependencies",
+        "updatedAt": "2024-10-31T12:59:49Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/3968"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "Title, basically.\r\n\r\nI imagine one well-worded paragraph mentioning\r\n\r\n- that the library (both the original as well as the community edition) are MIT licensed,\r\n- that the code for Grant's videos (3b1b/videos) is open-source but copyrighted (in particular: Pi creatures are protected),\r\n- that videos created with Manim are allowed (and actually even _supposed_) to be shared online; no attribution of Manim is required (just much appreciated)\r\n\r\nwould do the job. Help coming up with a suitable wording is very welcome!",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 4
+        },
+        "createdAt": "2024-07-01T09:00:14Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "documentation"
+          },
+          {
+           "name": "good first issue"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 3833,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "behackl"
+           },
+           "body": "@riyasunil you are welcome to work on this, just send a PR; we don't really use issue assignments here. Let us know if you run into any problems!",
+           "createdAt": "2024-10-15T07:14:59Z"
+          },
+          {
+           "author": {
+            "login": "riyasunil"
+           },
+           "body": "alright thankyou ! \ud83d\ude0a",
+           "createdAt": "2024-10-15T23:35:40Z"
+          },
+          {
+           "author": {
+            "login": "Wertzui123"
+           },
+           "body": "Looks like this can be closed now, right?",
+           "createdAt": "2025-10-29T16:37:15Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "MERGED"
+           }
+          }
+         ]
+        },
+        "title": "License situation of library should be mentioned on landing page of documentation",
+        "updatedAt": "2025-10-29T16:37:15Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/3833"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "Following https://github.com/ManimCommunity/manim/pull/3620, would be great to enforce linting on CI.\r\n\r\nI propose using Ruff instead of flake8, it would avoid having to install a bunch of plugins and `pyproject.toml` configuration is supported.\r\n\r\nFormat could be included as well if the diff isn't to big. ",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 5
+        },
+        "createdAt": "2024-02-16T08:04:25Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          },
+          {
+           "name": "help wanted"
+          },
+          {
+           "name": "tracking"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 3622,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "KaiqueDultra"
+           },
+           "body": "Hello @Viicos, @behackl and @JasonGrace2282, how are you? \n\nI was analyzing this issue and I found it very interesting! Maybe I could help with one of the following linting topics:\n\n-  pycodestyle\n-  pylint\n-  ruff lint rules\n\nI\u00b4m still analyzing the possibility of acting on this issue and as soon as I decide I will let you know. \n\nThanks!",
+           "createdAt": "2025-06-03T22:38:24Z"
+          },
+          {
+           "author": {
+            "login": "KaiqueDultra"
+           },
+           "body": "Hello @Viicos, @behackl and @JasonGrace2282, how are you? \n\nAs I mentioned in the above comment, I will help with this issue by working on:\n\n- [ ]  pylint\n\nI will implement Ruff linting CI to replace pylint and once I finished the code, I will create the PR.\n\nThanks, guys!\n",
+           "createdAt": "2025-06-06T01:19:52Z"
+          },
+          {
+           "author": {
+            "login": "KaiqueDultra"
+           },
+           "body": "Dears @behackl and @JasonGrace2282,\n\nDon\u00b4t forget to link #4276 with the pycodestyle W rule in the linting list :-) \n\nThanks!",
+           "createdAt": "2025-06-11T22:03:57Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "subject": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "MERGED"
+           }
+          }
+         ]
+        },
+        "title": "Add linting back to CI",
+        "updatedAt": "2025-06-13T13:05:08Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/3622"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "## Description of bug / unexpected behavior\r\n<!-- Add a clear and concise description of the problem you encountered. -->\r\nThe VMobject width/height attributes are calculated using the points array which is actually the control points for the quadratic b\u00e9zier curves. This is not very intuitive behavior for end-users.\r\n\r\n## Expected behavior\r\n<!-- Add a clear and concise description of what you expected to happen. -->\r\nThe VMobject width/height attributes should indicate the width/height of the physical curve, respectively. \r\n\r\n## How to reproduce the issue\r\n<!-- Provide a piece of code illustr",
+        "closedByPullRequestsReferences": {
+         "nodes": [
+          {
+           "state": "OPEN"
+          },
+          {
+           "state": "OPEN"
+          }
+         ]
+        },
+        "comments": {
+         "totalCount": 0
+        },
+        "createdAt": "2024-02-15T13:32:03Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          },
+          {
+           "name": "issue:bug"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 3619,
+        "recent": {
+         "nodes": []
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          },
+          {
+           "source": {}
+          },
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          }
+         ]
+        },
+        "title": "VMobject inaccurately attributes width/height attrs to its b\u00e9zier control points",
+        "updatedAt": "2026-03-17T16:00:12Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/3619"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "Based on #3456  I am opening a new issue as suggested. \r\n\r\nA small summary follows:  \r\n\r\n1. We have no control on Skia as it is a google tool and google is famous to drop its own products\r\n2. Skia supports only 2D animation,\r\n3. We use only a tiny part of Skia, namely we use it only for bool operation (which to me feels like to kill a fly with a cannon)\r\n\r\nPerhaps, if we want support only 2D for boolean operations, we may think to rely on a simpler tool with less dependencies and for which we could have some control, like [svgpathtools](https://github.com/mathandy/svgpathtools) but I feel that",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 0
+        },
+        "createdAt": "2023-12-14T22:36:48Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          },
+          {
+           "name": "new feature"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 3529,
+        "recent": {
+         "nodes": []
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": []
+        },
+        "title": "Investigate replacement of skia-pathops",
+        "updatedAt": "2026-04-04T00:11:31Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/3529"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "## Description of bug / unexpected behavior\r\nSetting a fixed width of the columns in a MathTable() is not correctly supported for the first and last column, which are truncated at the left and right edge of the table elements.\r\n\r\n\r\n## Expected behavior\r\nThe given width should be obeyed independent on the contents of the cells.\r\n\r\n\r\n## How to reproduce the issue\r\n<details><summary>Code for reproducing the problem</summary>\r\n\r\n```python\r\nclass Test(Scene):\r\n    def construct(self):\r\n        mytable = MathTable(\r\n            [[1, 10, 100, 1000, 10000, 100000], [0,0,0,0,0,0]],\r\n            h_buff=",
+        "closedByPullRequestsReferences": {
+         "nodes": [
+          {
+           "state": "OPEN"
+          }
+         ]
+        },
+        "comments": {
+         "totalCount": 2
+        },
+        "createdAt": "2023-11-09T19:42:21Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 3446,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "uwezi"
+           },
+           "body": "![image](https://github.com/ManimCommunity/manim/assets/8582807/2f8f1209-8b46-4b3b-a23e-d86b9bc18e9b)\r\n",
+           "createdAt": "2023-11-09T19:42:44Z"
+          },
+          {
+           "author": {
+            "login": "yyccPhil"
+           },
+           "body": "Hi! I'd love to pick this up. Since this issue was opened about two and a half years ago, I'm not sure whether it still exists, so I'm thinking I'll start by trying to reproduce it. Could you assign it to me, or let me know if there's any context I should be aware of? Thanks so much!",
+           "createdAt": "2026-07-21T03:48:01Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          }
+         ]
+        },
+        "title": "0.17.3 MathTable - first and last column of MathTable are truncated",
+        "updatedAt": "2026-07-21T03:48:02Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/3446"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "Hello. I would like to animate several algorithms used in computer science. I've noticed it is not possible to add loop edges (edge from a node to itself) and it is not possible to assign weights to edges (decimal numbers). Can you add this functionality? ",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 5
+        },
+        "createdAt": "2023-02-09T12:58:08Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          },
+          {
+           "name": "new feature"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 3153,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "KeerthanaUrella"
+           },
+           "body": "@GraxCode Hey, I would like to know more about this issue. Like is it just writing a logic in python or should we animate it?\r\n",
+           "createdAt": "2024-10-01T03:07:46Z"
+          },
+          {
+           "author": {
+            "login": "ebrossier-secher"
+           },
+           "body": "Hello,\r\nI have been working on this issue for the past one and a half week and I think I have an implementation that could work fine.\r\nI made a pull request today (#3945) so feel free to give some feedback!",
+           "createdAt": "2024-10-04T16:08:32Z"
+          },
+          {
+           "author": {
+            "login": "nobody280"
+           },
+           "body": "Hi, I'm intrested in contributing to this issue. I noticed that (#3945 ) is stale and has unresolved conflicts. If nobody is actively working on it, would you mind if I pick this up? I could also update the existing PR if preferred.",
+           "createdAt": "2026-02-25T21:13:17Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          },
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          }
+         ]
+        },
+        "title": "Graph theory: Weighted edges, loop edges",
+        "updatedAt": "2026-02-25T21:13:18Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/3153"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "## Description of the proposed feature\r\nThe feature I want to propose is a zoom deactivation system\r\nIt would look like this.\r\n```python\r\nfrom manim import *\r\nclass Basic(ZoomedScene):\r\n    def construct(self):\r\n             self.activate_zooming(animate=False)\r\n\r\n             self.deactivate_zooming(animate=False)\r\n\r\n```\r\n\r\nI would like to do this because we can activated zooming but not deactivate it.\r\n\r\n\r\n## How can the new feature be used?\r\nIn cases where you would like to zoom in for a little bit but then remove the zoom.\r\n\r\n\r\n",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 6
+        },
+        "createdAt": "2022-11-04T21:00:40Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          },
+          {
+           "name": "new feature"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 3009,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "Simon-Po"
+           },
+           "body": "Hi, I\u2019d like to pick this up. I saw that [#4905](https://github.com/ManimCommunity/manim/pull/4905)\u2060\ufffc was closed because the author couldn\u2019t continue, so I\u2019d be happy to take another shot at deactivate_zooming().\n\n~~One thing I wasn\u2019t fully sure about from the issue: should deactivate_zooming() also unregister the zoomed display from MultiCamera so that activating it again later works cleanly, or is the intended scope mainly removing the visible zoom objects and resetting the state?~~\n\nEdit: I tested this locally, and removing the frame and display still leaves the display registered with Mult",
+           "createdAt": "2026-08-16T12:37:11Z"
+          },
+          {
+           "author": {
+            "login": "PlayfulMathematician"
+           },
+           "body": "\n> Hello,\n> \n> I'm not sure to understand what you want. You can remove the zoom overlay added by `activate_zooming`, for sure.\n> \n> As the function definition states (l.151):\n> \n> https://github.com/ManimCommunity/manim/blob/42d595ac4fb6c607a8375e28f24b9b7193668cb5/manim/scene/zoomed_scene.py#L135-L154\n> \n> you can remove the two mobjects added (the zoomed frame and square) with\n> \n> self.remove(\n>     self.zoomed_camera.frame,\n>     self.zoomed_display,\n> )\n> That is a rough and handcrafted equivalent to \"deactivating\" the zoom. But I wholeheartedly agree that it should be implemented in a p",
+           "createdAt": "2026-08-21T00:33:50Z"
+          },
+          {
+           "author": {
+            "login": "Simon-Po"
+           },
+           "body": "> \n> > Hello,\n> > \n> > I'm not sure to understand what you want. You can remove the zoom overlay added by `activate_zooming`, for sure.\n> > \n> > As the function definition states (l.151):\n> > \n> > https://github.com/ManimCommunity/manim/blob/42d595ac4fb6c607a8375e28f24b9b7193668cb5/manim/scene/zoomed_scene.py#L135-L154\n> > \n> > you can remove the two mobjects added (the zoomed frame and square) with\n> > \n> > self.remove(\n> >     self.zoomed_camera.frame,\n> >     self.zoomed_display,\n> > )\n> > That is a rough and handcrafted equivalent to \"deactivating\" the zoom. But I wholeheartedly agree that",
+           "createdAt": "2026-09-15T16:58:19Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          }
+         ]
+        },
+        "title": "Zoom Deactivation",
+        "updatedAt": "2026-09-15T16:58:19Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/3009"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "As discussed [here](https://discord.com/channels/581738731934056449/582403919754297363/909035564030894100) you need to add `fill_opacity=0, stroke_width=3` to the `Tex` constructor for tikz to look like this:\r\n![image](https://user-images.githubusercontent.com/57909184/141643286-d969bc16-a2bc-445d-8d33-26be5ebbaa8c.png)\r\nand not like this:\r\n![image](https://user-images.githubusercontent.com/57909184/141643302-92eec2ea-1f74-4bee-9fdf-60e603584fba.png)\r\n\r\nThis should be put in a new MObject.",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 13
+        },
+        "createdAt": "2021-11-13T12:11:52Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "documentation"
+          },
+          {
+           "name": "good first issue"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 2293,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "behackl"
+           },
+           "body": "> When will be the November-Relase?\r\n\r\nThere are still a few open PRs that should be included in the release, feel free to lend a hand by reviewing some of the PRs labeled with documentation, or #3016. Perhaps towards the end of this week, and later otherwise. :-)",
+           "createdAt": "2022-11-13T12:26:50Z"
+          },
+          {
+           "author": {
+            "login": "madt2709"
+           },
+           "body": "Hey, has this been resolved yet? Is there anything I can do to help?",
+           "createdAt": "2023-04-26T23:23:23Z"
+          },
+          {
+           "author": {
+            "login": "yo-n1co"
+           },
+           "body": "Quoting @LingrenKong 's Message:\n\nIs this not what actually should have been happening in the back, after it gets the SVG right, is it not meant to just render the svg like how it renders the SVGMobject, or am i just really confused, because I am new to manim (not coding or python) and I use tikz frequently, never gets it right the first time, and also, in many TikZ Diagrams, adding the stroke_width=x parameter causes the image to be rendered differently (wrong colors sometimes, etc.) than expected...?",
+           "createdAt": "2025-03-23T07:55:16Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {}
+          }
+         ]
+        },
+        "title": "Add ``TikzTex`` MObject",
+        "updatedAt": "2025-03-23T07:56:38Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/2293"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "## Enhancement proposal\r\n<!-- Add a clear and concise description of your enhancement proposal. In particular,\r\n     if your enhancement introduces changes to the API, illustrate them with\r\n     (fictional) code examples. -->\r\nI suggested adding a channel in the discord server called `#beginner-resources` that would help beginners get started with Manim.\r\n\r\n@behackl also suggested adding this type of information in the docs/ landing page. \r\n\r\nI think this would be a good idea! We could probably add some of the resources we compiled from the `?sp tutorials` snippet:\r\n\r\n```\r\nMost tutorials onlin",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 6
+        },
+        "createdAt": "2021-10-09T23:10:45Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "documentation"
+          },
+          {
+           "name": "enhancement"
+          },
+          {
+           "name": "good first issue"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 2175,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "paragpawar0077"
+           },
+           "body": "Hi! I'd like to work on this issue. Is it still available? If so, I'd be happy to submit a PR.",
+           "createdAt": "2026-07-18T06:48:57Z"
+          },
+          {
+           "author": {
+            "login": "HarryXin0919"
+           },
+           "body": "I did a quick link audit to help whoever picks this up (not claiming the issue, since @paragpawar0077 has already expressed interest):\n\n- `https://try.manim.community/` is live and redirects to the interactive tutorial.\n- Flying Frames is live.\n- Both linked YouTube videos are still available (Brian Amedee, \u201cManim Explained\u201d; Theorem of Beethoven, \u201cManimCE tutorial #1\u201d).\n- `https://docs.manim.community/en/latest/tutorials.html` now returns **404**. The current official replacement is `https://docs.manim.community/en/stable/tutorials/`.\n\nGiven the earlier discussion, a small website resources b",
+           "createdAt": "2026-07-21T15:22:14Z"
+          },
+          {
+           "author": {
+            "login": "paragpawar0077"
+           },
+           "body": "Thanks for the investigation, @HarryXin0919 \u2014 confirms try.manim.community, Flying Frames, Brian Amedee, and Theorem of Beethoven are all still live, and that the old tutorials URL should be replaced with https://docs.manim.community/en/stable/tutorials/.\n\nLooking back at the thread, it seems like the placement question was already settled: @Darylgolden and @behackl both leaned toward the website over the docs, and @naveen521kk noted new pages can be added via a .md file in the contents folder of manim-website (per the frontmatter pattern in constants.py). Combined with your suggestion of a sm",
+           "createdAt": "2026-07-21T19:42:51Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": []
+        },
+        "title": "Add helpful resources for learning Manim in the landing page.",
+        "updatedAt": "2026-07-21T19:42:51Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/2175"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "Currently there is this method:\r\n\r\n```\r\n    def get_entries(\r\n        self, pos: Optional[Sequence[int]] = None\r\n    ) -> Union[VMobject, VGroup]:\r\n        \"\"\"Return the individual entries of the table (including labels) or one specific entry\r\n        if the parameter, ``pos``,  is set.\r\n```\r\n\r\nIt would be much better if this were two separate functions:\r\n\r\n```\r\n    def get_entries(self) -> VGroup:\r\n        ...\r\n\r\n    def get_entry(self, pos:Sequence[int]) -> VMobject:\r\n        ...\r\n```\r\n\r\nMore obvious what is happening, simpler, you don't have the weirdness of get_entr**ies** returning a sing",
+        "closedByPullRequestsReferences": {
+         "nodes": [
+          {
+           "state": "OPEN"
+          }
+         ]
+        },
+        "comments": {
+         "totalCount": 2
+        },
+        "createdAt": "2021-09-16T08:23:18Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "enhancement"
+          },
+          {
+           "name": "good first issue"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 2051,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "PhotonSpheres"
+           },
+           "body": "This makes sense, although we can just add the method `get_entry` as a \"shorthand\" calling `get_entries` itself and leave `get_entries` as it is. Then it would not be breaking. ",
+           "createdAt": "2021-09-16T09:06:05Z"
+          },
+          {
+           "author": {
+            "login": "Timmmm"
+           },
+           "body": "Yeah that would be a good intermediate step. Still worth changing `get_entries()` at some point I think so that people who use Python with proper static types don't have to do type assertions.",
+           "createdAt": "2021-09-16T17:06:52Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "OPEN"
+           }
+          },
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          }
+         ]
+        },
+        "title": "Table.get_entries() should be split in two",
+        "updatedAt": "2026-03-18T20:25:21Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/2051"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "## Description of bug / unexpected behavior\r\nI'm trying to change the base configurations for LinearTransformationScene, but I get an error. This was not the case when I was using the previous version of Manim a few days ago\r\n\r\n\r\n## Expected behavior\r\nI was hoping to change the configs without getting an error\r\n\r\n\r\n## How to reproduce the issue\r\n\r\nFollowing is some example code taken from the docs. The first line was to get it to run in Google Colab (as described in the tutorials section)\r\n\r\n```py\r\n %%manim LinearTransformationSceneExample\r\n \r\n class LinearTransformationSceneExample(LinearTran",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 6
+        },
+        "createdAt": "2021-09-05T19:22:19Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "documentation"
+          },
+          {
+           "name": "good first issue"
+          },
+          {
+           "name": "issue:bug"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 2018,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "BAREJAA"
+           },
+           "body": "Thank you for your clear explanation!",
+           "createdAt": "2021-09-08T12:20:00Z"
+          },
+          {
+           "author": {
+            "login": "Tsukalos"
+           },
+           "body": "I could write about it in the docs, but let me check if I understand correctly what is going on: By default, the cell magic `%%manim` feeds the constructor with the appropriate renderer to display the output in the IPython cell. So basically only the example needs to be changed or should also contain a note pointing out to this detail?",
+           "createdAt": "2022-06-27T17:53:22Z"
+          },
+          {
+           "author": {
+            "login": "detective-sokka"
+           },
+           "body": "@Tsukalos @behackl Do you need any help with this issue? I can work on it",
+           "createdAt": "2023-04-15T21:22:18Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": []
+        },
+        "title": "LinearTransformationSceneExample does not work in Colab",
+        "updatedAt": "2023-04-15T21:22:18Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/2018"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "## Description of bug / unexpected behavior\r\n\r\nAnimations behave differently depending on the way the mobject was added to the scene. If I use `self.play(Create(mobj))` there is no lag, if I use `self.add(mobj)` the animation lags in certain cases.\r\n\r\n\r\n## Expected behavior\r\n\r\nIMHO there should be no difference between the two cases. Also, if using `self.add` is discouraged for objects that have updaters, we might consider printing a warning.\r\n\r\n## How to reproduce the issue\r\n\r\nSee the following code:\r\n\r\n<details><summary>Code running with no lagging</summary>\r\n\r\n```py\r\nfrom manim import *\r\n\r\n",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 4
+        },
+        "createdAt": "2021-06-07T09:25:14Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "help wanted"
+          },
+          {
+           "name": "issue:bug"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 1648,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "jsonvillanueva"
+           },
+           "body": "Meh, I had time here's a quick *very likely incorrect* fix (for the case of adding multiple mobjects), although I'm sure the issue stems here. This manages to preserve the mobject ordering and fix the lag issue for your test case:\r\n### in scene.add\r\n```py\r\n        for mobject in mobjects:\r\n            if mobject not in self.mobjects:\r\n                if config.renderer == \"opengl\":\r\n                    new_mobjects = []\r\n                    new_meshes = []\r\n                    for mobject_or_mesh in mobjects:\r\n                        if isinstance(mobject_or_mesh, Mesh):\r\n                     ",
+           "createdAt": "2021-06-07T20:43:26Z"
+          },
+          {
+           "author": {
+            "login": "k4pran"
+           },
+           "body": "I was looking at this a bit and it does seem to be related to the order, you can reproduce it and see it lagging in both directions by adding label and rect in reverse order:\r\n\r\n```\r\nclass Test(Scene):\r\n    def construct(self):\r\n        tracker = ValueTracker(-3)\r\n        rect = Rectangle().set_x(tracker.get_value())\r\n        label = Text(\"x\")\r\n        rect.add_updater(lambda m: m.set_x(tracker.get_value()))\r\n        label.add_updater(lambda m: m.move_to(rect.get_center()))\r\n        self.add(label, rect)\r\n        self.play(tracker.animate.set_value(4))\r\n        self.wait()\r\n        self.play(t",
+           "createdAt": "2021-06-30T18:55:22Z"
+          },
+          {
+           "author": {
+            "login": "Octonions"
+           },
+           "body": "Really hoping to have this fixed anytime soon :/",
+           "createdAt": "2022-11-20T23:43:43Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": []
+        },
+        "title": "Lagging animations with updaters and self.add",
+        "updatedAt": "2022-11-20T23:43:43Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/1648"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "## Enhancement proposal\r\nPluggy: https://pluggy.readthedocs.io/\r\n\r\nCurrently how out plugin system works is\r\n- Get the list of plugins from the user config file\r\n- Add them to the global namespace, so when the user does `from manim import *` the plugin will also be imported. \r\n- Has no possible way to extend parts of the library without monkey patching or making a new subclass out of the original one. See how `manim-onlinetex` does this currently, https://github.com/ManimCommunity/manim-onlinetex/blob/38ed76c55f387e9205beeb28307a634b46691df1/src/manim_onlinetex/manim_onlinetex.py#L109\r\n\r\nWith ",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 10
+        },
+        "createdAt": "2021-03-21T04:38:36Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "enhancement"
+          },
+          {
+           "name": "help wanted"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 1133,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "GameDungeon"
+           },
+           "body": "This Issue has been put on hold until we migrate to OpenGL",
+           "createdAt": "2021-03-28T15:40:33Z"
+          },
+          {
+           "author": {
+            "login": "eulertour"
+           },
+           "body": "If we want to put this in hold then we should specify what it means to move to opengl. Does this mean cairo rendering needs to be removed? Or just not used by default or deprecated or something like that.",
+           "createdAt": "2021-03-28T15:44:29Z"
+          },
+          {
+           "author": {
+            "login": "GameDungeon"
+           },
+           "body": "I'm sorry I meant to put that in #1131. I still want this to go through now, as I think it will help plugin devs (Me :P) with their plugins.",
+           "createdAt": "2021-03-28T15:45:35Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "subject": {
+            "state": "CLOSED"
+           }
+          }
+         ]
+        },
+        "title": "Using pluggy for managing Plugins",
+        "updatedAt": "2022-06-18T20:22:36Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/1133"
+       },
+       {
+        "assignees": {
+         "totalCount": 0
+        },
+        "body": "At the moment we only have last-frames tests. Although they are useful, it's not enough. We would need to have tests for cli flags, that check videos, etc. This issue will keep a list of tests that need to be added. Please make more suggestions for tests!\r\n\r\n## Tests that need to be added\r\n- [ ] We should have at least one test for each CLI flag.\r\n- [ ] We should test that the cascading priorities in the config system work as expected. Ties in with #201\r\n- [ ] We should create a test to certify a clean install. See #11.\r\n- [x] Testing video content\r\n- [x] Test that manim runs correctly on all ",
+        "closedByPullRequestsReferences": {
+         "nodes": []
+        },
+        "comments": {
+         "totalCount": 10
+        },
+        "createdAt": "2020-07-10T19:38:38Z",
+        "labels": {
+         "nodes": [
+          {
+           "name": "good first issue"
+          },
+          {
+           "name": "testing"
+          }
+         ]
+        },
+        "locked": false,
+        "number": 193,
+        "recent": {
+         "nodes": [
+          {
+           "author": {
+            "login": "llricci"
+           },
+           "body": "@huguesdevimeux  I would like to take the creation of a test for ``add_fixed_in_frame_mobjects``. Of course, if still available.",
+           "createdAt": "2021-11-15T23:22:34Z"
+          },
+          {
+           "author": {
+            "login": "huguesdevimeux"
+           },
+           "body": "> @huguesdevimeux  I would like to take the creation of a test for ``add_fixed_in_frame_mobjects``. Of course, if still available.\n\nSure !",
+           "createdAt": "2021-11-16T07:30:31Z"
+          },
+          {
+           "author": {
+            "login": "giolucasd"
+           },
+           "body": "I would like to add unit tests for utility on \"utils/polylabel.py\", because it is used a lot and is only tested indirectly. It also seems easier for beginers. Any objections?",
+           "createdAt": "2025-06-03T19:22:52Z"
+          }
+         ]
+        },
+        "repository": {
+         "isArchived": false,
+         "nameWithOwner": "ManimCommunity/manim"
+        },
+        "timelineItems": {
+         "nodes": [
+          {
+           "source": {
+            "state": "MERGED"
+           }
+          },
+          {
+           "source": {
+            "state": "MERGED"
+           }
+          },
+          {
+           "source": {
+            "state": "MERGED"
+           }
+          },
+          {
+           "source": {
+            "state": "MERGED"
+           }
+          },
+          {
+           "source": {
+            "state": "CLOSED"
+           }
+          },
+          {
+           "source": {
+            "state": "MERGED"
+           }
+          },
+          {
+           "source": {}
+          },
+          {
+           "source": {
+            "state": "MERGED"
+           }
+          }
+         ]
+        },
+        "title": "List of tests to add ",
+        "updatedAt": "2025-06-03T19:23:16Z",
+        "url": "https://github.com/ManimCommunity/manim/issues/193"
+       }
+      ]
+     },
+     "rateLimit": {
+      "remaining": 4566,
+      "resetAt": "2026-09-25T18:58:18Z"
+     },
+     "repository": {
+      "isArchived": false,
+      "issues": {
+       "nodes": [
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of proposed feature\n\nCurrently, the config is often accessed via\n```py\nconfig[\"some_attribute\"]\n```\n\nI think it would be better to replace all of these with\n```py\nconfig.some_attribute\n```\nas that preserves the attribute type and prevents typos.\n",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2026-09-25T14:52:31Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "good first issue"
+           },
+           {
+            "name": "easy"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 5032,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "Aayushsuthar"
+            },
+            "body": "I'd like to take this one. PR is up: #5033 (covers the manim/ package; happy to follow up on tests/docs separately).",
+            "createdAt": "2026-09-25T15:55:05Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "Use `config.` instead of `config[\"...\"]` to preserve type",
+         "updatedAt": "2026-09-25T15:55:05Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/5032"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of proposed feature\n\nCurrently, `Scene.add_sound()` allows users to add background music or sound effects to animations. However, once a sound is added via `add_sound()`, there is **no way to stop or pause it** during the animation. The audio plays in its entirety and **determines the final video length**\u2014the rendered video will continue running until the audio file finishes, regardless of when the animation actually ends.\n\nThis creates several problems:\n- For short animations, long background music unnecessarily extends the video, forcing users to wait or manually edit the audi",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2026-06-17T11:02:21Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "new feature"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 4815,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "RajDalvi08"
+            },
+            "body": "Hi! I\u2019d like to take this issue up and contribute an implementation.\n\nI\u2019m planning to investigate Manim\u2019s current `add_sound()` and audio rendering pipeline, then implement `stop_sound()` with the appropriate audio truncation/timeline behavior. I\u2019ll also add or update tests to cover stopping active audio and ensuring that remaining audio does not unnecessarily extend the rendered video.\n\nIf there are no concerns with this approach, I\u2019d be happy to work on it. Please assign the issue to me if possible. Thanks!\n",
+            "createdAt": "2026-09-24T09:13:08Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Feature request: Add methods to control audio playback (pause/stop) for add_sound",
+         "updatedAt": "2026-09-24T09:13:09Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4815"
+        },
+        {
+         "assignees": {
+          "totalCount": 1
+         },
+         "body": "## Description of bug / unexpected behavior\nWhen using the `redirections` parameter of the `deprecated_params` decorator, a lot of function usages aren't allowed even though I would expect them to.\n\nHere for example, I renamed the `a,b,c` parameters to `x,y,z`.\n```py\nfrom manim.utils.deprecation import deprecated_params\n\n@deprecated_params(redirections=[(\"a\", \"x\"), (\"b\", \"y\"), (\"c\", \"z\")])\ndef foo(x: int, /, y: int, *, z: int) -> None:\n    print(x, y, z)\n```\nSo I would expect all the following calls to be valid, albeit some should issue a warnings:\n```py\nfoo(1, 2, z=3)  # no warning\nfoo(1, y=2",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 3
+         },
+         "createdAt": "2026-09-22T08:14:32Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 5026,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "GniLudio"
+            },
+            "body": "Here is a small prototype which behaves as I expect:\n```py\nimport functools\nimport warnings\nfrom collections.abc import Callable, Sequence\nfrom typing import Any, ParamSpec, TypeVar\n\nP = ParamSpec(\"P\")\nR = TypeVar(\"R\")\n\n\ndef deprecated_params(\n    redirections: dict[str, str] | Sequence[tuple[str, str]] = {},\n) -> Callable[[Callable[P, R]], Callable[P, R]]:\n    if not isinstance(redirections, dict):\n        redirections = dict(redirections)\n\n    def outer_wrapper(f: Callable[P, R]) -> Callable[P, R]:\n        @functools.wraps(f)\n        def inner_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:",
+            "createdAt": "2026-09-22T08:15:55Z"
+           },
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "I stepped through your code in the VS Code debugger. Seems like examples 3 and onward are failing when `decorator` attempts to parse the arguments. I appear to be able to fix the issue by changing `return decorator(deprecate_params)` to `return decorator(deprecate_params, kwsyntax=True)` in line 535: https://github.com/ManimCommunity/manim/blob/485c226168e9c189512b22468de89b18dbc1780e/manim/utils/deprecation.py#L535\n```pycon\n1 2 3\n1 2 3\n[09/22/26 11:13:01] WARNING  The parameter b of function foo has been         deprecation.py:532\n                             deprecated and may be removed in ",
+            "createdAt": "2026-09-22T09:16:26Z"
+           },
+           {
+            "author": {
+             "login": "GniLudio"
+            },
+            "body": ">  I appear to be able to fix the issue by changing `return decorator(deprecate_params)` to `return decorator(deprecate_params, kwsyntax=True)` in line 535.\n\nSeems to be working, at least for all variants I can come up with.\n",
+            "createdAt": "2026-09-22T09:30:12Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "`redirections` parameter of `deprecated_params` decorator not working",
+         "updatedAt": "2026-09-23T14:59:47Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/5026"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "The class `CurvesAsSubmobjects` throws two custom error messages for when it either has no submobjects or it has no submobjects with points:\nhttps://github.com/ManimCommunity/manim/blob/cafc63919eb03d398d7038a8c82e591b12de8da5/manim/mobject/types/vectorized_mobject.py#L2858-L2874\nThese error messages contain a hardcodes class name, causing issues if `CurvesAsSubmobjects` is subclassed. This should be fixed.\n\nThis implementation was originally a response to a hardcoded class name in the `throw_error_if_no_points` method of `Mobject`, but that has since been made dynamic (#4927) so this override",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 4
+         },
+         "createdAt": "2026-09-01T19:22:44Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "good first issue"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 4983,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "@behackl are the LLMs (including yours) not overcomplicating this? `Mobject` already handles the `throw_error_if_no_points` correctly as of #4927, so it seems like this issue can be solved by simply removing the special case. Or am I missing something?",
+            "createdAt": "2026-09-23T07:02:19Z"
+           },
+           {
+            "author": {
+             "login": "behackl"
+            },
+            "body": "No, it is quite likely it was a bit too late for me yesterday so that I missed that. I'll take another look in a few hours to clean this up. Thanks for the heads-up!",
+            "createdAt": "2026-09-23T07:16:05Z"
+           },
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "For the record, that was at least my intention with this issue at the beginning - my hope was that a new contributor would spot that `CurvesAsSubmobjects` is basically reimplementing the behavior of its superclass and that they would get to do a nice, clean, negative-LOC diff to boost their confidence \ud83d\ude04",
+            "createdAt": "2026-09-23T07:19:31Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "`CurvesAsSubmobjects` error messages contain hardcoded class names",
+         "updatedAt": "2026-09-23T09:52:22Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4983"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of proposed feature\n\n`Arrow3D` builds its conical tip as a `Cone`, which inherits `Surface`'s default\n`resolution=32`. That is **1024 quad submobjects** for a tip that is about 22 \u00d7 40 px on a\n1080p frame \u2014 **95% of every submobject the arrow contains**. `Arrow3D` does accept a\n`resolution` argument, but it is applied to the shaft only, so the tip's mesh density cannot\nbe changed through any public API.\n\nI'd like to propose exposing the tip's resolution and giving it a default in proportion to the\nobject's size. On scenes containing arrows this is worth roughly a **2.8\u00d7\u20134.6\u00d7 spe",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 0
+         },
+         "createdAt": "2026-09-17T01:03:50Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "new feature"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 5020,
+         "recent": {
+          "nodes": []
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "Arrow3D: expose the cone's resolution (currently unconfigurable, 95% of the arrow's submobjects)",
+         "updatedAt": "2026-09-17T01:03:50Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/5020"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "Currently, operations that work on family members don't take overidden methods of children into account. So the result can be quite different when children implement custom logic. \n\nThis is quite prominent with the `Arrow.scale` method:\n```py\ndef construct(self) -> None:\n    mob1 = VGroup(Arrow().scale(3))\n    mob2 = VGroup(Arrow()).scale(3)\n    self.add(VGroup(mob1, mob2).arrange(DOWN))\n```\n\n<img width=\"1280\" height=\"720\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/86999fca-05c3-4775-8ff0-12d9d7823489\" />\n\nIdeally, when calling an operation on a parent, it should still use the",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2026-09-15T21:07:31Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 5018,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "Gathering some points from previous discussions in a comment here. No need for replies unless anyone really feels like sharing, it's more for easy reference in the future.\n\n* In my opinion, the current `Arrow.scale` is simply a wrong implementation since it doesn't truly scale the mobject. I think this behavior would be more at home in an overridden `put_start_and_end_on` or a custom method.\n* I also acknowledge that overriding these methods makes a lot of sense in many cases. If I want a mobject to _always_ stay the same size, it feels completely intuitive to override `scale` to be a no-op, e",
+            "createdAt": "2026-09-16T06:53:24Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Use overrides of children in family operations",
+         "updatedAt": "2026-09-16T06:53:24Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/5018"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of the proposed feature\r\nThe feature I want to propose is a zoom deactivation system\r\nIt would look like this.\r\n```python\r\nfrom manim import *\r\nclass Basic(ZoomedScene):\r\n    def construct(self):\r\n             self.activate_zooming(animate=False)\r\n\r\n             self.deactivate_zooming(animate=False)\r\n\r\n```\r\n\r\nI would like to do this because we can activated zooming but not deactivate it.\r\n\r\n\r\n## How can the new feature be used?\r\nIn cases where you would like to zoom in for a little bit but then remove the zoom.\r\n\r\n\r\n",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 6
+         },
+         "createdAt": "2022-11-04T21:00:40Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "good first issue"
+           },
+           {
+            "name": "new feature"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 3009,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "Simon-Po"
+            },
+            "body": "Hi, I\u2019d like to pick this up. I saw that [#4905](https://github.com/ManimCommunity/manim/pull/4905)\u2060\ufffc was closed because the author couldn\u2019t continue, so I\u2019d be happy to take another shot at deactivate_zooming().\n\n~~One thing I wasn\u2019t fully sure about from the issue: should deactivate_zooming() also unregister the zoomed display from MultiCamera so that activating it again later works cleanly, or is the intended scope mainly removing the visible zoom objects and resetting the state?~~\n\nEdit: I tested this locally, and removing the frame and display still leaves the display registered with Mult",
+            "createdAt": "2026-08-16T12:37:11Z"
+           },
+           {
+            "author": {
+             "login": "PlayfulMathematician"
+            },
+            "body": "\n> Hello,\n> \n> I'm not sure to understand what you want. You can remove the zoom overlay added by `activate_zooming`, for sure.\n> \n> As the function definition states (l.151):\n> \n> https://github.com/ManimCommunity/manim/blob/42d595ac4fb6c607a8375e28f24b9b7193668cb5/manim/scene/zoomed_scene.py#L135-L154\n> \n> you can remove the two mobjects added (the zoomed frame and square) with\n> \n> self.remove(\n>     self.zoomed_camera.frame,\n>     self.zoomed_display,\n> )\n> That is a rough and handcrafted equivalent to \"deactivating\" the zoom. But I wholeheartedly agree that it should be implemented in a p",
+            "createdAt": "2026-08-21T00:33:50Z"
+           },
+           {
+            "author": {
+             "login": "Simon-Po"
+            },
+            "body": "> \n> > Hello,\n> > \n> > I'm not sure to understand what you want. You can remove the zoom overlay added by `activate_zooming`, for sure.\n> > \n> > As the function definition states (l.151):\n> > \n> > https://github.com/ManimCommunity/manim/blob/42d595ac4fb6c607a8375e28f24b9b7193668cb5/manim/scene/zoomed_scene.py#L135-L154\n> > \n> > you can remove the two mobjects added (the zoomed frame and square) with\n> > \n> > self.remove(\n> >     self.zoomed_camera.frame,\n> >     self.zoomed_display,\n> > )\n> > That is a rough and handcrafted equivalent to \"deactivating\" the zoom. But I wholeheartedly agree that",
+            "createdAt": "2026-09-15T16:58:19Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "Zoom Deactivation",
+         "updatedAt": "2026-09-15T16:58:19Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/3009"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\r\n<!-- Add a clear and concise description of the problem you encountered. -->\r\n\r\nWhen using `Text()` or `Paragraph()`, the spacing between letters is generally off regardless of the choice of the font. This is probably an issue with Pango.\r\n\r\nSee the attached images.\r\n\r\n## Expected behavior\r\n<!-- Add a clear and concise description of what you expected to happen. -->\r\n\r\nThe spacing between the letters should be more balanced and evenly distributed. \r\n\r\n## How to reproduce the issue\r\n<!-- Provide a piece of code illustrating the undesired behavior. --",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 15
+         },
+         "createdAt": "2022-06-22T16:37:43Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 2844,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "Err0r-v2"
+            },
+            "body": "I have a fix for this issue, ill propose it on the ManimPango repository",
+            "createdAt": "2026-09-13T12:20:43Z"
+           },
+           {
+            "author": {
+             "login": "Err0r-v2"
+            },
+            "body": "Here it is : https://github.com/ManimCommunity/ManimPango/issues/130",
+            "createdAt": "2026-09-13T12:32:23Z"
+           },
+           {
+            "author": {
+             "login": "Hun-Bot2"
+            },
+            "body": "A concrete root cause and proposed fix for this has been identified in ManimCommunity/ManimPango#130.\n\nI independently validated the proposed fix on macOS with Pango 1.56.4. Disabling Pango's glyph-position rounding fixes the uneven spacing in my tests, and the resulting glyph positions closely match Manim's Typst text output.\n\nLeaving this here to connect the original issue with the ManimPango investigation.",
+            "createdAt": "2026-09-15T10:00:47Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {}
+           },
+           {
+            "source": {}
+           },
+           {
+            "source": {}
+           },
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "Bad kerning in `Text()`",
+         "updatedAt": "2026-09-15T10:00:47Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/2844"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of proposed feature\nWarnings messages to the user should include the stack trace, so the user knows where it was caused from.\n\n```py\nlogger.warning(\n    \"Don't do ...\",\n    stack_info=True,\n    stacklevel=2,\n)\n```\n",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 5
+         },
+         "createdAt": "2026-09-01T16:04:42Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "good first issue"
+           },
+           {
+            "name": "new feature"
+           },
+           {
+            "name": "easy"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 4981,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "IMO such stack traces should mostly occur when the action is performed in userland - if the library itself is doing something stupid, that should ideally be caught by tests.\n\nAlso @RRXXZZYY, I just wanted to mention: reading the phrasing of your comment and looking at your profile, it seems like you have a pretty AI-heavy work flow. If you are intending to submit a (mostly) AI-generated PR for this, could I perhaps suggest that you give someone else a chance to \"hand-build\" a solution first? This seems like a really really good issue for a first-time open source contributor so it would be nice",
+            "createdAt": "2026-09-01T16:58:11Z"
+           },
+           {
+            "author": {
+             "login": "RRXXZZYY"
+            },
+            "body": "That is fair. I use AI in my workflow, and I do not want to crowd out a first-time contributor here, so I will step back from this issue. Thanks for raising it.",
+            "createdAt": "2026-09-02T05:20:28Z"
+           },
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "Thanks @RRXXZZYY, I really appreciate it! Hope we see you again soon on another issue \ud83d\udc4d ",
+            "createdAt": "2026-09-02T05:23:41Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "Add stack trace to warnings",
+         "updatedAt": "2026-09-02T05:23:41Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4981"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nAccording to the documentation in here https://docs.manim.community/en/stable/guides/configuration.html#the-config-files it says:\n\n> To use a local configuration file when rendering your scene, you must create a file with the name manim.cfg in the same directory as your scene code.\n> ...\n> Manim will look for a manim.cfg config file in the same directory as the file being rendered, and not in the directory of execution. For example,\n> ...\n>  It will **not** use the config file found in the current working directory, even if it exists. In this way, th",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2026-08-25T18:56:15Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4963,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "0x00cl"
+            },
+            "body": "For what is worth, if you run into this, and want multiple files with same or different configuration you can do it from the code (https://docs.manim.community/en/stable/guides/configuration.html#the-manimconfig-class)\n\n```python\nfrom manim import *\nconfig.background_color = RED\n```\n\nYou can even create your own `settings.py` file and add logic if you need to and then import it into your `.py` files depending if they need configuration like this:\n\n`animation1.py`\n```python\nfrom my_package import settings\n\nclass CreateCircle(Scene):\n    def construct(self):\n        circle = Circle()  # create a",
+            "createdAt": "2026-09-01T01:29:33Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "manim.cfg reading not working as expected",
+         "updatedAt": "2026-09-01T01:29:33Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4963"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nWhen calling `Create(mobj)`, updaters on `mobj` continue running even though the default value of the parameter `suspend_mobject_updating` in `Animation`(which `Create` is a descendant of) is `True`. This means that setting `suspend_mobject_updating` effectively does nothing, which I am fairly certain is not intended behavior.\n\n\n## Expected behavior\nWhat I expected is for any updaters on the `mobj` passed to `Create` to be paused while `Create(mobj)` is occurring.\n\n\n## How to reproduce the issue\nThe issue can be reproduced by adding an updater to any",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 2
+         },
+         "createdAt": "2026-06-02T21:29:14Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4763,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "Rebased fix in #4879 (replaces stale #4849).",
+            "createdAt": "2026-07-08T12:32:38Z"
+           },
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4884: suspend updaters on starting_mobject in ShowPartial.begin().",
+            "createdAt": "2026-07-14T12:27:25Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "Create() does not suspend Mobject updating",
+         "updatedAt": "2026-08-26T19:41:38Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4763"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nUnder specific circumstances a `Line` object can bend during an animation in unexpected ways despite `path_arc=0`.\n\n\n## Expected behavior\nA `Line` object should not have any curvature when `path_arc=0`.\n\n\n## How to reproduce the issue\n\n<details><summary>Code for reproducing the problem</summary>\n\nThis issue came up in this animation: \n```\nfrom manim import *\n\nclass Example(Scene):\n    def construct(self):\n        t = ValueTracker(0.1 * PI)\n        line = Line(end=(1,0,0))\n        line.add_updater(lambda m: m.put_start_and_end_on(\n                (3.4",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 2
+         },
+         "createdAt": "2026-08-20T08:00:37Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4945,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "uwezi"
+            },
+            "body": "This _interesting_ behavior must be caused by the accumulation of small rounding errors over the time. `.put_start_and_end_on()` uses both scaling and rotation of the original object to change its shape. During such a rotation both the endpoints and the handles of the Bezier curves are rotated (even a straight line in Manim is always constructed as a Bezier curve) and here small numeric inaccuracies can add up, especially if there is a sequence of `frame_rate * run_time` individual rotations performed on the object.\n\nThis is also severly impacted by the fact that your line shrinks to very smal",
+            "createdAt": "2026-08-20T09:00:50Z"
+           },
+           {
+            "author": {
+             "login": "wuerfelfreak"
+            },
+            "body": "Thank you for the insight and the detailed explanation!",
+            "createdAt": "2026-08-21T16:17:48Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Line object bending in unexpected ways during animation",
+         "updatedAt": "2026-08-21T16:17:48Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4945"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nset zoom for camera doesn't work with opengl renderer\n\n\n## Expected behavior\nit should work\n\n\n## How to reproduce the issue\n> Focus on the zoom part\n```py\nself.set_camera_orientation(phi=70 * DEGREES, theta=-35 * DEGREES, zoom=0.72)\n```\nadd this in the file and run with `manim --renderer opengl -ql main.py`\n\n<details><summary>Code for reproducing the problem</summary>\n\n```py\nself.set_camera_orientation(phi=70 * DEGREES, theta=-35 * DEGREES, zoom=0.72)\n```\n\n</details>\n\n\n## Additional media files\n<!-- Paste in the files manim produced on rendering the ",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 0
+         },
+         "createdAt": "2026-08-21T03:14:28Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4949,
+         "recent": {
+          "nodes": []
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "No zoom for opengl Camera",
+         "updatedAt": "2026-08-21T03:14:28Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4949"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of proposed feature\nThe scenes are split `with self.voiceover(\"Something here\") as tracker:` blocks, there should be an option to generate these frames in parallel.\n\n\n## How can the new feature be used?\nThis features will lead to better speed for builds\n\n\n## Additional comments\n- This doesn't need to be the case when you choose the Recorder option from manim_voiceover\n- But, for other voiceover options, you should offer parallel build and keep a file in system that keeps track of where things are, with data like position of objects and what they are, if they are present and anim",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 0
+         },
+         "createdAt": "2026-08-17T06:49:42Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "new feature"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 4942,
+         "recent": {
+          "nodes": []
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Parallel Scene builds",
+         "updatedAt": "2026-08-17T06:49:42Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4942"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of proposed feature\nIt would be nice if the `manim` commands supports construct functions with a surrounding class, similar to how the `manimator` does it on discord.\n```py\nfrom manim import *\n\ndef construct(self: Scene) -> None:\n    self.add(Circle())\n```\n\n\n## How can the new feature be used?\n1. Makes it easier to set up small scenes.\n2. Makes it easier to use snippets that were shared on discord.\n\n## Additional comments\nThe `manimator` also supports omitting the \n```py\nfrom manim import *\n```\nbut I haven't decided on whether I would like to see support of that too.",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 3
+         },
+         "createdAt": "2026-08-12T12:23:54Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "new feature"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 4933,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "behackl"
+            },
+            "body": "See #1901 for a proof of concept!",
+            "createdAt": "2026-08-12T12:28:04Z"
+           },
+           {
+            "author": {
+             "login": "GniLudio"
+            },
+            "body": "> See [#1901](https://github.com/ManimCommunity/manim/pull/1901) for a proof of concept!\n\nI can understand how a decorator would be wonderful for many situations, but it doesn't really address the friction when running snippets meant for the manimator.",
+            "createdAt": "2026-08-12T12:56:30Z"
+           },
+           {
+            "author": {
+             "login": "behackl"
+            },
+            "body": "Ah, yes: I do think it is the better pattern if users have to declare explicitly which functions are intended as scene functions and which aren't. If we had a easier-to-type mechanism available already, the current Discord bot would also not support \"plain function\" rendering, but would require a (say) decorated function.\n\nWe could of course also have the CLI parse a given module to see whether there are suitable plain functions in there that could be used as construct functions. I haven't thought too much about this, initially I'm somewhat worried about false-positives -- but I guess I could ",
+            "createdAt": "2026-08-12T13:36:38Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Support classless construct",
+         "updatedAt": "2026-08-12T13:36:38Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4933"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\n<!-- Add a clear and concise description of the problem you encountered. -->\nAs mentioned in #4914, the behavior of `split` is different between the two types of Mobject. Here is the implementation of `Mobject.split`:\n```py\ndef split(self) -> list[Mobject]:\n    result: list[Mobject] = [self] if len(self.points) > 0 else []\n    return result + self.submobjects\n```\nand here is the implementation of `OpenGLMobject.split`:\n```py\ndef split(self) -> Sequence[OpenGLMobject]:\n    return self.submobjects\n```\nIn short, the Cairo version potentially includes th",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2026-08-11T11:43:32Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4932,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "Did some digging; it seems like the \"include self if it has points\" behavior was removed from ManimGL in 2021 ([commit ](https://github.com/3b1b/manim/commit/d29cfd842f8aee2cd5c270f748bfda67bd2757b5) and [PR](https://github.com/3b1b/manim/pull/1325)).",
+            "createdAt": "2026-08-11T15:44:45Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Mobject.split() behaves differently between Cairo and OpenGL",
+         "updatedAt": "2026-08-11T15:44:45Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4932"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nWhen using VGroup.scale(), some unexpected behavior emerges. The stroke width gets funny.\nI know there's a \"scale_stroke\" parameter which does the trick, but the result is quite undesired when it comes to SVGMobject and it's derivatives (e.g. Text, MathTex, Tex...)\nI'll provide a detailed example below.\n\n## Example\nRecently, I drew an Arduino UNO using manim. It looks like this:\n\n<img width=\"1920\" height=\"1080\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/8e8bb0f0-4c39-4fae-bf61-00b5a881758d\" />\n\nHowever, when I wanted to shrink it... ",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 3
+         },
+         "createdAt": "2026-06-27T12:52:41Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4836,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "uwezi"
+            },
+            "body": "You drew that Arduino in Manim? Kudos... that's probably not what I would have done...\n\nI can tell you what the cause is, which was recently discussed either here on Github or more probably on Discord. `Text`, `Tex` etc in Manim are rendered as filled areas only, no strokes. So even a thin line in a letter is actually a filled area, rather than a stroke. \n\nI cannot really tell if any of the other objects in your Arduino are necessarily based on strokes, but if you would make sure that all you have is filled areas, then the scaling issue of strokes would not bother you, just sett all stroke wid",
+            "createdAt": "2026-06-27T14:13:34Z"
+           },
+           {
+            "author": {
+             "login": "jzwalliser"
+            },
+            "body": "Thank you very much for your detailed explanation!",
+            "createdAt": "2026-06-28T04:42:15Z"
+           },
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "Is this perhaps fixed by #4694?",
+            "createdAt": "2026-08-11T13:37:03Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Unexpected scaling behavior (especially complicated VGroup object)",
+         "updatedAt": "2026-08-11T13:37:03Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4836"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "I'm trying to understand why `self.set_camera_orientation()` and `self.move_camera()` produce different final camera views, even when I pass exactly the same camera parameters (phi, theta, frame_center, zoom, etc.) in a ThreeDScene.\n\nI expected both methods to end up with the same final camera position and orientation, with the only difference being that move_camera() animates the transition. However, the final views are actually different. \n\n```\nfrom manim import *\n\nclass Test(ThreeDScene):\n    def construct(self):\n        sp = Sphere()\n\n        # Uncomment this and comment out move_camera()\n",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 3
+         },
+         "createdAt": "2026-07-02T13:50:09Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4862,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "MakabeD"
+            },
+            "body": "Using your code: \n\nhttps://github.com/user-attachments/assets/4fdf26bb-c953-489e-a80a-fb5e15c64d45\n\nNow the weird behaviour starts here; when I changed the zoom value=1:\n\nhttps://github.com/user-attachments/assets/41d2411f-d9e6-4e78-944f-7b803bd6a487\n\nAnd then I set de self.wait value in 2 :\n\nhttps://github.com/user-attachments/assets/1a2c4748-2a98-4612-8cfb-bf7c02a35be8\n\n So in fact both methods seems to give the same result but only if the animation time is long enough. But there is a weird jump in the middle of the animation  ",
+            "createdAt": "2026-07-26T22:59:00Z"
+           },
+           {
+            "author": {
+             "login": "MakabeD"
+            },
+            "body": "I added a sphere(sp2) in the frame_center position to validate whether the sphere's position is correct.\nI discovered that \"set_camera_position\" method give an incorrect  position if there wasn't a \"self.wait()\" line before.\nTake a look, Now both methods give correct result:\n``` python\nfrom manim import *\n\n\nclass Test(ThreeDScene):\n    def construct(self):\n        sp = Sphere()\n        # Note: The ([0, 0, 3] - 3 * UR) is the camera new frame center,\n        # it means that the smallest(sp2) sphere have to be in the center at the end of the animation\n        sp2 = Sphere().scale(0.5).move_to([0",
+            "createdAt": "2026-07-27T00:02:43Z"
+           },
+           {
+            "author": {
+             "login": "1Dung"
+            },
+            "body": "Thank you very much! This will be very helpful to me.",
+            "createdAt": "2026-07-30T01:32:02Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Why do self.set_camera_orientation() and self.move_camera() produce different results?",
+         "updatedAt": "2026-08-06T01:07:20Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4862"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nPlaying animations with the dt-updater added results in duplicate frames. This issue is especially noticeable at low FPS or when using TracedPath.\n\n<details><summary>Code for reproducing the problem</summary>\n\n```py\nconfig.frame_rate = 5\nclass DtUpdaterBug(Scene):\n    def construct(self):\n        circle = Circle().set_fill(RED, 1).to_edge(LEFT)\n\n        def upd_circle(mob, dt):\n            mob.shift(2 * dt * RIGHT)\n\n        def upd_cnt(cnt, dt):\n            cnt.increment_value(dt * config.frame_rate)\n\n        counter = Integer().shift(UP * 2).add_upd",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2026-02-24T01:45:19Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4611,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "msdh"
+            },
+            "body": "This is the same bug as #3005, seen from the other end.\n\n`Scene.compile_animation_data` resets `self.last_t = 0` before every animation and the frame times start at 0 as well, so `update_to_time` works out `dt = 0` for the first frame of each `play()` and `wait()`. Your `upd_circle` shifts by `2 * dt * RIGHT`, so on that one frame the circle does not move, and that is the duplicate you are seeing. The loop is ten animations, so ten stutters, and at 5 fps each one is a fifth of a second wide.\n\nThe counter is the other half of it. Over an animation an updater receives `run_time - 1/fps` in total",
+            "createdAt": "2026-08-04T15:03:24Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "Extra frame of animation with dt-updater",
+         "updatedAt": "2026-08-04T15:03:24Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4611"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "As a first time user, the docs could use a little more explanation. As an example, the \"Manim's building blocks\" page. In the Creating a custom animation part, there's a lot of text explaining what to do, but not how to do it. It then shows you the complete code, including parts that weren't explained in the text, like at no point has the article explained what an updater or kwargs** are, but they're still in the finished code. a good way to change it might be to add snippets of the code as the parts of it are being introduced, then showing the whole code at the end.\nIn the same page, in the c",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 6
+         },
+         "createdAt": "2026-08-02T19:16:09Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4909,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "behackl"
+            },
+            "body": "Thanks for the feedback!\n\nAs of right now, this issue isn't really very actionable. We could turn this into a discussion about primarily the building blocks tutorial (which I absolutely agree needs some attention).\n\nIf you would like to help us change and improve this particular document, more details would be useful: what parts exactly are confusing and should be rewritten? What did you expect to learn about that was not contained in the tutorial? The more details you can give, or maybe even suggestions for changes, the more likely it is that we can get this improved soon.\n\n(And just because ",
+            "createdAt": "2026-08-02T20:26:07Z"
+           },
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "I'm happy to make a concrete suggestion:\n\nAs-is, the _Using coordinates of a mobject_ section mainly explains that there _exists_ various methods to get a point from a mobject, but not what they are and how exactly we might use them (though of course something like `get_top()` is fairly self-explanatory). I suggest that this section is changed to cover the following:\n\n- The methods `get_top`, `get_bottom`, `get_right`, `get_left`, and `get_center` as well as `get_corner(direction)` and `get_edge_center(direction)`. Probably with an example showing the axis-aligned bounding box built from these",
+            "createdAt": "2026-08-03T10:53:51Z"
+           },
+           {
+            "author": {
+             "login": "Hakkesaelger"
+            },
+            "body": "Another problem is in the Custom animations part. I think it would be better and more understandable if as \n the text describes the code to be written, you should also see a code snippet according to the description. That way, you feel like you're building with the tutorial, while currently it feels like someone standing and talking at you and then the complete code is thrown at your head",
+            "createdAt": "2026-08-03T11:12:38Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "The docs are confusing",
+         "updatedAt": "2026-08-03T11:12:38Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4909"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "There are a lot of issues related to Images in Manim, this issue should keep all the important ones and the state of them in one place\r\n\r\n- [ ] #3146 \r\n- [x] #3131\r\n- [x] #2979\r\n- [x] #2412\r\n- [ ] #3113 \r\n- [x] #2924\r\n- [x] #2918\r\n- [ ] #2832",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2023-12-02T12:06:17Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "tracking"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 3482,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "chopan050"
+            },
+            "body": "Regarding the 3D rotation/movement/flipping issues:\n\nThe main problem is that the implementation of the [`Camera.display_image_mobject()`](https://github.com/ManimCommunity/manim/blob/bcab73a3d2a5065e6ce330aaa3a4a8f85c785f27/manim/camera/camera.py#L964-L1021) method is incomplete:\n- It only resizes and rotates the image.\n- It does not shear the image or apply perspective to it. Therefore, it always looks rectangular and faces the camera, even when you 3D rotate it. [Take a look at this TODO.](https://github.com/ManimCommunity/manim/blob/bcab73a3d2a5065e6ce330aaa3a4a8f85c785f27/manim/camera/cam",
+            "createdAt": "2025-06-02T20:24:56Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {}
+           },
+           {
+            "source": {
+             "state": "MERGED"
+            }
+           }
+          ]
+         },
+         "title": "Image issues Tracking",
+         "updatedAt": "2026-08-02T06:55:05Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/3482"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of proposed feature\n<!-- Add a clear and concise description of the new feature, including a motivation: why do you think this will be useful? -->\n\n### My motivation\n\nHello, I want to be able to select the last object in a group as the target for alignment when using `Mobject.arrange()`, instead of the default first object.\n\nLike this:\n\nhttps://github.com/user-attachments/assets/abd9c835-6a4e-4182-be2c-b71372e7c2a9\n\n### Why\n\n`Mobject.arrange()` always uses the first object as the alignment target:\n\nhttps://github.com/ManimCommunity/manim/blob/2ab99b53d3e8f43b1cd7245208d78c5dd6f9",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           },
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 10
+         },
+         "createdAt": "2025-03-07T09:29:50Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "good first issue"
+           },
+           {
+            "name": "new feature"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 4183,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "rotempasharel1"
+            },
+            "body": "Updated the PR to use a `reference` parameter instead of `last`, and fixed the arrange iteration issue. The CI checks are now passing.\n",
+            "createdAt": "2026-04-26T19:20:21Z"
+           },
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "I think @behackl's suggestion of \"just remember the position of the `reference` mobject, arrange with respect to the first and then shift the arranged group such that the `reference` object is in its original position\" (adjusted here for arbitrary reference objects from the group) makes a lot of sense.\n\nBut it seems to me that having both the `reference` parameter and the `center` parameter causes issues. If we keep the default of `center=True`, then calling something like `group.arrange(RIGHT, reference=group[-1])` will lead to one of two results, depending on implementation:\n\n1. As is curren",
+            "createdAt": "2026-07-31T09:00:25Z"
+           },
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "On further reflection: Although this would be a highly breaking change to implement, you _could_ make the argument that it is very unusual for a mobject method to center the mobject after performing the actual change; we wouldn't accept this behavior for methods like `scale` or `rotate`, and AFAIK even `arrange_in_grid` only moves the arranged group back to its original center point, not to ORIGIN. It doesn't seem preposterous that the default behavior of `arrange` would be to keep the first element fixed in space.",
+            "createdAt": "2026-07-31T09:14:26Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           },
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "Select the last object of the group as the alignment target when using `Mobject.arrange()`",
+         "updatedAt": "2026-07-31T09:14:26Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4183"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\n<!-- Add a clear and concise description of the problem you encountered. -->\nI recently set up Manim in a fresh virtual environment. The Cairo renderer displays this scene correctly, but the OpenGL renderer does not. In OpenGL, the fills and strokes of different Mobjects appear to be composited in the wrong order, so one object\u2019s stroke can appear above another object\u2019s fill.\nEverything that has a VGroup with overlapping shapes renders as shown in the images below. \n\n## Expected behavior\n<!-- Add a clear and concise description of what you expected t",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 5
+         },
+         "createdAt": "2026-07-17T22:10:01Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4890,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "anagram-of-pi"
+            },
+            "body": "Yes, that looks similar to my issue. However, it does seem like there might be something different regarding the infill. When I get a chance, I'll try to recreate #4721 and see if it is the same issue.",
+            "createdAt": "2026-07-29T20:43:38Z"
+           },
+           {
+            "author": {
+             "login": "anagram-of-pi"
+            },
+            "body": "After testing, that does seem to be it. I've attached another screenshot as well. \nI would agree that the render depth is being calculated as the order in which the mobjects were added rather than the actual z depth. \n\n<details>\n<summary>OpenGL render of boxes + logo</summary>\n<img width=\"1680\" height=\"1050\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/e7d0d5bb-96d8-47c4-b699-21a34bd1368e\" /></details>\n",
+            "createdAt": "2026-07-29T22:32:39Z"
+           },
+           {
+            "author": {
+             "login": "colinrubow"
+            },
+            "body": "This is correct, the OpenGL renderer does not render orders correctly and there's a number of challenges to prevent proper ordering.\n\nThe simplest way to do proper ordering in OpenGL with opacity considerations is to:\n1.  enable depth testing for all completely opaque objects\n2. render the opaque objects (depth testing will do orderings correctly)\n3. turn off depth testing for all transparent objects (but still enable depth writing)\n4. sort transparent objects by distance from camera\n5. render the transparent objects (farthest away first)\n\nif you keep depth testing on for transparent objects t",
+            "createdAt": "2026-07-29T23:18:21Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "VGroup using OpenGL renderer incorrectly layers fills and strokes (macOS)",
+         "updatedAt": "2026-07-29T23:28:28Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4890"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Enhancement proposal\r\n<!-- Add a clear and concise description of your enhancement proposal. In particular,\r\n     if your enhancement introduces changes to the API, illustrate them with\r\n     (fictional) code examples. -->\r\nI suggested adding a channel in the discord server called `#beginner-resources` that would help beginners get started with Manim.\r\n\r\n@behackl also suggested adding this type of information in the docs/ landing page. \r\n\r\nI think this would be a good idea! We could probably add some of the resources we compiled from the `?sp tutorials` snippet:\r\n\r\n```\r\nMost tutorials onlin",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 6
+         },
+         "createdAt": "2021-10-09T23:10:45Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "documentation"
+           },
+           {
+            "name": "enhancement"
+           },
+           {
+            "name": "good first issue"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 2175,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "paragpawar0077"
+            },
+            "body": "Hi! I'd like to work on this issue. Is it still available? If so, I'd be happy to submit a PR.",
+            "createdAt": "2026-07-18T06:48:57Z"
+           },
+           {
+            "author": {
+             "login": "HarryXin0919"
+            },
+            "body": "I did a quick link audit to help whoever picks this up (not claiming the issue, since @paragpawar0077 has already expressed interest):\n\n- `https://try.manim.community/` is live and redirects to the interactive tutorial.\n- Flying Frames is live.\n- Both linked YouTube videos are still available (Brian Amedee, \u201cManim Explained\u201d; Theorem of Beethoven, \u201cManimCE tutorial #1\u201d).\n- `https://docs.manim.community/en/latest/tutorials.html` now returns **404**. The current official replacement is `https://docs.manim.community/en/stable/tutorials/`.\n\nGiven the earlier discussion, a small website resources b",
+            "createdAt": "2026-07-21T15:22:14Z"
+           },
+           {
+            "author": {
+             "login": "paragpawar0077"
+            },
+            "body": "Thanks for the investigation, @HarryXin0919 \u2014 confirms try.manim.community, Flying Frames, Brian Amedee, and Theorem of Beethoven are all still live, and that the old tutorials URL should be replaced with https://docs.manim.community/en/stable/tutorials/.\n\nLooking back at the thread, it seems like the placement question was already settled: @Darylgolden and @behackl both leaned toward the website over the docs, and @naveen521kk noted new pages can be added via a .md file in the contents folder of manim-website (per the frontmatter pattern in constants.py). Combined with your suggestion of a sm",
+            "createdAt": "2026-07-21T19:42:51Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Add helpful resources for learning Manim in the landing page.",
+         "updatedAt": "2026-07-21T19:42:51Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/2175"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\r\nSetting a fixed width of the columns in a MathTable() is not correctly supported for the first and last column, which are truncated at the left and right edge of the table elements.\r\n\r\n\r\n## Expected behavior\r\nThe given width should be obeyed independent on the contents of the cells.\r\n\r\n\r\n## How to reproduce the issue\r\n<details><summary>Code for reproducing the problem</summary>\r\n\r\n```python\r\nclass Test(Scene):\r\n    def construct(self):\r\n        mytable = MathTable(\r\n            [[1, 10, 100, 1000, 10000, 100000], [0,0,0,0,0,0]],\r\n            h_buff=",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 2
+         },
+         "createdAt": "2023-11-09T19:42:21Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "good first issue"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 3446,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "uwezi"
+            },
+            "body": "![image](https://github.com/ManimCommunity/manim/assets/8582807/2f8f1209-8b46-4b3b-a23e-d86b9bc18e9b)\r\n",
+            "createdAt": "2023-11-09T19:42:44Z"
+           },
+           {
+            "author": {
+             "login": "yyccPhil"
+            },
+            "body": "Hi! I'd love to pick this up. Since this issue was opened about two and a half years ago, I'm not sure whether it still exists, so I'm thinking I'll start by trying to reproduce it. Could you assign it to me, or let me know if there's any context I should be aware of? Thanks so much!",
+            "createdAt": "2026-07-21T03:48:01Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "0.17.3 MathTable - first and last column of MathTable are truncated",
+         "updatedAt": "2026-07-21T03:48:02Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/3446"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nBoth the preview window (`manim -p file.py`) and movie file (`manim -w file.py`) at a random location in the manimation freezes and then previews the same frame for the rest of the manimation.  It seems like the rest of the manimation is still processing like normal (progress bars and info prints still proceed as normal).\n\n## How to reproduce the issue\nRun any manimation, though longer ones have an increasingly larger chance of freezing.\n\n## Logs\n<details><summary>Terminal output</summary>\nNo details found by `-v DEBUG`.\n\n## System specifications\n\n<d",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2026-07-03T22:20:59Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4863,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "detective-sokka"
+            },
+            "body": "@colinrubow this looks interesting. I'm taking a look",
+            "createdAt": "2026-07-18T16:15:42Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Experimental: Manimation Freezes Consistently, but Randomly",
+         "updatedAt": "2026-07-18T16:15:42Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4863"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of proposed feature\nSupport for colors, gradients, and animations utilizing the Oklab and Oklch color models.\nThese color models account for the fact that color vision is both a physical, and a psychological phenomena.\nRGB and HSL/HSV are very easy to implement into computers, but they don't account for some weird biases our vision has.\n\nThese perceptual models also represent device-independent color which is very useful for web video. Not every possible input is valid, and the range of possible inputs depends on your target color space (sRGB, P3, Adobe RGB, Rec. 2020, Rec. 2100",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2026-06-19T11:03:45Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "new feature"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 4820,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "LFS6502"
+            },
+            "body": "The models themselves need not be implemented by the maintainers. Tapping into one of the many pre-existing color libraries in Python should do.",
+            "createdAt": "2026-07-16T09:03:41Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Feature request [Color]: Support for perceptual color models (Oklab, Oklch)",
+         "updatedAt": "2026-07-16T09:03:41Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4820"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nWhen having audio after silence, that audio is broken in rerendered videos. \nMeanwhile the audio before the silence stays fine.\n\n```py\nclass AudioTest(Scene):\n    def construct(self):\n        # audio before silence works fine\n        self.add_sound(\"audio.wav\")\n        self.wait(5)\n        # silence\n        self.wait(3)\n        # audio after silence is broken after rerender\n        self.add_sound(\"audio.wav\")\n        self.wait(5)\n```\n\nThis bug seems to be caused by the caching system since the audio is fine \n* for the initial render\n* when disabling ",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 3
+         },
+         "createdAt": "2026-05-29T17:23:47Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4751,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "GniLudio"
+            },
+            "body": "The bug seems to be connected to the `renderer.skip_animations` flag,\nso it can be bypassed with this for now:\n```py\n        self.renderer.skip_animations = False\n        self.add_sound(\"audio.wav\")\n```",
+            "createdAt": "2026-06-05T14:53:39Z"
+           },
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4876: reset skip_animations after cache-only play() so add_sound() isn't skipped between cached waits.",
+            "createdAt": "2026-07-08T11:35:08Z"
+           },
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4888: restore skip_animations after cached plays so audio is recorded on rerender.",
+            "createdAt": "2026-07-14T17:17:25Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "Audio broken after silence in rerendered video",
+         "updatedAt": "2026-07-15T10:08:27Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4751"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\r\nI am animating a DashedLine, using `put_start_and_end_on()` in an updater. This stretches the dashes, making them inconsistent with other DashedLines, when the length changes.\r\n\r\n## Expected behavior\r\nI would like to have consistent dash geometries among all my dashed lines, so the number of dashes would have to be recomputed when I change the line length. I would be fine with calling an extra method in my updater, but right now the code in `__init__` does not lend itself to being copied into an updater.\r\n\r\n## How to reproduce the issue\r\n<!-- Provid",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 2
+         },
+         "createdAt": "2024-10-30T22:11:45Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 3989,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4878: `put_start_and_end_on` now rebuilds dashes with updated `num_dashes` instead of scaling existing segments.",
+            "createdAt": "2026-07-08T11:44:15Z"
+           },
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4885: recompute DashedLine dashes on put_start_and_end_on.",
+            "createdAt": "2026-07-14T12:27:26Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {}
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "[BUG] DashedLine computes num_dashes only once (on init)",
+         "updatedAt": "2026-07-15T10:08:26Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/3989"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\n\nWhen a single `self.play(...)` call is given two independent `.animate`-built animations that both touch the same mobject \u2014 one via a parent `VGroup`'s `.animate`, the other directly on one of that group's submobjects \u2014 the two animations don't compose. Instead, for any attribute that only one of the two animations actually changes, **whichever animation appears later in the `self.play(...)` argument list wins**, silently discarding the other's effect on that attribute for every frame.\n\nRoot cause (as far as I can tell from `mobject.animate` / `_Ani",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 2
+         },
+         "createdAt": "2026-07-04T19:59:21Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4865,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4875 logs a warning when multiple `.animate` calls in one `play()` share a mobject family.",
+            "createdAt": "2026-07-08T11:29:25Z"
+           },
+           {
+            "author": {
+             "login": "nikolajmunk"
+            },
+            "body": "Yeah, this is perhaps _the_ most common footgun in Manim's current implementation. AFAIK, the closest you'll get to an actual callout is this warning bit from the docs of [Mobject.animate](https://docs.manim.community/en/stable/reference/manim.mobject.mobject.Mobject.html#manim.mobject.mobject.Mobject.animate):\n<img width=\"642\" height=\"442\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/598a2bf7-f0e6-44fd-82b7-575db25b6419\" />\n\u2014 but this warning indeed doesn't explicitly call out that this also applies to submobjects of `my_mobject` (since the submobjects are also de facto part of",
+            "createdAt": "2026-07-14T12:10:19Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "Combining a parent-group .animate with a child .animate in the same self.play() silently drops whichever comes first",
+         "updatedAt": "2026-07-15T10:08:24Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4865"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nWhen shifting a `MathTex()` object which has an argument in the form of a list of substrings, the bounding box of the object grows, both vertically and horizontally.\n\nAs reported by TomBC on Discord https://discord.com/channels/1453870851807117363/1482938671190511748/1482938671190511748\n\n## Expected behavior\nThe bounding box should not change and just be the bounding box of the object.\n\n\n## How to reproduce the issue\n<details><summary>Code for reproducing the problem</summary>\n\n```py\nclass TryMathTex(Scene):\n    def construct(self):\n        li = ['\\\\",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 3
+         },
+         "createdAt": "2026-03-16T21:41:48Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4643,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "BraverChiang"
+            },
+            "body": "I'm TomBC on Discord, Thank you so much for this bug report @uwezi . To help contributors of manimCE to navigate the bug a little bit faster, I post what I find below:\nThis *shift bounding box bug* can date back to  [PR#3423](https://github.com/ManimCommunity/manim/pull/3423)  or  [Commit b7eefca](https://github.com/ManimCommunity/manim/commit/b7eefca98f40b9fc658a5a52295161f7e620baa0#diff-fc5e7892673cde1353c2e22da6ce5c65ee934bb27bfc9a78f134a40ee2d9f062).  When great contributors tried to *Fix incorrect submobject count of multi-part Tex/MathTex*, and removed this line `sub_tex_mob.submobjects ",
+            "createdAt": "2026-03-17T07:50:54Z"
+           },
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4877: empty MathTexPart submobjects now get a VectorizedPoint placeholder so the bbox stays fixed after shift.",
+            "createdAt": "2026-07-08T11:35:06Z"
+           },
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "Closed #4877 \u2014 VectorizedPoint workaround breaks `test_multi_part_tex_with_empty_parts` and the shift bbox regression doesn't reproduce on current main (Cairo + OpenGL). Happy to revisit if there's a minimal repro on latest.",
+            "createdAt": "2026-07-08T11:39:31Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "ManimCE 0.20.1: MathTex bounding box changes size when shifted",
+         "updatedAt": "2026-07-15T10:08:24Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4643"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Source\n\n`manim/mobject/graphing/coordinate_systems.py`, line 159 (as of HEAD <SHA>):\n\n\n```\ndef coords_to_point(self, *coords: ManimFloat) -> Point3D:\n        # TODO: I think the method should be able to return more than just a single point.\n        # E.g. see the implementation of it on line 2065.\n        raise NotImplementedError()\n```\n\n\n(Note: the \"line 2065\" reference in the original TODO is stale. The concrete implementations of `coords_to_point` live in subclasses such as `Axes` and `NumberPlane`, see `def coords_to_point` matches in the same file.)\n\n## Problem\n\nThe abstract `coords_to",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2026-06-12T16:56:47Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4804,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4848 aligns the base `coords_to_point`/`point_to_coords`/`p2c` annotations with the `Axes`/`NumberPlane` implementations (batch coords, `np.ndarray` return) and drops the stale TODO.",
+            "createdAt": "2026-06-30T10:56:44Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "graphing: align coords_to_point return type in base class with subclass behaviour",
+         "updatedAt": "2026-07-15T10:08:22Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4804"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nWhen an Angle is initialized on two lines (even with `always_redraw`) and one of the lines changes the value of the angle doesn't reflect that change.\nMight be a duplicate of #3698, if so, can someone please explain?\n\n## Expected behavior\nRunning `angle.get_value()` should reflect the change in rotation of the lines.\n\n## How to reproduce the issue\n<details><summary>Code for reproducing the problem</summary>\n\nMinimal example that just prints the angles to the console while rendering\n```py\nfrom manim import *\n\nclass Main(Scene):\n    def construct(self)",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 2
+         },
+         "createdAt": "2025-12-14T16:42:03Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4512,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "uwezi"
+            },
+            "body": "The problem has probably to do with the way how `always_redraw` replaces/updates the object instances.\n\nHere is a quick-and-dirty solution for you (I replaced the `Tex()` with `Text()` so that LaTeX is not evoked for every single frame of the animation with a new value for the angle, and I changed to an f-string with adjustable resolution):\n```py\nclass Main(Scene):\n    def construct(self):\n        rotation = ValueTracker(0)\n        l1 = Line(LEFT, RIGHT)\n        l2 = always_redraw(lambda: Line(DOWN, UP).rotate(rotation.get_value()))\n        a = always_redraw(lambda: Angle(l1, l2))\n        def ",
+            "createdAt": "2025-12-14T23:20:34Z"
+           },
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "Confirmed: `always_redraw` refreshes via `become()`, which copies points/submobjects but not the cached `angle_value` that `get_value()` returns, so it stays at the initial angle. Opened #4853 to copy `angle_value` in an `Angle.become()` override.",
+            "createdAt": "2026-07-01T00:20:22Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "Angle does not change value when line updates",
+         "updatedAt": "2026-07-15T10:08:22Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4512"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nMobjects being drawn to the screen by `TransformFromCopy` with the source mobject being `Text` or `Tex` seem to have no points when `mobject.get_start()` is run and it throws an Exception. I tested it with the source beign some others and it worked fine.\n\n## Expected behavior\nWell, it's not supposed to throw an exception...\n\n## How to reproduce the issue\n<details><summary>Code for reproducing the problem</summary>\n\n```py\nfrom manim import *\n\nclass Main(Scene):\n    def construct(self):\n        mobject = Circle()\n        text = Text(\"Hello, World!\")\n  ",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 3
+         },
+         "createdAt": "2025-12-12T17:26:06Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4510,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "strniko"
+            },
+            "body": "There is a dirty fix I found for now but transforming from Text really does not look good imo:\n```py\nfrom manim import *\n\nclass Main(Scene):\n    def construct(self):\n        mobject = Circle()\n        text = Text(\"Hello, World!\")\n        self.add(text)\n        temp_mobject = mobject.copy()\n        self.play(TransformFromCopy(text, temp_mobject))\n        self.add(mobject)\n        self.remove(temp_mobject)\n        print(f\"points: {mobject.get_all_points()}\")  # this works fine\n        print(f\"start: {mobject.get_start()}\")  # this now also works\n```\nIt really looks like the transformation messes",
+            "createdAt": "2025-12-13T14:34:14Z"
+           },
+           {
+            "author": {
+             "login": "aaronshenhao"
+            },
+            "body": "Is the text supposed to persist on screen? If not, removing `self.add(text)` will fix that problem.\n\nRegarding the main issue: It will work if you use the OpenGL renderer instead of the default Cairo one, by adding `--renderer opengl` to the CLI command. There's probably some odd renderer-specific behavior going on, either within the Text class itself, or within one of the base classes that the `ConvertToOpenGL` metaclass swaps normal Cairo classes out for.",
+            "createdAt": "2026-05-07T17:59:54Z"
+           },
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "Root cause: transforming onto a `Text`/`Tex`-shaped mobject leaves the points on submobjects, so the top level has none. `get_start`/`get_end` only checked `self.points` and errored. Opened #4852 to fall back to `family_members_with_points()` (OpenGL already worked because its getters walk the family).",
+            "createdAt": "2026-07-01T00:20:20Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "Mobject created from TransformFromCopy has no start",
+         "updatedAt": "2026-07-15T10:08:22Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4510"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nI ran a MoveAlongPath on a parametric function that also raised a RuntimeWarning:\ninvalid value encountered in scalar power       x = -((2 + t**-3)/(t**3 - 1))**(1/3).\nI then also got an exception that said \"Not sure how you reached here, please file a bug report at [github link]\".\n\n\n## Expected behavior\nI'm pretty new to manim. I think I just expected it to work lol.\n\n\n## How to reproduce the issue\n<details><summary>Code for reproducing the problem</summary>\n\n```py\nfrom manim import *\n\ndef f(u, v):\n    if v == 0:\n        return int(bool(u)) # cheati",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 2
+         },
+         "createdAt": "2026-06-28T13:41:09Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4838,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "chopan050"
+            },
+            "body": "Hi! At some points in your t_range of [-2, -0.5] (example: t = -1.1), you'll have a negative number raised to the power of 1/3. Python will raise an error when trying to raise a negative number to a decimal number, even if that number is something like 1/3 (trying to calculate the cube root): Python does not store 1/3 as the exact fraction 1/3, but rather a floating point approximation of it, because 1/3 in floating point cannot be expressed as a finite string of 0s and 1s.\n\nIn this specific case, apart from a `sqrt` (square root) function, NumPy and the `math` module have `cbrt` (cube root) w",
+            "createdAt": "2026-06-28T15:43:22Z"
+           },
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4847 replaces the \"Not sure how you reached here\" exception with a clear ValueError when the function produces NaN/inf points (and falls back to the last point on float-rounding fallthrough).",
+            "createdAt": "2026-06-30T10:56:43Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {}
+           },
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "\"Exception: Not sure how you reached here\" when `ParametricFunction` takes invalid values",
+         "updatedAt": "2026-07-15T10:08:21Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4838"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\nText(\"test\", color=WHITE) does not result in a Text object with color WHITE\n\n\n## Expected behavior\nText(\"test\", color=WHITE) should result in a Text object with color WHITE\n\n## How to reproduce the issue\n\n<details><summary>Code for reproducing the problem</summary>\n\n```py\n    text_obj = Text(\"test\", color=WHITE)\n    print(text_obj.text + \" \" + str(text_obj.get_color()))\n    text_obj.set_color(WHITE)\n    print(text_obj.text + \" \" + str(text_obj.get_color()))\n```\n\n</details>\n\nEXPECTED OUTPUT:\ntest #FFFFFF\ntest #FFFFFF\n\nACTUAL OUTPUT:\ntest #000000\ntest ",
+         "closedByPullRequestsReferences": {
+          "nodes": [
+           {
+            "state": "OPEN"
+           }
+          ]
+         },
+         "comments": {
+          "totalCount": 3
+         },
+         "createdAt": "2026-06-18T02:36:54Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4817,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "uwezi"
+            },
+            "body": "I can reproduce the result - the `color` attribute is correctly set for the individual glyphs of the text object though:\n\n```\nclass whiteText(Scene):\n    def construct(self):\n        text_obj = Text(\"test\", color=RED)\n        self.add(text_obj)\n        print(text_obj.text + \" \" + str(text_obj[0].get_color()))\n        text_obj.set_color(WHITE)\n        print(text_obj.text + \" \" + str(text_obj.get_color()))\n```\n\n```\ntest #FC6255\ntest #FFFFFF\n```",
+            "createdAt": "2026-06-18T07:29:25Z"
+           },
+           {
+            "author": {
+             "login": "dave-br"
+            },
+            "body": "Sounds useful to know, thanks.  I hadn't considered checking the color of individual characters.",
+            "createdAt": "2026-06-18T18:42:07Z"
+           },
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4844 sets the Text mobject color when `color=` is passed to the constructor.",
+            "createdAt": "2026-06-30T10:47:04Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           },
+           {
+            "source": {
+             "state": "OPEN"
+            }
+           }
+          ]
+         },
+         "title": "Text color attribute ignored on constructions",
+         "updatedAt": "2026-07-15T10:08:21Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4817"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Description of bug / unexpected behavior\n`DecimalNumber.set_value` ignores the rotation of the original number.\n\nThis leads to the changed number not being rotated and being scaled to the \"rotated size\".\n\n```py\nclass TestScene(Scene):\n    def construct(self) -> None:\n        number = DecimalNumber(font_size=192)\n        self.add(number)\n        self.play(Rotate(number, 45 * DEGREES))\n        number.set_value(1)\n        self.wait()\n```\n\nhttps://github.com/user-attachments/assets/652e6518-8b15-4f32-afad-9841ecc0027c\n\n## Expected behavior\nThe decimal number should have:\n* The same rotation\n* T",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 1
+         },
+         "createdAt": "2026-06-21T18:41:51Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4830,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "Chessing234"
+            },
+            "body": "PR #4843 preserves rotation and font size in `DecimalNumber.set_value`.",
+            "createdAt": "2026-06-30T10:47:02Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": [
+           {
+            "source": {
+             "state": "CLOSED"
+            }
+           }
+          ]
+         },
+         "title": "`DecimalNumber.set_value` ignores rotation",
+         "updatedAt": "2026-07-15T10:08:20Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4830"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Enhancement proposal\r\nCurrently, Manim stores the point data for `VMobjects` as a flat list of points. This is not representative at all of how `VMobjects` are actually structured, i.e. as composite bezier curves. In fact, every four points (three for OpenGL) form the points defining a cubic/bezier curve, yet they are currently not explicitly grouped together. Furthermore, the data of which points form what paths is not stored, and Manim instead spends a significant amount of time every frame checking whether for each pair of consecutive bezier curves, their end and start points are close e",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 3
+         },
+         "createdAt": "2022-02-02T06:05:24Z",
+         "labels": {
+          "nodes": [
+           {
+            "name": "enhancement"
+           },
+           {
+            "name": "needs discussion"
+           }
+          ]
+         },
+         "locked": false,
+         "number": 2527,
+         "recent": {
+          "nodes": [
+           {
+            "author": {
+             "login": "Darylgolden"
+            },
+            "body": "A possible approach is to have a `Bezier` dataclass, then having the `points` array be an array of these dataclasses. This easily extends to allow different path components. If they are made immutable, it will help with caching. However, this might cause overhead when operating on points (I think it would be perfect, if not for that problem).",
+            "createdAt": "2022-02-09T09:43:10Z"
+           },
+           {
+            "author": {
+             "login": "Darylgolden"
+            },
+            "body": "One possible approach is to have components be subclasses of numpy arrays. Pointwise functions can still be applied directly with numpy through `apply_along_axis`. This could retain speed while semantically splitting up data. Needs more investigation.",
+            "createdAt": "2022-02-11T04:06:20Z"
+           },
+           {
+            "author": {
+             "login": "chopan050"
+            },
+            "body": "I have recently been thinking about this. Calculations of things like subpaths, bounding boxes* and unit normals could be memoized and grouped inside a separate object. For `Mobject`s, it could be something like `MobjectPoints`. For `VMobject`s, it could be a subclass of `MobjectPoints` called `VMobjectPoints`. They would have an underlying `_array` of points, a lot of initially `None` memos for useful things such as subpaths and bounding boxes*, properties / getters which calculate those attributes if they're `None` or return them if they're set to something else, etc. Something like this:\n\n`",
+            "createdAt": "2026-06-30T20:32:25Z"
+           }
+          ]
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "A better data structure for `VMobject`s",
+         "updatedAt": "2026-06-30T20:32:26Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/2527"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Background\n\nAs part of an academic project on software maintenance and evolution (repository mining course assignment), we ran a static audit of TODO/FIXME/XXX/HACK markers across the source tree. The audit focused on eight hotspot files identified by a churn \u00d7 bug-fix-touches analysis over the 2024-01 to 2026-05 window. Two larger hotspot files (`mobject.py` and `vectorized_mobject.py`) were excluded because they are reported to be under active refactor.\n\nThe audit found **26 real markers** across the eight files. After a manual triage, we believe **18 of them** describe work that would be",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 0
+         },
+         "createdAt": "2026-05-27T16:39:15Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4747,
+         "recent": {
+          "nodes": []
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "Audit and triage of TODO/FIXME markers in hotspot source files",
+         "updatedAt": "2026-06-21T04:26:10Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4747"
+        },
+        {
+         "assignees": {
+          "totalCount": 0
+         },
+         "body": "## Source\n\nTwo related sites in `manim/mobject/opengl/opengl_mobject.py`\n(as of HEAD <SHA>):\n\nLine 156 \u2014 the parameter declaration in `OpenGLMobject.__init__`:\n\n```\ndef __init__(\n    self,\n    color: ParsableManimColor | Sequence[ParsableManimColor] = WHITE,\n    opacity: float = 1,\n    dim: int = 3,  # TODO, get rid of this\n    ...\n```\n\nLine 185 \u2014 the instance attribute assignment:\n\n`self.dim: int = dim  # TODO, get rid of this`\n\n## Problem\n\nThe `dim` parameter on `OpenGLMobject.__init__` is paired with two in-source TODOs asking for its removal. The parameter is declared with a default of `3`",
+         "closedByPullRequestsReferences": {
+          "nodes": []
+         },
+         "comments": {
+          "totalCount": 0
+         },
+         "createdAt": "2026-06-12T17:04:53Z",
+         "labels": {
+          "nodes": []
+         },
+         "locked": false,
+         "number": 4806,
+         "recent": {
+          "nodes": []
+         },
+         "repository": {
+          "isArchived": false,
+          "nameWithOwner": "ManimCommunity/manim"
+         },
+         "timelineItems": {
+          "nodes": []
+         },
+         "title": "opengl: deprecate unused dim parameter on OpenGLMobject",
+         "updatedAt": "2026-06-12T17:04:53Z",
+         "url": "https://github.com/ManimCommunity/manim/issues/4806"
+        }
+       ]
+      },
+      "nameWithOwner": "ManimCommunity/manim"
+     }
+    }
+   },
+   "variables": {
+    "name": "manim",
+    "owner": "ManimCommunity",
+    "q": "repo:ManimCommunity/manim is:issue is:open no:assignee label:\"good first issue\",\"good-first-issue\",\"good first bug\",\"first-timers-only\",beginner,\"beginner friendly\",easy,\"E-easy\",\"help wanted\",\"up-for-grabs\",hacktoberfest"
+   }
+  }
+ ]
+}
