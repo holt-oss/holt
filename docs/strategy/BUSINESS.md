@@ -192,7 +192,7 @@ The months (realistic case):
 | mix (average paying subscribers over the 6 months) | revenue a month |
 |---|---|
 | 10 USD Pro + 5 India Pro + 7 students | ₹8,300 |
-| 14 USD Pro | ₹8,064 |
+| 14 USD Pro | ₹8,066 |
 | 6 USD Pro + 10 India Pro + 6 students + 4 India top-ups | ₹8,136 |
 
 ### Runway
