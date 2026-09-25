@@ -5,7 +5,9 @@ import type {
   AnalysisStart, ApiError, ByokProvider, FindQuery, FindResult, FindStart, HistoryItem, JobStatus, Me, Mode,
   Report, Result, StarterIssue,
 } from "./types";
+import { isJobId } from "./ids";
 import * as mock from "./mock/server";
+import { isValidRepo } from "./repo";
 
 export const MOCK = process.env.MOCK_API === "1";
 const BASE = (process.env.HOLT_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
@@ -64,18 +66,31 @@ async function call<T>(path: string, init: RequestInit & { caller?: Caller } = {
 const enc = encodeURIComponent;
 const repoPath = (repo: string) => repo.split("/").map(enc).join("/");
 
+// Path parameters are validated here too, so nothing unexpected is ever
+// interpolated into an upstream URL, whatever the caller checked.
+const BAD_JOB = { ok: false as const, status: 400, error: { code: "invalid_request" as const, message: "That isn't a valid job id." } };
+const BAD_REPO = { ok: false as const, status: 400, error: { code: "invalid_repo" as const, message: "That doesn't look like a GitHub repository." } };
+function repoOk(repo: string) {
+  const [o, r, ...rest] = repo.split("/");
+  return rest.length === 0 && Boolean(o && r) && isValidRepo(o, r);
+}
+
 export function startAnalysis(repo: string, mode: Mode, days: number, refresh: boolean, caller: Caller): Promise<Result<AnalysisStart>> {
   if (MOCK) return mock.startAnalysis(repo, mode, days, refresh, caller.userId ?? undefined);
   return call("/v1/analyses", { method: "POST", body: JSON.stringify({ repo, mode, days, refresh }), caller });
 }
 
-export function jobStatus(jobId: string): Promise<Result<JobStatus>> {
+export async function jobStatus(jobId: string): Promise<Result<JobStatus>> {
+  if (!isJobId(jobId)) return BAD_JOB;
   if (MOCK) return mock.jobStatus(jobId);
   return call(`/v1/analyses/${enc(jobId)}`);
 }
 
 /** Raw upstream SSE response for a job (analyses or find). */
 export async function jobEvents(kind: "analyses" | "find", jobId: string, signal: AbortSignal): Promise<Response> {
+  if (!isJobId(jobId)) {
+    return new Response(`event: error\ndata: ${JSON.stringify({ error: BAD_JOB.error })}\n\n`, { status: 400, headers: { "Content-Type": "text/event-stream" } });
+  }
   if (MOCK) return mock.jobEvents(kind, jobId, signal);
   try {
     return await fetch(`${BASE}/v1/${kind}/${enc(jobId)}/events`, {
@@ -89,12 +104,14 @@ export async function jobEvents(kind: "analyses" | "find", jobId: string, signal
   }
 }
 
-export function getReport(repo: string, mode: Mode = "rules", days = 7): Promise<Result<Report>> {
+export async function getReport(repo: string, mode: Mode = "rules", days = 7): Promise<Result<Report>> {
+  if (!repoOk(repo)) return BAD_REPO;
   if (MOCK) return mock.getReport(repo, mode, days);
   return call(`/v1/reports/${repoPath(repo)}?mode=${mode}&days=${days}`);
 }
 
-export function starterIssues(repo: string, limit: number, caller: Caller): Promise<Result<{ repo: string; issues: StarterIssue[] }>> {
+export async function starterIssues(repo: string, limit: number, caller: Caller): Promise<Result<{ repo: string; issues: StarterIssue[] }>> {
+  if (!repoOk(repo)) return BAD_REPO;
   if (MOCK) return mock.starterIssues(repo, limit);
   return call(`/v1/repos/${repoPath(repo)}/starter-issues?limit=${limit}`, { caller });
 }
@@ -133,6 +150,7 @@ export function history(userId: string, limit = 50): Promise<Result<{ items: His
 }
 
 export async function badge(owner: string, repo: string): Promise<Response> {
+  if (!isValidRepo(owner, repo)) return new Response("Not found", { status: 404 });
   if (MOCK) return mock.badge(`${owner}/${repo}`);
   try {
     const res = await fetch(`${BASE}/badge/${enc(owner)}/${enc(repo)}.svg`, { next: { revalidate: 3600 } });

@@ -5,8 +5,8 @@ import { starterIssues } from "@/lib/api";
 import { preflight, publicGet } from "@/lib/public-api";
 import { isValidRepo } from "@/lib/repo";
 
-export function OPTIONS(req: Request) {
-  return preflight(req);
+export function OPTIONS() {
+  return preflight();
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ owner: string; repo: string }> }) {
@@ -14,5 +14,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ owner: s
   if (!isValidRepo(owner, repo)) {
     return NextResponse.json({ error: { code: "invalid_repo", message: "That isn't a GitHub repository." } }, { status: 400 });
   }
-  return publicGet(req, "issues", (ip) => starterIssues(`${owner}/${repo}`, 10, { ip }));
+  return publicGet(req, "issues", (ip) => starterIssues(`${owner}/${repo}`, 20, { ip }));
 }

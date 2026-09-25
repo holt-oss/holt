@@ -10,6 +10,7 @@ export async function proxyJobEvents(kind: "analyses" | "find", jobId: string, s
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
   };
+  if (upstream.status === 400) return new Response(upstream.body, { status: 400, headers });
   if (!upstream.ok || !upstream.body) {
     const error = upstream.status === 404
       ? { code: "not_found", message: "That analysis has expired. Start it again." }

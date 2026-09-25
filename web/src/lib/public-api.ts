@@ -8,26 +8,17 @@ import type { Result } from "./types";
 
 const PER_MINUTE = 60;
 
-export function allowedOrigin(origin: string | null): string | null {
-  if (!origin) return null;
-  if (origin === "https://github.com") return origin;
-  if (/^(chrome|moz)-extension:\/\/[a-z0-9-]+$/i.test(origin)) return origin;
-  return null;
+// API.md "Public proxy for the browser extension": the data is public, so
+// CORS is open; no cookies or auth are read.
+function cors(headers: Headers) {
+  headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  headers.set("Access-Control-Max-Age", "86400");
 }
 
-function cors(req: Request, headers: Headers) {
-  const origin = allowedOrigin(req.headers.get("origin"));
-  if (origin) {
-    headers.set("Access-Control-Allow-Origin", origin);
-    headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-    headers.set("Access-Control-Max-Age", "86400");
-  }
-  headers.set("Vary", "Origin");
-}
-
-export function preflight(req: Request) {
+export function preflight() {
   const res = new NextResponse(null, { status: 204 });
-  cors(req, res.headers);
+  cors(res.headers);
   return res;
 }
 
@@ -43,8 +34,9 @@ export async function publicGet<T>(req: Request, bucket: string, load: (ip: stri
   } else {
     const r = await load(ip);
     res = r.ok ? NextResponse.json(r.data) : NextResponse.json({ error: r.error }, { status: r.status });
-    res.headers.set("Cache-Control", r.ok || r.status === 404 ? "public, max-age=3600, s-maxage=3600" : "no-store");
+    // 15 min on 200, 5 min on 404 so a new analysis shows up soon.
+    res.headers.set("Cache-Control", r.ok ? "public, max-age=900" : r.status === 404 ? "public, max-age=300" : "no-store");
   }
-  cors(req, res.headers);
+  cors(res.headers);
   return res;
 }
