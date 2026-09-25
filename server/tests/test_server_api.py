@@ -542,3 +542,18 @@ def test_report_list_for_sitemaps(h):
     assert body[0] == {"repo": "octo/one", "mode": "rules",
                        "generated_at": "2026-09-25T00:00:00Z", "verdict": "viable"}
     assert len(h.get("/v1/reports?limit=2").json()["reports"]) == 2
+
+
+def test_badge_work_runs_even_with_a_single_worker(make_harness):
+    """Staging runs one worker; badge and warm jobs must not starve there."""
+    h = make_harness(run_jobs=False, HOLT_JOB_CONCURRENCY=1)
+    assert h.svc.runner.badge_concurrency == 1
+    h.client.get("/badge/octo/one.svg")
+    user_job = h.post("/v1/analyses", {"repo": "octo/two"}).json()["job_id"]
+    runner = h.svc.runner
+    first = h.client.portal.call(runner._claim)
+    assert first.id == user_job  # the user's job still goes first
+    runner._running.pop(first.id)
+    assert h.client.portal.call(runner._claim).priority == 10  # then the badge job
+    off = make_harness(run_jobs=False, HOLT_JOB_CONCURRENCY=1, HOLT_BADGE_CONCURRENCY=0)
+    assert off.svc.runner.badge_concurrency == 0

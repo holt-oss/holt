@@ -142,3 +142,40 @@ def test_dry_run_changes_nothing(h, starter_mod):
     assert result.reports_run == 2 and result.finds_run == 23
     assert rows(h, Job) == [] and starter_mod.calls == {"find": 0, "issues": 0}
     assert "would analyse octo/one" in lines
+
+
+def test_a_timed_out_job_fails_its_repo_and_the_pass_goes_on(h, starter_mod, monkeypatch):
+    budget(h, 5000)
+    real = warm.Warmer._run_job
+
+    async def flaky(self, job):
+        if job.repo == "octo/one":
+            raise TimeoutError("job for octo/one still running after 900s")
+        return await real(self, job)
+
+    monkeypatch.setattr(warm.Warmer, "_run_job", flaky)
+    result = run(h, ["octo/one", "octo/two"], starter=False, finds=False)
+    assert result.stopped is None
+    assert (result.reports_run, result.reports_failed) == (1, 1)
+    assert "octo/one: timed out" in result.failures
+
+
+def test_repeated_timeouts_stop_the_pass(h, starter_mod, monkeypatch):
+    budget(h, 5000)
+
+    async def never(self, job):
+        raise TimeoutError("still running")
+
+    monkeypatch.setattr(warm.Warmer, "_run_job", never)
+    result = run(h, ["octo/one", "octo/two", "octo/three", "octo/four"],
+                 starter=False, finds=False)
+    assert "never finished" in result.stopped and result.reports_failed == 3
+
+
+def test_seed_list_ships_inside_the_package():
+    from pathlib import Path
+
+    import holt_server
+
+    assert warm.SEEDS.is_relative_to(Path(holt_server.__file__).parent)
+    assert warm.SEEDS.is_file()
