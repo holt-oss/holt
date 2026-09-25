@@ -31,6 +31,9 @@ What they check:
 - `/pricing` shows the plans.
 - The extension's `/api/public/*` endpoints answer JSON with CORS headers.
 - `/__build` is valid JSON.
+- Phones (`tests/mobile.spec.ts`): no page scrolls sideways at 360px (the
+  failure names the elements that stick out), the viewport meta is
+  device-width, and on desktop the OPEN / SOURCE band moves as you scroll.
 - `/`, `/pallets/flask`, `/find`, `/pricing` and `/how-it-works` log no console errors.
 
 Staging runs this suite after every rebuild (`deploy/staging/preview.sh`)

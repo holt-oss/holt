@@ -29,7 +29,7 @@ const SCORES = [
 function Block({ n, label, title, children, alt = false }: { n: string; label: string; title: string; children: React.ReactNode; alt?: boolean }) {
   return (
     <section className={`border-t border-line py-16 md:py-20 ${alt ? "bg-section-alt" : ""}`}>
-      <div className="wrap grid gap-6 md:grid-cols-[148px_minmax(0,1fr)] md:gap-10">
+      <div className="wrap grid grid-cols-1 gap-6 md:grid-cols-[148px_minmax(0,1fr)] md:gap-10">
         <aside className="rail"><strong>{n}</strong><span>{label}</span></aside>
         <div>
           <h2 className="h2 mb-6 max-w-[770px]">{title}</h2>
@@ -116,7 +116,7 @@ export default function HowItWorks() {
         </p>
         <div className="mb-10 grid max-w-[760px] grid-cols-[auto_1fr_auto] items-center border border-line-strong bg-panel">
           <span aria-hidden="true" className="pl-4 text-amber">$</span>
-          <code className="overflow-x-auto whitespace-nowrap px-3 py-4 text-[0.9rem]">uv tool install holt-cli</code>
+          <code className="min-w-0 overflow-x-auto whitespace-nowrap px-3 py-4 text-[0.9rem]">uv tool install holt-cli</code>
           <CopyButton text="uv tool install holt-cli" className="self-stretch border-l border-line-strong px-4 text-[0.85rem] text-muted transition-colors hover:bg-green hover:text-on-accent" />
         </div>
         <figure className="m-0 border border-line-strong bg-[#101010]">
