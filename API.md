@@ -150,3 +150,38 @@ server's key, counted per calendar month (UTC). Failed AI jobs are not counted.
 
 Plans and payments are not implemented yet; `plan` is set manually in the DB
 for now. Free-tier quota values come from env.
+
+## Public proxy for the browser extension (implemented by `web/`)
+
+The browser extension (`extension/`) cannot hold `HOLT_INTERNAL_KEY`, so
+`web/` exposes two read-only, anonymous proxy routes on the public host
+(default `holt.aahil-khan.xyz`). They only read the cache; they never start an
+analysis or call GitHub.
+
+### `GET /api/public/report/{owner}/{repo}`
+Proxies `GET /v1/reports/{owner}/{repo}?mode=rules&days=7`.
+- `200` → the Report object (above), `mode: "rules"`. The extension reads only
+  `verdict` and `stats.outsider_attempts` / `stats.outsider_merged`, so the
+  proxy may strip `evidence` to keep responses small.
+- `404` → `{"error": {"code": "not_found", ...}}` when nothing is cached yet
+  (or the repo is missing/private). The extension then shows "Check with Holt"
+  and links to `/{owner}/{repo}`, whose page starts the analysis.
+- `429` `rate_limited` / `5xx` → shown as "Check with Holt" too.
+
+### `GET /api/public/starter-issues/{owner}/{repo}`
+Proxies `GET /v1/repos/{owner}/{repo}/starter-issues?limit=20` →
+`{"repo": "…", "issues": [StarterIssue]}`. The extension reads `number` and
+`why`. `404` when nothing is known.
+
+Both routes:
+- Accept `GET` and `OPTIONS` only, no cookies or auth. Forward the caller's
+  IP as `X-Holt-Client-Ip` like any anonymous request. A `501` from the
+  server (starter issues not shipped yet) may pass through; the extension
+  just shows no marks.
+- Send `Cache-Control: public, max-age=900` (15 min) on `200` and
+  `max-age=300` on `404`, so a new analysis shows up soon.
+- Send `Access-Control-Allow-Origin: *`. The extension fetches from its
+  background worker (which its host permission covers), but open CORS keeps
+  other read-only clients simple; the data is public.
+- Normalise `{owner}/{repo}` as in "Repo identifiers"; reject anything else
+  with `400 invalid_repo`.

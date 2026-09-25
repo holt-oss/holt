@@ -1,0 +1,98 @@
+<!doctype html>
+<!-- A trimmed copy of a GitHub repository page (header + issue list), using the
+     same element ids and Primer colour variables the extension relies on.
+     Sample data only. See fixtures/fixture.ts. -->
+<html lang="en" data-color-mode="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Issues · pallets/flask (fixture)</title>
+<link rel="stylesheet" href="../dist/chrome/content.css">
+<style>
+  :root {
+    --fgColor-default: #1f2328; --fgColor-muted: #59636e; --fgColor-accent: #0969da;
+    --fgColor-success: #1a7f37; --fgColor-danger: #d1242f; --fgColor-attention: #9a6700;
+    --bgColor-default: #ffffff; --bgColor-muted: #f6f8fa; --borderColor-default: #d1d9e0;
+    --borderColor-success-emphasis: #1f883d; --header-bg: #f6f8fa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fgColor-default: #f0f6fc; --fgColor-muted: #9198a1; --fgColor-accent: #4493f8;
+      --fgColor-success: #3fb950; --fgColor-danger: #f85149; --fgColor-attention: #d29922;
+      --bgColor-default: #0d1117; --bgColor-muted: #151b23; --borderColor-default: #3d444d;
+      --borderColor-success-emphasis: #238636; --header-bg: #010409;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bgColor-default); color: var(--fgColor-default);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; }
+  a { color: var(--fgColor-accent); text-decoration: none; }
+  .AppHeader { background: var(--header-bg); border-bottom: 1px solid var(--borderColor-default); padding: 16px 16px 0; }
+  .crumbs { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 12px; }
+  .crumbs .mark { width: 32px; height: 32px; border-radius: 50%; background: var(--fgColor-default); }
+  #repository-container-header { padding: 0 0 0; }
+  #repo-title-component { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; font-size: 20px; }
+  #repo-title-component .avatar { width: 24px; height: 24px; border-radius: 6px; background: #3c3c3c; margin-right: 8px; }
+  #repo-title-component strong a { color: var(--fgColor-default); font-weight: 600; }
+  .owner { color: var(--fgColor-muted); margin-right: 4px; }
+  .Label { margin-left: 8px; border: 1px solid var(--borderColor-default); border-radius: 2em; padding: 0 7px;
+    font-size: 12px; font-weight: 500; line-height: 18px; color: var(--fgColor-muted); }
+  nav.tabs { display: flex; gap: 4px; margin-top: 16px; overflow-x: auto; }
+  nav.tabs a { color: var(--fgColor-default); padding: 8px 12px; border-bottom: 2px solid transparent; white-space: nowrap; }
+  nav.tabs a.selected { border-bottom-color: #fd8c73; font-weight: 600; }
+  main { max-width: 1280px; margin: 24px auto; padding: 0 16px; }
+  .Box { border: 1px solid var(--borderColor-default); border-radius: 6px; }
+  .Box-header { background: var(--bgColor-muted); padding: 16px; border-bottom: 1px solid var(--borderColor-default); font-weight: 600; }
+  .row { padding: 10px 16px; border-bottom: 1px solid var(--borderColor-default); }
+  .row:last-child { border-bottom: 0; }
+  .row .title { color: var(--fgColor-default); font-weight: 600; font-size: 16px; }
+  .row .meta { color: var(--fgColor-muted); font-size: 12px; margin-top: 2px; }
+  .gh-label { display: inline-block; margin-left: 4px; padding: 0 7px; border-radius: 2em; font-size: 12px; font-weight: 500;
+    line-height: 18px; background: #7057ff; color: #fff; vertical-align: middle; }
+</style>
+</head>
+<body>
+<header class="AppHeader">
+  <div class="crumbs"><span class="mark"></span><span class="owner">pallets</span> / <strong>flask</strong></div>
+  <div id="repository-container-header">
+    <div id="repo-title-component">
+      <span class="avatar"></span>
+      <span class="owner">pallets /</span>
+      <strong itemprop="name" class="mr-1"><a href="/pallets/flask">flask</a></strong>
+      <span class="Label">Public</span>
+    </div>
+    <nav class="tabs">
+      <a href="/pallets/flask">Code</a>
+      <a class="selected" href="/pallets/flask/issues">Issues 12</a>
+      <a href="/pallets/flask/pulls">Pull requests 4</a>
+      <a href="/pallets/flask/actions">Actions</a>
+      <a href="/pallets/flask/security">Security</a>
+    </nav>
+  </div>
+</header>
+<main>
+  <div class="Box" role="list">
+    <div class="Box-header">12 Open</div>
+    <div class="row" role="listitem">
+      <a class="title" data-testid="issue-pr-title-link" href="/pallets/flask/issues/5612">Clarify app factory example in the tutorial</a>
+      <span class="gh-label">good first issue</span>
+      <div class="meta">#5612 opened 3 days ago · docs</div>
+    </div>
+    <div class="row" role="listitem">
+      <a class="title" data-testid="issue-pr-title-link" href="/pallets/flask/issues/5605">Async view raises on streamed response with teardown</a>
+      <div class="meta">#5605 opened 5 days ago</div>
+    </div>
+    <div class="row" role="listitem">
+      <a class="title" data-testid="issue-pr-title-link" href="/pallets/flask/issues/5598">Add a test for url_for with trailing slash</a>
+      <span class="gh-label">good first issue</span>
+      <div class="meta">#5598 opened last week · tests</div>
+    </div>
+    <div class="row" role="listitem">
+      <a class="title" data-testid="issue-pr-title-link" href="/pallets/flask/issues/5580">Rethink config loading order</a>
+      <div class="meta">#5580 opened 2 weeks ago</div>
+    </div>
+  </div>
+</main>
+<script src="../dist/fixture.js"></script>
+</body>
+</html>
