@@ -84,7 +84,10 @@ export default async function RepoPage({ params, searchParams }: Props) {
   const [dOwner, dRepo] = display.split("/");
 
   return (
-    <div className="wrap py-8 sm:py-12">
+    <div className="relative">
+    {/* The same backdrop as the landing hero, behind the repo header and verdict. */}
+    <div aria-hidden="true" className="hero-backdrop bottom-auto h-[560px] [mask-image:linear-gradient(#000_55%,transparent)]" />
+    <div className="wrap relative py-8 sm:py-12">
       {mode === "rules" && <JsonLd report={report.ok ? report.data : null} name={display} />}
       <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -143,6 +146,7 @@ export default async function RepoPage({ params, searchParams }: Props) {
       ) : (
         <ErrorPanel error={report.error} repo={name} retryHref={`/${name}${mode === "ai" ? "?mode=ai" : ""}`} />
       )}
+    </div>
     </div>
   );
 }

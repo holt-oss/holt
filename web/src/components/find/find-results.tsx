@@ -24,7 +24,7 @@ export function FindResults({ results, days }: { results: FindResult[]; days: nu
       {results.map((r, i) => {
         const s = r.stats;
         return (
-          <li key={r.repo} className="fade-up border border-line-strong bg-panel" style={{ ["--d" as string]: `${i * 0.06}s` }}>
+          <li key={r.repo} className="fade-up border border-line-strong bg-panel shadow-soft" style={{ ["--d" as string]: `${i * 0.06}s` }}>
             <div className="flex flex-wrap items-start gap-4 border-b border-line p-5 sm:p-6">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`https://github.com/${r.repo.split("/")[0]}.png?size=80`} alt="" width={40} height={40} loading="lazy" className="size-10 rounded-md border border-line-strong bg-panel-2" />

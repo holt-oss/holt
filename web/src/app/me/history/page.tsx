@@ -7,6 +7,7 @@ import { VerdictPill } from "@/components/report/verdict-pill";
 import { history } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { currentUser } from "@/lib/session";
+import { PageHead } from "@/components/page-head";
 
 export const metadata: Metadata = { title: "Your history", robots: { index: false } };
 
@@ -16,11 +17,13 @@ export default async function HistoryPage() {
   const r = await history(user.id);
 
   return (
-    <div className="wrap max-w-3xl py-10 sm:py-14">
+    <>
+    <PageHead narrow>
       <p className="rail mb-4 flex gap-2"><strong className="m-0">history</strong><span>{user.name || user.email}</span></p>
       <h1 className="display text-[clamp(2rem,6vw,3rem)]">Repos you&apos;ve checked</h1>
-
-      <div className="mt-8">
+    </PageHead>
+    <div className="wrap max-w-3xl py-10 sm:py-12">
+      <div>
         {!r.ok ? (
           <ErrorPanel error={r.error} retryHref="/me/history" />
         ) : r.data.items.length === 0 ? (
@@ -30,12 +33,12 @@ export default async function HistoryPage() {
             <Link href="/" className="bracket-link mt-6">[ check a repo → ]</Link>
           </div>
         ) : (
-          <ul className="border-t border-line-strong">
+          <ul className="border border-line-strong bg-panel px-3 shadow-soft sm:px-4">
             {r.data.items.map((h) => (
-              <li key={h.job_id}>
+              <li key={h.job_id} className="border-b border-line last:border-b-0">
                 <Link
                   href={`/${h.repo}${h.mode === "ai" ? "?mode=ai" : ""}`}
-                  className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 border-b border-line px-1 py-4 transition-colors hover:bg-panel sm:grid-cols-[1fr_auto_auto]"
+                  className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 px-1 py-4 transition-colors hover:bg-panel-2 sm:grid-cols-[1fr_auto_auto]"
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-semibold">{h.repo}</span>
@@ -58,5 +61,6 @@ export default async function HistoryPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

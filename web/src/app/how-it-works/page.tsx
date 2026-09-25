@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CopyButton } from "@/components/copy-button";
 import { GITHUB_REPO_URL } from "@/lib/site";
 import tui from "../../../public/holt-tui.png";
+import { PageHead } from "@/components/page-head";
 
 export const metadata: Metadata = {
   title: "How Holt decides",
@@ -25,9 +26,9 @@ const SCORES = [
   { label: "Holt", v: 0.63, holt: true },
 ];
 
-function Block({ n, label, title, children }: { n: string; label: string; title: string; children: React.ReactNode }) {
+function Block({ n, label, title, children, alt = false }: { n: string; label: string; title: string; children: React.ReactNode; alt?: boolean }) {
   return (
-    <section className="border-t border-line py-16 md:py-20">
+    <section className={`border-t border-line py-16 md:py-20 ${alt ? "bg-section-alt" : ""}`}>
       <div className="wrap grid gap-6 md:grid-cols-[148px_minmax(0,1fr)] md:gap-10">
         <aside className="rail"><strong>{n}</strong><span>{label}</span></aside>
         <div>
@@ -42,7 +43,7 @@ function Block({ n, label, title, children }: { n: string; label: string; title:
 export default function HowItWorks() {
   return (
     <>
-      <div className="wrap py-12 md:py-16">
+      <PageHead>
         <p className="rail mb-4 flex gap-2"><strong className="m-0">how it works</strong><span>for the curious</span></p>
         <h1 className="display max-w-4xl text-[clamp(2.1rem,6vw,3.8rem)]">
           One procedure. <span className="text-orange">A verdict you can check.</span>
@@ -51,7 +52,7 @@ export default function HowItWorks() {
           Holt gathers contribution history, turns it into cited findings, checks every source, and applies a fixed set
           of rules. A model can explain the evidence, but it can&apos;t override the final decision.
         </p>
-      </div>
+      </PageHead>
 
       <Block n="01" label="the pipeline" title="Models read. Rules decide.">
         <div className="relative border-t border-line-strong">
@@ -72,7 +73,7 @@ export default function HowItWorks() {
         </p>
       </Block>
 
-      <Block n="02" label="confidence" title="Useful enough to guide you. Open enough to question.">
+      <Block alt n="02" label="confidence" title="Useful enough to guide you. Open enough to question.">
         <p className="prose-sans mb-10 max-w-[740px] text-[1.05rem]">
           We tested Holt against what later happened to real contributors, using outcomes it couldn&apos;t see while
           analysing. The bars show how well each approach agreed with those outcomes, where 0 is a coin flip and 1 is

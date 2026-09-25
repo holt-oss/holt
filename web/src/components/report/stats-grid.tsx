@@ -5,7 +5,7 @@ import { TONE } from "./tone";
 export function StatsGrid({ stats, limit }: { stats: Partial<Stats>; limit?: number }) {
   const lines = statLines(stats).slice(0, limit);
   return (
-    <ul className="grid gap-px overflow-hidden border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
+    <ul className="grid gap-px overflow-hidden border border-line bg-line shadow-soft sm:grid-cols-2 lg:grid-cols-3">
       {lines.map((s, i) => {
         const t = TONE[s.tone];
         return (
