@@ -14,7 +14,6 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-
 from holt_server.errors import not_found_repo
 from holt_server.main import create_app
 from holt_server.services import Services

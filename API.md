@@ -21,6 +21,13 @@ with codes: `unauthorized`, `not_found` (repo missing or private),
 `quota_exceeded`, `needs_key` (AI report requested with no plan and no BYOK),
 `upstream` (GitHub/model failure), `internal`.
 
+HTTP statuses: `unauthorized` 401, `not_found` 404, `invalid_repo` and
+`invalid_request` (malformed body or query) 400, `rate_limited` 429 (also sent
+as a `Retry-After` header), `quota_exceeded` 402, `needs_key` 403 (also for an
+anonymous AI request, and when a saved BYOK key is rejected by its provider),
+`upstream` 502, `internal` 500, `not_implemented` 501 (starter issues and find,
+until the engine side ships).
+
 ## Repo identifiers
 
 `{owner}/{repo}`, case-insensitive, normalised to GitHub's canonical casing in
@@ -58,6 +65,13 @@ responses. The server also accepts and normalises full URLs
 
 Every evidence item MUST have a clickable `url`.
 
+`kind` is a machine key: in AI mode the engine field the claim is about
+(`onboarding`, `outsider_posture`, `repo_kind`, …) or `outcome` for what
+happened on one pull request (`value` e.g. `merged_after_review`, with the
+maintainer's words in `quote`). Rules mode has no model claims; it lists the
+newest first-timer pull requests behind the counts instead, as
+`kind: "outsider_pr"`, `value: "merged" | "no_reply"`.
+
 ## Endpoints
 
 ### `GET /health` → `{"ok": true, "version": "…"}` (no internal key needed)
@@ -94,7 +108,9 @@ Returns `{"results": [ { "repo": "owner/repo", "headline": "…", "verdict": "�
 "stats": {…subset}, "issues": [StarterIssue] } ]}`, only repos whose rules
 verdict is `viable`, ordered by starter-issue quality. May return `202` with a
 `job_id` like analyses if it takes long; same polling/SSE endpoints under
-`/v1/find/{job_id}`.
+`/v1/find/{job_id}`. (The server always answers `202`. Polling a find job
+returns `results` instead of `report`; the SSE `done` event carries
+`{"results": [...]}`.)
 
 StarterIssue:
 ```jsonc
@@ -105,14 +121,24 @@ StarterIssue:
 
 ### `GET /badge/{owner}/{repo}.svg` (no internal key; public, cached 1 day)
 Shields-style SVG badge showing the rules verdict ("Holt | newcomer-friendly").
-Maintainers embed it in READMEs; it links back to the report page.
+Maintainers embed it in READMEs; it links back to the report page at
+`{HOLT_WEB_URL}/r/{owner}/{repo}`. Uses the latest 7-day rules report; when
+there is none, or it is over 24h old, it shows what it has ("not checked yet")
+and queues a rules check behind it.
 
 ### Account
 - `GET /v1/me` → `{"plan": "free"|"…", "quota": {"ai_used": 1, "ai_limit": 3, "resets_at": "…"}, "byok": {"provider": "openrouter"|"openai"|"anthropic"|"gemini", "model": "…", "set": true} | null}`
 - `PUT /v1/me/byok` body `{"provider": "…", "api_key": "…", "model": "…"}` → stored
   encrypted (AES-GCM, key from env `HOLT_SECRET_KEY`); the key is never returned.
-- `DELETE /v1/me/byok`
-- `GET /v1/me/history` → recent analyses by this user.
+  Returns the same body as `GET /v1/me`.
+- `DELETE /v1/me/byok` → the `GET /v1/me` body.
+- `GET /v1/me/history?limit=50` → recent analyses by this user:
+  `{"items": [{"job_id", "repo", "mode", "days", "status", "verdict", "headline", "created_at"}]}`
+  (`verdict`/`headline` are null until the job is done).
+
+`/v1/me*` without `X-Holt-User` → 401 `unauthorized`. AI reports use the
+user's BYOK key when one is saved (not counted against quota); otherwise the
+server's key, counted per calendar month (UTC). Failed AI jobs are not counted.
 
 Plans and payments are not implemented yet; `plan` is set manually in the DB
 for now. Free-tier quota values come from env.

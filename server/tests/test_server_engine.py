@@ -6,15 +6,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from holt_server import crypto, engine, repos
+from holt_server import report as report_mod
+from holt_server.errors import ApiError
 
 from holt.agent import pipeline
 from holt.evidence.fixtures import FixtureProvider
 from holt.model import ReplayModel
 from holt.report import Assessment, Claim, Verdict
 from holt.types import T_CUTOFF, Window
-from holt_server import crypto, engine, repos
-from holt_server import report as report_mod
-from holt_server.errors import ApiError
 
 ROOT = Path(__file__).resolve().parents[2]
 REPO = "NixOS/nixpkgs"
@@ -72,6 +72,10 @@ def test_rules_report_end_to_end(make_harness):
     assert report["stats"]["outsider_attempts"] == trace.signals.outsider_threads
     assert report["summary"] is None and report["cost"] is None
     assert report["landing"], "nixpkgs has well-known landing areas"
+    # Even with no AI, the counts come with pull requests to click through to.
+    values = [e["value"] for e in report["evidence"] if e["kind"] == "outsider_pr"]
+    assert values.count("merged") == 4 and values.count("no_reply") == 4
+    assert all("/pull/" in e["url"] for e in report["evidence"])
     assert report["decided_by"]
 
 
@@ -234,13 +238,15 @@ def test_crypto_roundtrip_and_binding():
     import base64
     import os
 
+    from cryptography.exceptions import InvalidTag
+
     for secret in ("a passphrase", base64.b64encode(os.urandom(32)).decode()):
         token = crypto.encrypt(secret, "sk-live-1", "user-a")
         assert "sk-live-1" not in token
         assert crypto.decrypt(secret, token, "user-a") == "sk-live-1"
-        with pytest.raises(Exception):
+        with pytest.raises(InvalidTag):
             crypto.decrypt(secret, token, "user-b")
-        with pytest.raises(Exception):
+        with pytest.raises(InvalidTag):
             crypto.decrypt(secret + "x", token, "user-a")
     with pytest.raises(crypto.SecretKeyMissing):
         crypto.encrypt("", "k", "u")

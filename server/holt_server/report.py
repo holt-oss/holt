@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from holt.agent import landing as landing_mod
-from holt.agent.signals import Signals, build_threads
+from holt.agent.signals import Signals, Thread, build_threads, newcomer_threads
 from holt.report import Assessment, Verdict
 from holt.types import EvidenceRecord
 
@@ -95,6 +95,37 @@ def evidence_item(text: str, evidence_id: str | None,
             "text": body, "quote": quote}
 
 
+RULES_EVIDENCE_EACH = 4
+
+
+def counted_examples(threads: dict[str, Thread],
+                     records: dict[str, EvidenceRecord]) -> list[dict[str, Any]]:
+    """Recent first-timer pull requests behind the counts, for a report with no AI.
+
+    Without a model the engine cites nothing, which leaves a beginner with
+    numbers and no way to look for themselves. These are picked by arithmetic
+    only (newest merged, newest with no reply), so they say nothing the counts
+    do not already say; they just make the counts clickable.
+    """
+    outsiders = sorted(newcomer_threads(threads), key=lambda t: t.opened_at, reverse=True)
+    picks = [("merged", t) for t in outsiders if t.merged][:RULES_EVIDENCE_EACH]
+    picks += [("no_reply", t) for t in outsiders
+              if not t.merged and not t.engaged][:RULES_EVIDENCE_EACH]
+    out = []
+    for value, t in picks:
+        evidence_id = f"{t.key}:opened"
+        url = url_for(evidence_id, records)
+        if not url:
+            continue
+        title = (records.get(evidence_id).payload.get("title") or "").strip() \
+            if evidence_id in records else ""
+        what = "was merged" if value == "merged" else "had no reply from anyone when we looked"
+        text = f"First-time contributor's pull request #{t.number} {what}"
+        out.append({"id": evidence_id, "url": url, "kind": "outsider_pr", "value": value,
+                    "text": text + (f": “{title}”" if title else ""), "quote": None})
+    return out
+
+
 def plain_rule(rule: str) -> str:
     """The engine's rule trace, minus the one internal name it can contain."""
     rule = _REPO_KIND.sub(lambda m: f"the project type ({m.group(1).replace('_', ' ')})", rule)
@@ -133,13 +164,16 @@ def build(
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
     by_id = {r.evidence_id: r for r in records}
-    where = landing_mod.compute(build_threads(by_id.values()))
+    threads = build_threads(by_id.values())
+    where = landing_mod.compute(threads)
 
     evidence = []
     for claim in assessment.claims:
         item = evidence_item(claim.text, claim.evidence_id, by_id)
         if item is not None:
             evidence.append(item)
+    if mode == "rules":
+        evidence += counted_examples(threads, by_id)
 
     unknowns: list[str] = []
     if mode == "ai":

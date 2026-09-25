@@ -12,7 +12,15 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import (
-    JSON, Boolean, DateTime, Float, Index, Integer, String, Text, text,
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    Index,
+    Integer,
+    String,
+    Text,
+    text,
 )
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column

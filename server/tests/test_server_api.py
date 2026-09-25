@@ -8,10 +8,9 @@ import sys
 import types
 
 import pytest
-from sqlalchemy import select
-
 from holt_server.db import Job, User
 from holt_server.errors import ApiError
+from sqlalchemy import select
 
 
 def db_rows(h, model):

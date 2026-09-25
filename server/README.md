@@ -1,0 +1,88 @@
+# Holt API server
+
+The HTTP API behind the Holt web app. It wraps the engine in `src/holt` and
+implements [`API.md`](../API.md), which is the contract with `web/`.
+
+FastAPI, Postgres (SQLAlchemy async + asyncpg), and an in-process jobs runner.
+No Redis: jobs live in a Postgres table and up to `HOLT_JOB_CONCURRENCY` run at
+once in worker threads.
+
+## Run it locally
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+uv sync                                   # from the repo root; installs holt-server too
+
+docker compose -f server/compose.yml up -d   # Postgres on 127.0.0.1:${HOLT_DB_PORT:-20131}
+cp server/.env.example server/.env           # then fill it in (see below)
+
+cd server
+PORT=20130 uv run holt-server              # http://127.0.0.1:20130, docs at /docs
+curl localhost:20130/health
+```
+
+`holt-server` reads `server/.env` when started from `server/`, plus the process
+environment (which wins). The schema is created on startup (`create_all`).
+Stop Postgres with `docker compose -f server/compose.yml down` (add `-v` to
+drop the data).
+
+A quick check with a real repository:
+
+```sh
+K="X-Holt-Internal-Key: $HOLT_INTERNAL_KEY"
+curl -s -XPOST localhost:20130/v1/analyses -H "$K" -H 'content-type: application/json' \
+  -d '{"repo": "pallets/flask"}'                       # -> 202 {"job_id": ...}
+curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
+```
+
+## Environment
+
+| Variable | Default | What it does |
+|---|---|---|
+| `DATABASE_URL` | `postgresql+asyncpg://holt:holt@127.0.0.1:20131/holt` | SQLAlchemy async URL. `sqlite+aiosqlite:///path.db` works for quick experiments. |
+| `HOLT_INTERNAL_KEY` | *(empty)* | Shared secret with `web/`. Every `/v1` request must send it as `X-Holt-Internal-Key`. Empty means every `/v1` request is refused. |
+| `HOLT_SECRET_KEY` | *(empty)* | Encrypts saved BYOK keys (AES-256-GCM). Use 32 random bytes, base64: `python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"`. Changing it makes saved keys unreadable (users are asked to save them again). |
+| `HOLT_WEB_URL` | `https://holt.dev` | The badge links to `{HOLT_WEB_URL}/r/{owner}/{repo}`. |
+| `GITHUB_TOKENS` | *(empty)* | Comma-separated GitHub tokens, used round-robin, one per analysis. Read-only public access is enough (a fine-grained token with no extra permissions). |
+| `OPENROUTER_API_KEY` | *(empty)* | The server's model key, used for users' free AI reports. Empty means AI reports need BYOK. |
+| `OPENROUTER_MODEL` | `openai/gpt-5-mini` | Model id on OpenRouter for server-paid AI reports. |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenAI-compatible endpoint. |
+| `HOLT_JOB_CONCURRENCY` | `2` | Analyses running at once in this process. Each holds a thread and some memory. |
+| `HOLT_CACHE_HOURS` | `24` | How long a finished report is served instead of re-running. |
+| `HOLT_FREE_AI_LIMIT` | `3` | AI reports per user per calendar month on the server's key (plan `free`). `0` turns free AI reports off. |
+| `HOLT_PLAN_AI_LIMIT` | `100` | The same, for any other plan (set by hand in the `users` table for now). |
+| `HOLT_ANON_RATE_PER_HOUR` | `10` | New jobs / starter-issue lookups per hour per IP for anonymous callers (`X-Holt-Client-Ip`). Cached answers are free. |
+| `HOLT_USER_RATE_PER_HOUR` | `60` | The same, per signed-in user. |
+| `HOLT_MAX_PAGES` | `8` | Pull-request pages crawled per analysis (25 PRs a page). |
+| `HOST`, `PORT` | `127.0.0.1`, `8000` | Where `holt-server` listens. |
+| `LOG_LEVEL` | `INFO` | |
+
+## How it fits together
+
+| File | What |
+|---|---|
+| `holt_server/api.py` | The endpoints. Cache lookups, rate limits, quota and BYOK checks happen here, before a job is queued. |
+| `holt_server/jobs.py` | The runner: claims queued jobs from Postgres, runs them in threads, publishes progress for SSE. Jobs left `running` by a crashed process are re-queued at startup. |
+| `holt_server/engine.py` | Calls `holt.agent.pipeline.analyze` / `analyze_without_model`. Wraps the provider and model to report stages; uses the engine's own progress callback when it has one. Maps failures to API error codes. |
+| `holt_server/report.py` | `Assessment` + `Trace` → the Report JSON. Landing areas and evidence URLs come from the records the run read. |
+| `holt_server/llm.py` | Model clients (OpenRouter/OpenAI/Gemini over the OpenAI API, Anthropic native) built per job from the server key or a decrypted BYOK key. Nothing is written to disk. |
+| `holt_server/starter.py` | Lazy adapter over `holt.starter`; the endpoints return 501 until that module exists. |
+| `holt_server/badge.py` | The README badge SVG. |
+
+Who pays for an AI report: a saved BYOK key if the user has one (it does not
+use up free reports); otherwise the server's OpenRouter key, counted against the
+monthly quota. A report that fails is not counted.
+
+Limits that are per process (fine for one server, to revisit when there are
+more): rate-limit counters and the repo-name cache are in memory; SSE fan-out
+is in memory but falls back to re-reading the jobs table every 15 seconds.
+
+## Tests
+
+```sh
+uv run pytest server/tests -q
+```
+
+SQLite instead of Postgres, the GitHub lookup faked, no network. Most tests
+fake the engine; `test_server_engine.py` runs the real one over the committed
+`NixOS/nixpkgs` replay fixtures, in both rules and AI mode.
