@@ -43,11 +43,14 @@ class AssessmentScreen(Screen):
     BINDINGS = [
         ("escape", "home", "home"),
         ("enter", "inspect", "open evidence"),
+        ("o", "open_on_github", "open on GitHub"),
         ("c", "copy", "copy as markdown"),
         ("ctrl+r", "rerun", "re-run"),
         ("n", "next", "what next"),
         ("t", "trace", "trace"),
-        ("q", "quit", "quit"),
+        # Back, not quit: `q` on a report is "I'm done reading this", and
+        # losing the whole interface to it was the surprise. ctrl+q still quits.
+        ("q", "back", "back"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -296,11 +299,32 @@ class AssessmentScreen(Screen):
             "holt kept them. Re-run it (ctrl+r) to watch one."
         )
 
+    def action_open_on_github(self) -> None:
+        """The selected claim's pull request or issue, in the browser.
+
+        With no claim selected — a rules-only report has none — the
+        repository's own pull request list, which is where the counts came from.
+        """
+        from holt.report import evidence_url
+        from holt.tui.screens.token import open_url
+
+        claim = self.query_one("#claims", ClaimList).selected
+        url = evidence_url(claim.evidence_id) if claim and claim.evidence_id else ""
+        if not url:
+            url = f"https://github.com/{self.app.session.assessment.repo}/pulls"
+        if open_url(url):
+            self._notice(f"Opened {url}")
+        else:
+            self._notice(f"No browser to open. The link: {url}")
+
+    def action_back(self) -> None:
+        if len(self.app.screen_stack) > 2:
+            self.app.pop_screen()
+        else:
+            self.app.go_home()
+
     def action_home(self) -> None:
         self.app.go_home()
-
-    def action_quit(self) -> None:
-        self.app.exit()
 
 
 def _headline(verdict) -> str:

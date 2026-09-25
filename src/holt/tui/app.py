@@ -22,6 +22,7 @@ ends for exactly one reason — it finished, it failed, or someone stopped it.
 from __future__ import annotations
 
 from textual.app import App
+from textual.binding import Binding
 from textual.await_complete import AwaitComplete
 from textual.screen import Screen
 
@@ -59,6 +60,10 @@ class HoltApp(App):
         # app with no visible way out. `ctrl+q` works everywhere, including
         # while you are typing, and being app-level it is on every footer.
         ("ctrl+q", "quit", "quit"),
+        # `?` everywhere a text box is not focused; home, whose box always is,
+        # catches a lone `?` typed into it instead. f1 works regardless.
+        ("question_mark", "help", "help"),
+        Binding("f1", "help", "help", show=False),
     ]
 
     def __init__(
@@ -86,7 +91,55 @@ class HoltApp(App):
         self.set_interval(PUMP_SECONDS, self.pump)
         self.push_screen("home")
         if self.initial is not None:
-            self.start_run(self.initial)
+            initial = self.initial
+            self.with_token(initial, lambda: self.start_run(initial))
+
+    # ─── first run ──────────────────────────────────────────────────────────
+
+    def with_token(self, options: RunOptions, then) -> None:
+        """Run `then` once a live run has a GitHub token to read with.
+
+        The first live run on a machine with no token anywhere opens the
+        prompt instead of failing; the run starts as soon as a token is saved.
+        Skipping the prompt starts nothing, and the home screen says why.
+        """
+        from holt.tui.session import token_missing
+
+        if not token_missing(options):
+            then()
+            return
+        from holt.tui.screens.token import TokenScreen
+
+        def done(saved: bool | None) -> None:
+            if saved:
+                then()
+            else:
+                home = self._home()
+                if home is not None:
+                    home.notice(
+                        "Holt needs a GitHub token to read a repository. "
+                        "Press enter on it again when you have one.",
+                        theme.DROP,
+                    )
+
+        self.push_screen(TokenScreen(), done)
+
+    def _home(self):
+        for screen in self.screen_stack:
+            if hasattr(screen, "run_repo"):
+                return screen
+        return None
+
+    def action_help(self) -> None:
+        """The keys on the screen you are looking at, and what Holt is."""
+        from holt.tui.screens.help import HelpScreen
+
+        screen = self.screen
+        if isinstance(screen, HelpScreen):
+            return
+        bindings = list(getattr(type(screen), "BINDINGS", [])) + list(self.BINDINGS)
+        name = type(screen).__name__.removesuffix("Screen").lower() or "holt"
+        self.push_screen(HelpScreen(bindings, title=name))
 
     # ─── the pump ───────────────────────────────────────────────────────────
 
