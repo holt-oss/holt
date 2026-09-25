@@ -12,14 +12,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select, update
 
 from holt_server import starter
-from holt_server.db import Job, Report, User, now
+from holt_server.db import BADGE_PRIORITY, Job, Report, User, now
 from holt_server.errors import ApiError
 
 if TYPE_CHECKING:
@@ -28,6 +29,10 @@ if TYPE_CHECKING:
 log = logging.getLogger("holt_server.jobs")
 
 POLL_SECONDS = 5.0
+# A running job's runner touches `heartbeat_at` this often. One not touched for
+# STALE_AFTER belonged to a process that died, and is queued again.
+HEARTBEAT_SECONDS = 15.0
+STALE_AFTER = timedelta(seconds=90)
 
 
 class Hub:
@@ -54,26 +59,61 @@ class Hub:
 
 
 class JobRunner:
-    def __init__(self, services: Services, concurrency: int = 2) -> None:
+    def __init__(self, services: Services, concurrency: int = 2,
+                 badge_concurrency: int = 1) -> None:
         self.services = services
         self.concurrency = max(1, concurrency)
+        # Never all workers: a user request always has a worker badges can't take.
+        self.badge_concurrency = max(0, min(badge_concurrency, self.concurrency - 1))
         self.hub = Hub()
+        self.worker_id = uuid.uuid4().hex
         self._wake = asyncio.Event()
         self._tasks: list[asyncio.Task] = []
+        self._running: dict[str, int] = {}  # job id -> priority, jobs this runner holds
         self._stopping = False
 
     # --- lifecycle ----------------------------------------------------------
 
     async def start(self) -> None:
-        # A job left `running` by a process that died will never finish. Put it
-        # back in the queue; the engine is read-only, so running it again is safe.
-        async with self.services.db.session() as s:
-            await s.execute(update(Job).where(Job.status == "running")
-                            .values(status="queued", stage="Waiting to start", progress=0.0))
-            await s.commit()
         self._stopping = False
+        await self.requeue_stale()
         self._tasks = [asyncio.create_task(self._worker(i), name=f"holt-job-{i}")
                        for i in range(self.concurrency)]
+        self._tasks.append(asyncio.create_task(self._heartbeat(), name="holt-heartbeat"))
+
+    async def requeue_stale(self) -> int:
+        """Queue again the running jobs whose runner stopped heartbeating.
+
+        Only stale ones: a job another live process is running keeps its
+        heartbeat fresh and is left alone. The engine is read-only, so running
+        a dead process's job again is safe.
+        """
+        cutoff = now() - STALE_AFTER
+        async with self.services.db.session() as s:
+            result = await s.execute(
+                update(Job).where(Job.status == "running",
+                                  (Job.heartbeat_at < cutoff) | Job.heartbeat_at.is_(None))
+                .values(status="queued", stage="Waiting to start", progress=0.0,
+                        worker_id=None, heartbeat_at=None))
+            await s.commit()
+        if result.rowcount:
+            log.warning("requeued %d stale job(s)", result.rowcount)
+            self.wake()
+        return result.rowcount
+
+    async def _heartbeat(self) -> None:
+        while not self._stopping:
+            await asyncio.sleep(HEARTBEAT_SECONDS)
+            try:
+                if self._running:
+                    async with self.services.db.session() as s:
+                        await s.execute(update(Job).where(
+                            Job.id.in_(list(self._running)), Job.worker_id == self.worker_id,
+                            Job.status == "running").values(heartbeat_at=now()))
+                        await s.commit()
+                await self.requeue_stale()
+            except Exception:  # noqa: BLE001 -- try again next beat
+                log.exception("heartbeat failed")
 
     async def stop(self) -> None:
         self._stopping = True
@@ -102,21 +142,28 @@ class JobRunner:
                 except TimeoutError:
                     pass
                 continue
-            await self._run(job)
+            try:
+                await self._run(job)
+            finally:
+                self._running.pop(job.id, None)
 
     async def _claim(self) -> Job | None:
+        badges = sum(1 for p in self._running.values() if p >= BADGE_PRIORITY)
+        query = select(Job.id, Job.priority).where(Job.status == "queued")
+        if badges >= self.badge_concurrency:
+            query = query.where(Job.priority < BADGE_PRIORITY)
         async with self.services.db.session() as s:
-            ids = (await s.execute(
-                select(Job.id).where(Job.status == "queued").order_by(Job.created_at).limit(5)
-            )).scalars().all()
-            for job_id in ids:
+            rows = (await s.execute(
+                query.order_by(Job.priority, Job.created_at).limit(5))).all()
+            for job_id, priority in rows:
                 claimed = await s.execute(
                     update(Job).where(Job.id == job_id, Job.status == "queued")
                     .values(status="running", started_at=now(), stage="Starting",
-                            progress=0.01)
+                            progress=0.01, worker_id=self.worker_id, heartbeat_at=now())
                 )
                 await s.commit()
                 if claimed.rowcount == 1:
+                    self._running[job_id] = priority
                     return await s.get(Job, job_id)
         return None
 
@@ -165,18 +212,27 @@ class JobRunner:
 
     # --- state changes ------------------------------------------------------
 
+    def _mine(self, job_id: str):
+        """Writes to a job only while this runner still holds it. If it was
+        requeued as stale and picked up elsewhere, this runner's result is dropped."""
+        return update(Job).where(Job.id == job_id, Job.status == "running",
+                                 Job.worker_id == self.worker_id)
+
     async def _progress(self, job_id: str, stage: str, progress: float) -> None:
         async with self.services.db.session() as s:
-            await s.execute(update(Job).where(Job.id == job_id, Job.status == "running")
-                            .values(stage=stage[:80], progress=progress))
+            await s.execute(self._mine(job_id).values(
+                stage=stage[:80], progress=progress, heartbeat_at=now()))
             await s.commit()
         self.hub.publish(job_id, "stage", {"stage": stage, "progress": progress})
 
     async def _finish(self, job: Job, result: dict[str, Any]) -> None:
         async with self.services.db.session() as s:
-            await s.execute(update(Job).where(Job.id == job.id).values(
+            done = await s.execute(self._mine(job.id).values(
                 status="done", stage="Done", progress=1.0, result=result,
                 finished_at=now()))
+            if done.rowcount != 1:
+                await s.rollback()
+                return
             if job.kind == "analysis":
                 s.add(Report(repo=job.repo, repo_key=job.repo_key, mode=job.mode,
                              days=job.days, report=result))
@@ -185,13 +241,18 @@ class JobRunner:
 
     async def _fail(self, job: Job, err: ApiError) -> None:
         async with self.services.db.session() as s:
-            await s.execute(update(Job).where(Job.id == job.id).values(
+            failed = await s.execute(self._mine(job.id).values(
                 status="error", stage="Failed", error=err.body(), finished_at=now()))
+            if failed.rowcount != 1:
+                await s.rollback()
+                return
             if job.charged and job.user_id:
-                # A report that never arrived is not charged for.
-                user = await s.get(User, job.user_id)
-                if user is not None and user.ai_used > 0:
-                    user.ai_used -= 1
+                # A report that never arrived is not charged for. Atomic, and
+                # only against the month it was charged to.
+                await s.execute(update(User).where(
+                    User.id == job.user_id, User.ai_used > 0,
+                    User.ai_period == (job.params or {}).get("ai_period", ""),
+                ).values(ai_used=User.ai_used - 1))
             await s.commit()
         self.hub.publish(job.id, "error", {"error": err.body()})
 

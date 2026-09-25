@@ -264,3 +264,21 @@ def test_rate_limiter_window():
     assert err.value.retry_after == 3600
     t[0] = 3601
     rl.hit("k", 2)
+
+
+def test_rate_limiter_forgets_idle_keys():
+    from holt_server.ratelimit import RateLimiter
+
+    t = [0.0]
+    rl = RateLimiter(clock=lambda: t[0])
+    for i in range(50):
+        rl.hit(f"ip:{i}", 5)
+    t[0] = 4000
+    rl.hit("ip:new", 5)
+    assert len(rl) == 1
+
+
+def test_model_spec_hides_the_key():
+    from holt_server.llm import ModelSpec
+
+    assert "sk-secret" not in repr(ModelSpec("openrouter", "m", "sk-secret"))

@@ -14,6 +14,8 @@ from collections import defaultdict, deque
 from holt_server.errors import ApiError
 
 WINDOW = 3600.0
+# How often idle keys are swept out, so one-off IPs do not accumulate forever.
+PRUNE_EVERY = 300.0
 
 
 class RateLimiter:
@@ -21,6 +23,7 @@ class RateLimiter:
         self._hits: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
         self._clock = clock
+        self._pruned = clock()
 
     def hit(self, key: str, limit: int) -> None:
         """Count one request against `key`; raise `rate_limited` over `limit`."""
@@ -28,6 +31,8 @@ class RateLimiter:
             return
         now = self._clock()
         with self._lock:
+            if now - self._pruned >= PRUNE_EVERY:
+                self._prune(now)
             hits = self._hits[key]
             while hits and hits[0] <= now - WINDOW:
                 hits.popleft()
@@ -40,3 +45,11 @@ class RateLimiter:
                     retry_after=retry,
                 )
             hits.append(now)
+
+    def _prune(self, now: float) -> None:
+        for k in [k for k, hits in self._hits.items() if not hits or hits[-1] <= now - WINDOW]:
+            del self._hits[k]
+        self._pruned = now
+
+    def __len__(self) -> int:
+        return len(self._hits)

@@ -16,6 +16,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    # "dev" serves /docs and /openapi.json; anything else does not.
+    env: str = Field("production", alias="HOLT_ENV")
     database_url: str = Field(
         "postgresql+asyncpg://holt:holt@127.0.0.1:20131/holt", alias="DATABASE_URL"
     )
@@ -38,6 +40,12 @@ class Settings(BaseSettings):
     # New work (jobs, starter-issue lookups) per hour.
     anon_rate_per_hour: int = Field(10, alias="HOLT_ANON_RATE_PER_HOUR")
     user_rate_per_hour: int = Field(60, alias="HOLT_USER_RATE_PER_HOUR")
+    # Rules checks queued by public badge requests: per client IP, and in total.
+    # Separate from the buckets user requests draw from.
+    badge_rate_per_ip: int = Field(20, alias="HOLT_BADGE_RATE_PER_IP")
+    badge_rate_total: int = Field(60, alias="HOLT_BADGE_RATE_TOTAL")
+    # Badge refreshes running at once, at most. They also queue behind user jobs.
+    badge_concurrency: int = Field(1, alias="HOLT_BADGE_CONCURRENCY")
     # Pull-request pages crawled per analysis (25 PRs a page).
     max_pages: int = Field(8, alias="HOLT_MAX_PAGES")
 

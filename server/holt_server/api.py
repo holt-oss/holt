@@ -11,10 +11,21 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 
 from holt_server import __version__, badge, crypto, llm, repos, starter
-from holt_server.db import Job, Report, User, iso, now, utc
+from holt_server.db import (
+    ACTIVE,
+    BADGE_PRIORITY,
+    Job,
+    Report,
+    User,
+    dedupe_key,
+    iso,
+    now,
+    utc,
+)
 from holt_server.errors import ApiError
 from holt_server.jobs import done_payload
 from holt_server.services import Services
@@ -44,7 +55,7 @@ async def internal(
 
 
 class Caller:
-    def __init__(self, user_id: str | None, ip: str) -> None:
+    def __init__(self, user_id: str | None, ip: str | None) -> None:
         self.user_id = user_id
         self.ip = ip
 
@@ -64,12 +75,16 @@ async def caller(
     x_holt_client_ip: str | None = Header(default=None),
 ) -> Caller:
     user_id = (x_holt_user or "").strip()[:200] or None
-    ip = (x_holt_client_ip or "").strip()[:64] or (
-        request.client.host if request.client else "unknown")
+    # No fallback to the socket address: that is the BFF's, and every anonymous
+    # visitor would share one bucket.
+    ip = (x_holt_client_ip or "").strip()[:64] or None
     return Caller(user_id, ip)
 
 
 def rate_limit(svc: Services, who: Caller) -> None:
+    if not who.user_id and not who.ip:
+        raise ApiError("invalid_request",
+                       "Anonymous requests must say who is asking (X-Holt-Client-Ip).")
     svc.limiter.hit(who.rate_key, who.limit(svc))
 
 
@@ -174,32 +189,42 @@ async def badge_svg(owner: str, repo: str, request: Request) -> Response:
     stale = latest is None or not is_fresh(svc, latest)
     if stale:
         # Stale-while-revalidate: show what we have, refresh behind it. Bounded
-        # globally so random badge URLs cannot fill the queue.
+        # per client and in total, on counters of its own, and queued behind
+        # every user request (see JobRunner), so badge URLs cannot crowd out
+        # people using the site.
         try:
-            svc.limiter.hit("badge", 60)
-            await enqueue_rules_quietly(svc, name)
-        except ApiError:
-            pass
+            await enqueue_badge_refresh(svc, name, badge_client(request))
         except Exception:  # noqa: BLE001 -- a badge must always render
             pass
     link = f"{svc.settings.web_url.rstrip('/')}/{shown}"
     return Response(
         badge.render(verdict, link),
         media_type="image/svg+xml",
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={"Cache-Control": BADGE_CACHE},
     )
 
 
-async def enqueue_rules_quietly(svc: Services, repo: str) -> None:
+BADGE_CACHE = "public, max-age=3600, stale-while-revalidate=86400"
+
+
+def badge_client(request: Request) -> str:
+    """Who is asking for a badge. Behind the Cloudflare tunnel the socket is
+    always local, so Cloudflare's header is the client when present."""
+    return (request.headers.get("cf-connecting-ip")
+            or (request.client.host if request.client else "unknown"))[:64]
+
+
+async def enqueue_badge_refresh(svc: Services, repo: str, client: str) -> None:
     key = repos.key(repo)
     if await active_job(svc, key, "rules", 7):
         return
+    s = svc.settings
+    svc.badge_limiter.hit(f"ip:{client}", s.badge_rate_per_ip)
+    svc.badge_limiter.hit("total", s.badge_rate_total)
     canonical = await svc.canonical(repo)
-    async with svc.db.session() as s:
-        s.add(Job(kind="analysis", repo=canonical, repo_key=key, mode="rules", days=7,
-                  params={}, user_id=None))
-        await s.commit()
-    svc.runner.wake()
+    await insert_or_join(svc, Job(
+        kind="analysis", repo=canonical, repo_key=key, mode="rules", days=7, params={},
+        user_id=None, priority=BADGE_PRIORITY, dedupe_key=dedupe_key(key, "rules", 7)))
 
 
 # --- reports and cache ----------------------------------------------------------
@@ -221,10 +246,52 @@ def is_fresh(svc: Services, report: Report) -> bool:
 async def active_job(svc: Services, key: str, mode: str, days: int) -> Job | None:
     async with svc.db.session() as s:
         return (await s.execute(
-            select(Job).where(Job.kind == "analysis", Job.repo_key == key, Job.mode == mode,
-                              Job.days == days, Job.status.in_(("queued", "running")))
-            .order_by(Job.created_at).limit(1)
+            select(Job).where(Job.dedupe_key == dedupe_key(key, mode, days),
+                              Job.status.in_(ACTIVE)).limit(1)
         )).scalar_one_or_none()
+
+
+async def join_active(svc: Services, key: str, mode: str, days: int) -> Job | None:
+    """The in-flight job for this question, promoted to user priority: someone
+    is waiting on it now, even if a badge queued it."""
+    job = await active_job(svc, key, mode, days)
+    if job is not None and job.priority:
+        async with svc.db.session() as s:
+            await s.execute(update(Job).where(Job.id == job.id).values(priority=0))
+            await s.commit()
+    return job
+
+
+async def insert_or_join(svc: Services, job: Job, before_insert=None) -> tuple[Job, bool]:
+    """Insert `job` unless an identical one is queued or running; then return that.
+
+    Atomic: the partial unique index on `dedupe_key` decides, so two requests
+    racing past the `active_job` check still end up with one job. Whatever
+    `before_insert` does in the session (the quota charge) commits with the
+    insert or rolls back with it. Returns (job, created).
+    """
+    async with svc.db.session() as s:
+        if before_insert is not None:
+            await before_insert(s)
+        s.add(job)
+        try:
+            await s.commit()
+        except IntegrityError:
+            await s.rollback()
+        else:
+            svc.runner.wake()
+            return job, True
+    existing = await join_active(svc, job.repo_key, job.mode, job.days)
+    if existing is None:  # finished in between; retry once without the race
+        return await insert_or_join(svc, job_copy(job), before_insert)
+    return existing, False
+
+
+def job_copy(job: Job) -> Job:
+    return Job(kind=job.kind, repo=job.repo, repo_key=job.repo_key, mode=job.mode,
+               days=job.days, params=dict(job.params or {}), user_id=job.user_id,
+               key_source=job.key_source, charged=job.charged, priority=job.priority,
+               dedupe_key=job.dedupe_key)
 
 
 @router.get("/reports/{owner}/{repo}", dependencies=[Depends(internal)])
@@ -260,48 +327,55 @@ async def create_analysis(body: AnalysisIn, request: Request,
 
     rate_limit(svc, who)
 
-    if existing := await active_job(svc, key, body.mode, body.days):
+    if existing := await join_active(svc, key, body.mode, body.days):
         return queued(existing.id)
 
     canonical = await svc.canonical(repo)
-    key_source, charged = None, False
-    async with svc.db.session() as s:
-        if body.mode == "ai":
-            user = await get_user(svc, who.user_id)
-            user = await s.get(User, user.id, with_for_update=True)
-            key_source, charged = reserve_ai(svc, user)
-        job = Job(kind="analysis", repo=canonical, repo_key=key, mode=body.mode,
-                  days=body.days, params={"refresh": body.refresh},
-                  user_id=who.user_id, key_source=key_source, charged=charged)
-        s.add(job)
-        await s.commit()
-    svc.runner.wake()
+    job = Job(kind="analysis", repo=canonical, repo_key=key, mode=body.mode,
+              days=body.days, params={"refresh": body.refresh}, user_id=who.user_id,
+              dedupe_key=dedupe_key(key, body.mode, body.days))
+    charge = None
+    if body.mode == "ai":
+        user = await get_user(svc, who.user_id)
+        if user.byok_cipher:
+            # A saved key is used when there is one: the person chose to set
+            # it, and it leaves their free reports for later.
+            job.key_source = "byok"
+        else:
+            job.key_source, job.charged = "server", True
+            job.params["ai_period"] = period()
+            charge = charge_ai(svc, user)
+    job, _created = await insert_or_join(svc, job, charge)
     return queued(job.id)
 
 
-def reserve_ai(svc: Services, user: User) -> tuple[str, bool]:
-    """Pick whose key pays for an AI report, and count it. Caller commits.
-
-    A saved key is used when there is one: the person chose to set it, and it
-    leaves their free reports for later.
-    """
-    if user.byok_cipher:
-        return "byok", False
+def charge_ai(svc: Services, user: User):
+    """One AI report against the server's key, counted atomically in the same
+    transaction as the job insert: a lost dedupe race refunds itself."""
     limit = ai_limit(svc, user)
     if limit <= 0 or not svc.server_model_available():
         raise ApiError("needs_key", "AI reports need an API key. Add your own key "
                        "in settings to run one.")
-    if user.ai_period != period():
-        user.ai_period, user.ai_used = period(), 0
-    if user.ai_used >= limit:
-        raise ApiError(
-            "quota_exceeded",
-            f"You've used all {limit} free AI reports this month. They reset on "
-            f"{resets_at().strftime('%-d %B')}. You can add your own API key in "
-            "settings to keep going.",
-        )
-    user.ai_used += 1
-    return "server", True
+    month = period()
+
+    async def charge(s) -> None:
+        # New month: start the count again. Guarded so it happens once.
+        await s.execute(update(User).where(User.id == user.id, User.ai_period != month)
+                        .values(ai_period=month, ai_used=0))
+        took = await s.execute(
+            update(User).where(User.id == user.id, User.ai_period == month,
+                               User.ai_used < limit)
+            .values(ai_used=User.ai_used + 1))
+        if took.rowcount != 1:
+            await s.rollback()
+            raise ApiError(
+                "quota_exceeded",
+                f"You've used all {limit} free AI reports this month. They reset on "
+                f"{resets_at().strftime('%-d %B')}. You can add your own API key in "
+                "settings to keep going.",
+            )
+
+    return charge
 
 
 def queued(job_id: str) -> JSONResponse:

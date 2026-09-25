@@ -8,7 +8,10 @@ handlers, server components) — a BFF. So:
   `HOLT_INTERNAL_KEY` on both sides). Requests without it get 401.
 - Requests made for a signed-in user also carry `X-Holt-User: <user id>`.
   The server trusts it because of the internal key. Anonymous requests omit it.
-- Anonymous requests carry `X-Holt-Client-Ip` for rate limiting.
+- Anonymous requests carry `X-Holt-Client-Ip` for rate limiting. An anonymous
+  request that needs rate limiting (new analyses, find, starter issues) without
+  it gets 400 `invalid_request`; the server never falls back to the BFF's own
+  address.
 - Base URL for web: env `HOLT_API_URL` (e.g. `http://127.0.0.1:$PORT`).
 
 Users, sessions and OAuth (GitHub + Google) live in `web/` (Auth.js). The
@@ -95,8 +98,9 @@ plain English ("Fetching pull requests", "Reading threads", "Checking evidence",
 "Writing the report").
 
 ### `GET /v1/reports/{owner}/{repo}?mode=rules|ai&days=7`
-Latest cached report or 404 `not_found`. Public (used for shareable pages and
-OG images).
+Latest cached report or 404 `not_found`. Public via the BFF: no user needed
+(used for shareable pages and OG images), but it still requires the internal
+key like every `/v1` route.
 
 ### `GET /v1/repos/{owner}/{repo}/starter-issues?limit=20`
 Open, unassigned issues in this repo that suit a newcomer, best first:
@@ -119,12 +123,14 @@ StarterIssue:
   "why": ["Labelled good first issue", "Touches docs/, where 8 of 10 outsider PRs were merged"] }
 ```
 
-### `GET /badge/{owner}/{repo}.svg` (no internal key; public, cached 1 day)
+### `GET /badge/{owner}/{repo}.svg` (no internal key; public; `Cache-Control: public, max-age=3600, stale-while-revalidate=86400`)
 Shields-style SVG badge showing the rules verdict ("Holt | newcomer-friendly").
 Maintainers embed it in READMEs; it links back to the report page at
 `{HOLT_WEB_URL}/{owner}/{repo}`. Uses the latest 7-day rules report; when
 there is none, or it is over 24h old, it shows what it has ("not checked yet")
-and queues a rules check behind it.
+and queues a rules check behind it. Badge-queued checks have their own rate
+limits (per client IP and in total, separate from user limits), run at most
+one at a time, and wait behind every user request.
 
 ### Account
 - `GET /v1/me` → `{"plan": "free"|"…", "quota": {"ai_used": 1, "ai_limit": 3, "resets_at": "…"}, "byok": {"provider": "openrouter"|"openai"|"anthropic"|"gemini", "model": "…", "set": true} | null}`

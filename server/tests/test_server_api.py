@@ -311,7 +311,7 @@ def test_badge(h):
     r = h.client.get("/badge/pallets/flask.svg")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("image/svg+xml")
-    assert "max-age=86400" in r.headers["cache-control"]
+    assert r.headers["cache-control"] == "public, max-age=3600, stale-while-revalidate=86400"
     assert "not checked yet" in r.text
     # The unchecked badge queued a rules check behind itself.
     jobs = db_rows(h, Job)
@@ -388,3 +388,142 @@ def test_find(h, fake_starter):
     assert fake_starter["find"] == (["python"], [], True, 5)
     # find jobs are not analyses
     assert h.get(f"/v1/analyses/{r.json()['job_id']}").status_code == 404
+
+
+# --- review fixes: races, lanes, heartbeats ------------------------------------------
+
+
+def post_together(h, n, body, **kw):
+    """`n` identical requests at once, each past the dedupe check before any inserts."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    real = h.svc.canonical
+
+    async def slow(repo):
+        await asyncio.sleep(0.2)  # everyone reaches the insert together
+        return await real(repo)
+
+    h.svc.canonical = slow
+    with ThreadPoolExecutor(n) as pool:
+        return list(pool.map(lambda _: h.post("/v1/analyses", body, **kw), range(n)))
+
+
+def test_concurrent_identical_requests_share_one_job(make_harness):
+    h = make_harness(OPENROUTER_API_KEY="sk-or-server")
+    h.engine.gate.clear()
+    try:
+        rs = post_together(h, 4, {"repo": "octo/one", "mode": "ai"}, user="racer")
+        assert {r.status_code for r in rs} == {202}
+        assert len({r.json()["job_id"] for r in rs}) == 1
+        assert len([j for j in db_rows(h, Job) if j.repo == "octo/one"]) == 1
+        assert h.get("/v1/me", user="racer").json()["quota"]["ai_used"] == 1
+    finally:
+        h.engine.gate.set()
+
+
+def test_concurrent_rules_requests_share_one_job(h):
+    h.engine.gate.clear()
+    try:
+        rs = post_together(h, 4, {"repo": "octo/two"})
+        assert len({r.json()["job_id"] for r in rs}) == 1
+    finally:
+        h.engine.gate.set()
+
+
+def test_anonymous_without_client_ip_is_rejected(h):
+    r = h.post("/v1/analyses", {"repo": "octo/one"}, ip=None)
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_request"
+    # Signed-in requests are limited per user and don't need it.
+    assert h.post("/v1/analyses", {"repo": "octo/one"}, user="u1", ip=None).status_code == 202
+
+
+def test_badge_refreshes_have_their_own_limits(make_harness):
+    h = make_harness(run_jobs=False, HOLT_BADGE_RATE_PER_IP=1, HOLT_ANON_RATE_PER_HOUR=1)
+    headers = {"CF-Connecting-IP": "5.5.5.5"}
+    h.client.get("/badge/octo/one.svg", headers=headers)
+    h.client.get("/badge/octo/two.svg", headers=headers)  # over this client's badge limit
+    h.client.get("/badge/octo/three.svg", headers={"CF-Connecting-IP": "6.6.6.6"})
+    jobs = db_rows(h, Job)
+    assert sorted(j.repo for j in jobs) == ["octo/one", "octo/three"]
+    assert all(j.priority == 10 for j in jobs)
+    # Badge traffic did not touch the bucket a person's request draws from.
+    assert h.post("/v1/analyses", {"repo": "octo/four"}, ip="5.5.5.5").status_code == 202
+
+
+def test_user_jobs_run_before_badge_refreshes(make_harness):
+    h = make_harness(run_jobs=False)
+    h.client.get("/badge/octo/one.svg")
+    h.client.get("/badge/octo/two.svg")
+    user_job = h.post("/v1/analyses", {"repo": "octo/three"}).json()["job_id"]
+    runner = h.svc.runner
+    first = h.client.portal.call(runner._claim)
+    assert first.id == user_job
+    second = h.client.portal.call(runner._claim)
+    assert second.priority == 10
+    # One badge job at a time: the other badge job waits even with a free worker.
+    assert h.client.portal.call(runner._claim) is None
+
+
+def test_joining_a_badge_job_promotes_it(make_harness):
+    h = make_harness(run_jobs=False)
+    h.client.get("/badge/octo/one.svg")
+    job = db_rows(h, Job)[0]
+    assert job.priority == 10
+    assert h.post("/v1/analyses", {"repo": "octo/one"}).json()["job_id"] == job.id
+    assert db_rows(h, Job)[0].priority == 0
+
+
+def test_only_stale_running_jobs_are_requeued(make_harness):
+    from datetime import timedelta
+
+    from holt_server.db import now
+
+    h = make_harness(run_jobs=False)
+
+    async def seed():
+        async with h.svc.db.session() as s:
+            s.add(Job(id="stale", repo="octo/one", status="running", worker_id="dead",
+                      heartbeat_at=now() - timedelta(minutes=5)))
+            s.add(Job(id="alive", repo="octo/two", status="running", worker_id="other",
+                      heartbeat_at=now()))
+            await s.commit()
+
+    h.client.portal.call(seed)
+    assert h.client.portal.call(h.svc.runner.requeue_stale) == 1
+    status = {j.id: j.status for j in db_rows(h, Job)}
+    assert status == {"stale": "queued", "alive": "running"}
+
+
+def test_result_from_a_runner_that_lost_the_job_is_dropped(make_harness):
+    h = make_harness(run_jobs=False)
+    job_id = h.post("/v1/analyses", {"repo": "octo/one"}).json()["job_id"]
+    runner = h.svc.runner
+    job = h.client.portal.call(runner._claim)
+
+    async def steal():
+        async with h.svc.db.session() as s:
+            row = await s.get(Job, job_id)
+            row.worker_id = "someone-else"
+            await s.commit()
+
+    h.client.portal.call(steal)
+    h.client.portal.call(runner._finish, job, {"repo": "octo/one"})
+    assert db_rows(h, Job)[0].status == "running"
+    assert h.get("/v1/reports/octo/one").status_code == 404
+
+
+def test_refund_only_hits_the_month_charged(make_harness):
+    h = make_harness(run_jobs=False, OPENROUTER_API_KEY="sk-or-server")
+    h.post("/v1/analyses", {"repo": "octo/one", "mode": "ai"}, user="m1")
+    job = h.client.portal.call(h.svc.runner._claim)
+    job.params = {"ai_period": "2000-01"}  # charged in some earlier month
+    h.client.portal.call(h.svc.runner._fail, job, ApiError("upstream", "x"))
+    assert h.get("/v1/me", user="m1").json()["quota"]["ai_used"] == 1
+
+
+def test_docs_only_in_dev(make_harness):
+    assert make_harness().client.get("/openapi.json").status_code == 404
+    dev = make_harness(HOLT_ENV="dev")
+    assert dev.client.get("/openapi.json").status_code == 200
+    assert dev.client.get("/docs").status_code == 200

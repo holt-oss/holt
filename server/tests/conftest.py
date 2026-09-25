@@ -7,6 +7,7 @@ report unless a test swaps in the real engine over the replay fixtures.
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from pathlib import Path
@@ -64,7 +65,10 @@ class FakeEngine:
 
 def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
     values = {
-        "DATABASE_URL": f"sqlite+aiosqlite:///{tmp_path / 'holt.db'}",
+        # Set HOLT_TEST_DATABASE_URL to run against a real Postgres (e.g. the
+        # one in server/compose.yml). Its tables are dropped for every harness.
+        "DATABASE_URL": os.environ.get("HOLT_TEST_DATABASE_URL")
+        or f"sqlite+aiosqlite:///{tmp_path / 'holt.db'}",
         "HOLT_INTERNAL_KEY": KEY,
         "HOLT_SECRET_KEY": "a test passphrase",
         "GITHUB_TOKENS": "tok1,tok2",
@@ -85,10 +89,10 @@ class Harness:
         self.model_specs: list[Any] = []
 
     def post(self, path: str, json: Any = None, user: str | None = None,
-             ip: str | None = None, **kw):
+             ip: str | None = "10.0.0.1", **kw):
         return self.client.post(path, json=json, headers=self.headers(user, ip), **kw)
 
-    def get(self, path: str, user: str | None = None, ip: str | None = None, **kw):
+    def get(self, path: str, user: str | None = None, ip: str | None = "10.0.0.1", **kw):
         return self.client.get(path, headers=self.headers(user, ip), **kw)
 
     def put(self, path: str, json: Any = None, user: str | None = None):
@@ -98,7 +102,7 @@ class Harness:
         return self.client.delete(path, headers=self.headers(user))
 
     @staticmethod
-    def headers(user: str | None = None, ip: str | None = None) -> dict[str, str]:
+    def headers(user: str | None = None, ip: str | None = "10.0.0.1") -> dict[str, str]:
         h = dict(H)
         if user:
             h["X-Holt-User"] = user
@@ -120,9 +124,20 @@ class Harness:
 def make_harness(tmp_path):
     clients: list[TestClient] = []
 
-    def build(**overrides: Any) -> Harness:
+    def build(run_jobs: bool = True, **overrides: Any) -> Harness:
         settings = make_settings(tmp_path, **overrides)
         services = Services(settings)
+        if os.environ.get("HOLT_TEST_DATABASE_URL"):
+            import asyncio
+
+            from holt_server.db import Base
+
+            async def reset():
+                async with services.db.engine.begin() as conn:
+                    await conn.run_sync(Base.metadata.drop_all)
+                await services.db.engine.dispose()
+
+            asyncio.run(reset())
         engine = FakeEngine()
         services.analysis_fn = engine
 
@@ -141,7 +156,7 @@ def make_harness(tmp_path):
             return object()
 
         services.model_factory = model_factory
-        client = TestClient(create_app(services=services))
+        client = TestClient(create_app(services=services, run_jobs=run_jobs))
         client.__enter__()
         clients.append(client)
         h = Harness(client, services, engine)

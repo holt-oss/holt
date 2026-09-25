@@ -25,7 +25,9 @@ class Services:
         self.pool = TokenPool(settings.token_list)
         self.lookup = GitHubLookup(self.pool)
         self.limiter = RateLimiter()
-        self.runner = JobRunner(self, settings.job_concurrency)
+        # Its own counters: badge traffic never uses up what user requests draw on.
+        self.badge_limiter = RateLimiter()
+        self.runner = JobRunner(self, settings.job_concurrency, settings.badge_concurrency)
         self._canonical: OrderedDict[str, str] = OrderedDict()
         # Swappable seams. Tests replace these; production uses the defaults.
         self.provider_factory: Callable[[str, datetime], Any] = self._live_provider

@@ -30,8 +30,10 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
                 await svc.runner.stop()
             await svc.db.dispose()
 
+    dev = svc.settings.env == "dev"
     app = FastAPI(title="Holt API", version=__version__, lifespan=lifespan,
-                  docs_url="/docs", redoc_url=None)
+                  docs_url="/docs" if dev else None, redoc_url=None,
+                  openapi_url="/openapi.json" if dev else None)
     app.state.services = svc
     errors.install(app)
     app.include_router(public)

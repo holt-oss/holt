@@ -38,7 +38,7 @@ RETRIES = 2
 class ModelSpec:
     provider: str
     model: str
-    api_key: str
+    api_key: str = field(repr=False)
     base_url: str | None = None
     # A user's own key: a rejected key is their problem to fix, not an outage.
     byok: bool = False

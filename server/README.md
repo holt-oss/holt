@@ -39,6 +39,7 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 
 | Variable | Default | What it does |
 |---|---|---|
+| `HOLT_ENV` | `production` | `dev` serves the interactive docs at `/docs` and `/openapi.json`; otherwise they are off. |
 | `DATABASE_URL` | `postgresql+asyncpg://holt:holt@127.0.0.1:20131/holt` | SQLAlchemy async URL. `sqlite+aiosqlite:///path.db` works for quick experiments. |
 | `HOLT_INTERNAL_KEY` | *(empty)* | Shared secret with `web/`. Every `/v1` request must send it as `X-Holt-Internal-Key`. Empty means every `/v1` request is refused. |
 | `HOLT_SECRET_KEY` | *(empty)* | Encrypts saved BYOK keys (AES-256-GCM). Use 32 random bytes, base64: `python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"`. Changing it makes saved keys unreadable (users are asked to save them again). |
@@ -53,6 +54,9 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | `HOLT_PLAN_AI_LIMIT` | `100` | The same, for any other plan (set by hand in the `users` table for now). |
 | `HOLT_ANON_RATE_PER_HOUR` | `10` | New jobs / starter-issue lookups per hour per IP for anonymous callers (`X-Holt-Client-Ip`). Cached answers are free. |
 | `HOLT_USER_RATE_PER_HOUR` | `60` | The same, per signed-in user. |
+| `HOLT_BADGE_RATE_PER_IP` | `20` | Rules checks a single client can trigger per hour by loading badges (client = `CF-Connecting-IP`, else the socket address). |
+| `HOLT_BADGE_RATE_TOTAL` | `60` | The same, across all clients. |
+| `HOLT_BADGE_CONCURRENCY` | `1` | Badge-triggered checks running at once; always fewer than `HOLT_JOB_CONCURRENCY`, and they queue behind user jobs. |
 | `HOLT_MAX_PAGES` | `8` | Pull-request pages crawled per analysis (25 PRs a page). |
 | `HOST`, `PORT` | `127.0.0.1`, `8000` | Where `holt-server` listens. |
 | `LOG_LEVEL` | `INFO` | |
@@ -62,20 +66,30 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | File | What |
 |---|---|
 | `holt_server/api.py` | The endpoints. Cache lookups, rate limits, quota and BYOK checks happen here, before a job is queued. |
-| `holt_server/jobs.py` | The runner: claims queued jobs from Postgres, runs them in threads, publishes progress for SSE. Jobs left `running` by a crashed process are re-queued at startup. |
+| `holt_server/jobs.py` | The runner: claims queued jobs from Postgres (user jobs before badge refreshes), runs them in threads, publishes progress for SSE. Each runner heartbeats the jobs it holds every 15s; a `running` job with no heartbeat for 90s belonged to a dead process and is queued again. Several processes can share one database. |
 | `holt_server/engine.py` | Calls `holt.agent.pipeline.analyze` / `analyze_without_model`. Wraps the provider and model to report stages; uses the engine's own progress callback when it has one. Maps failures to API error codes. |
 | `holt_server/report.py` | `Assessment` + `Trace` → the Report JSON. Landing areas and evidence URLs come from the records the run read. |
 | `holt_server/llm.py` | Model clients (OpenRouter/OpenAI/Gemini over the OpenAI API, Anthropic native) built per job from the server key or a decrypted BYOK key. Nothing is written to disk. |
 | `holt_server/starter.py` | Lazy adapter over `holt.starter`; the endpoints return 501 until that module exists. |
 | `holt_server/badge.py` | The README badge SVG. |
 
+Identical requests share one job. That is enforced by a partial unique index
+on `jobs.dedupe_key` (only over queued/running jobs), so two requests racing
+each other still get one job and one quota charge.
+
 Who pays for an AI report: a saved BYOK key if the user has one (it does not
 use up free reports); otherwise the server's OpenRouter key, counted against the
-monthly quota. A report that fails is not counted.
+monthly quota (an atomic `UPDATE`, in the same transaction as the job insert).
+A report that fails is refunded, again atomically and only against the month
+it was charged to.
 
-Limits that are per process (fine for one server, to revisit when there are
-more): rate-limit counters and the repo-name cache are in memory; SSE fan-out
-is in memory but falls back to re-reading the jobs table every 15 seconds.
+Per process (fine for one server; revisit with more): rate-limit counters,
+the badge lane's concurrency count and the repo-name cache are in memory. SSE
+fan-out is in memory but falls back to re-reading the jobs table every 15s.
+
+The schema is made with `create_all`, which adds missing tables but never
+alters existing ones. Pre-launch, after a schema change, recreate the dev
+database (`docker compose -f server/compose.yml down -v`).
 
 ## Tests
 

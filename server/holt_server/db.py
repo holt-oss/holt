@@ -77,6 +77,16 @@ class Job(Base):
     # Where the model key came from: "server" (counts against quota) or "byok".
     key_source: Mapped[str | None] = mapped_column(String(10), nullable=True)
     charged: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Identical questions share a job: at most one queued/running job per key,
+    # enforced by the partial unique index below, not by a read-then-insert.
+    dedupe_key: Mapped[str | None] = mapped_column(String(260), nullable=True)
+    # Lower runs first. User requests are 0; badge refreshes are BADGE_PRIORITY.
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    # The runner that claimed the job, and when it last said it was alive. A
+    # `running` job whose heartbeat is stale belonged to a dead process.
+    worker_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                          nullable=True)
     status: Mapped[str] = mapped_column(String(10), default="queued")
     stage: Mapped[str] = mapped_column(String(80), default="Waiting to start")
     progress: Mapped[float] = mapped_column(Float, default=0.0)
@@ -87,10 +97,20 @@ class Job(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        Index("ix_jobs_status_created", "status", "created_at"),
+        Index("ix_jobs_status_priority", "status", "priority", "created_at"),
         Index("ix_jobs_user_created", "user_id", "created_at"),
-        Index("ix_jobs_dedupe", "repo_key", "mode", "days", "status"),
+        Index("ux_jobs_active_dedupe", "dedupe_key", unique=True,
+              postgresql_where=text("status IN ('queued', 'running')"),
+              sqlite_where=text("status IN ('queued', 'running')")),
     )
+
+
+BADGE_PRIORITY = 10
+ACTIVE = ("queued", "running")
+
+
+def dedupe_key(repo_key: str, mode: str, days: int) -> str:
+    return f"analysis:{repo_key}:{mode}:{days}"
 
 
 class Report(Base):
