@@ -82,6 +82,8 @@ services:
       args:
         NEXT_PUBLIC_SITE_HOST: ${NEXT_PUBLIC_SITE_HOST}
         NEXT_PUBLIC_FREE_AI_QUOTA: ${NEXT_PUBLIC_FREE_AI_QUOTA:-3}
+        # Staging must never be indexed; build time too, for prerendered pages.
+        ROBOTS_NOINDEX: "1"
     image: stage-holt-new-web:latest
     labels: *stage-label
     environment:
@@ -99,6 +101,7 @@ services:
       # because web publishes no port: the one way in is tunnel -> staging
       # nginx -> edge (127.0.0.1) -> web.
       TRUST_PROXY_HEADERS: "1"
+      ROBOTS_NOINDEX: "1"
       NODE_OPTIONS: --max-old-space-size=384
     depends_on:
       server: { condition: service_healthy }
