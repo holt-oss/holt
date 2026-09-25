@@ -68,6 +68,8 @@ class Pack:
 class Catalog:
     plans: dict[str, Plan] = field(default_factory=dict)
     packs: dict[str, Pack] = field(default_factory=dict)
+    tax_note: str = ""
+    tax_notes: dict[str, str] = field(default_factory=dict)  # by currency
 
     @property
     def free(self) -> Plan:
@@ -81,6 +83,8 @@ class Catalog:
             "plans": [p.public() for p in self.plans.values()],
             "packs": [p.public() for p in self.packs.values()],
             "byok": {"price": 0, "unlimited": True},
+            "tax_note": self.tax_note,
+            "tax_notes": {k: v for k, v in self.tax_notes.items() if v},
         }
 
 
@@ -117,4 +121,8 @@ def load(path: str | Path | None = None) -> Catalog:
                   prices=_prices(p.get("prices"), None, f"packs.{pid}"))
         for pid, p in (data.get("packs") or {}).items()
     }
-    return Catalog(plans=plans, packs=packs)
+    return Catalog(
+        plans=plans, packs=packs, tax_note=str(data.get("tax_note") or ""),
+        tax_notes={str(k).upper(): str(v)
+                   for k, v in (data.get("tax_notes") or {}).items()},
+    )

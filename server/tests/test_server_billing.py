@@ -151,6 +151,7 @@ def test_plans_are_public_via_the_bff(bh):
                                 "prices": [{"currency": "INR", "amount": 4900}]}
     assert body["byok"] == {"price": 0, "unlimited": True}
     assert body["provider"] == "razorpay"
+    assert body["tax_note"] == "" and body["tax_notes"] == {}
 
 
 def test_shipped_plans_file_loads():
@@ -378,11 +379,19 @@ def test_subscription_lifecycle(bh):
     webhook(bh, "subscription.halted", sub_entity(sid, "halted", end1, end2), "e5")
     assert me(bh, "subber")["plan"] == "free"
 
-    # They pay after all; the subscription comes back.
-    webhook(bh, "subscription.charged", {**sub_entity(sid, "active", end1, end2),
+    # A stale event for the same period (delivered late) must not revive it.
+    webhook(bh, "subscription.activated", sub_entity(sid, "active", end1, end2), "e5b")
+    webhook(bh, "subscription.charged", sub_entity(sid, "active", end1 - DAY, end1), "e5c")
+    assert me(bh, "subber")["plan"] == "free"
+    assert rows(bh, Subscription)[0].status == "halted"
+
+    # They pay after all: a charge for a new period brings it back.
+    end3 = end2 + 30 * DAY
+    webhook(bh, "subscription.charged", {**sub_entity(sid, "active", end2, end3),
                                          **payment_entity("pay_s2", amount=9900,
                                                           subscription_id=sid)}, "e6")
     assert me(bh, "subber")["plan"] == "student"
+    end2 = end3
 
     # Cancelled: keeps what was paid for, then stops renewing.
     webhook(bh, "subscription.cancelled", sub_entity(sid, "cancelled", end1, end2), "e7")
@@ -557,3 +566,191 @@ def test_manual_plan_grant_does_not_lapse(make_harness):
     m = me(h, "staff")
     assert m["plan"] == "pro" and m["quota"]["ai_limit"] == 5
     assert m["renews_at"] is None and m["ends_at"] is None
+
+
+# --- review fixes -------------------------------------------------------------------------
+
+
+def refund_body(refund_id, payment_id, amount, created_at=1):
+    return {"refund": {"entity": {"id": refund_id, "payment_id": payment_id,
+                                  "amount": amount, "currency": "INR",
+                                  "created_at": created_at}}}
+
+
+def dispute_body(dispute_id, payment_id, amount=4900):
+    return {"dispute": {"entity": {"id": dispute_id, "payment_id": payment_id,
+                                   "amount": amount, "currency": "INR"}}}
+
+
+def paid_pack(h, user="buyer", pid="pay_1"):
+    order = buy_pack(h, user=user)["order_id"]
+    assert verify_order(h, order, pid, user=user).status_code == 200
+    return order
+
+
+def test_old_subscription_cannot_touch_a_newer_one(bh):
+    now = int(time.time())
+    old = start_subscription(bh, user="switcher", plan="student")
+    webhook(bh, "subscription.activated", sub_entity(old, "active", now - DAY, now + 10 * DAY))
+    assert bh.post("/v1/billing/cancel", user="switcher").status_code == 200
+    new = start_subscription(bh, user="switcher", plan="pro")
+    assert new != old
+    webhook(bh, "subscription.activated", sub_entity(new, "active", now, now + 30 * DAY))
+    m = me(bh, "switcher")
+    assert m["plan"] == "pro"
+    until = m["renews_at"]
+
+    # The old subscription's endings, and a late charge from it, change nothing.
+    webhook(bh, "subscription.charged", sub_entity(old, "active", now + 10 * DAY,
+                                                   now + 40 * DAY))
+    for kind in ("halted", "cancelled", "completed"):
+        webhook(bh, f"subscription.{kind}", sub_entity(old, kind, now - DAY, now + 10 * DAY))
+        m = me(bh, "switcher")
+        assert (m["plan"], m["renews_at"]) == ("pro", until), kind
+
+    # The granting subscription's own end still ends it.
+    webhook(bh, "subscription.halted", sub_entity(new, "halted", now, now + 30 * DAY))
+    assert me(bh, "switcher")["plan"] == "free"
+
+
+def test_event_id_header_is_not_trusted_for_dedupe(bh):
+    order = buy_pack(bh)["order_id"]
+    payload = payment_entity("pay_1", order)
+    assert webhook(bh, "payment.captured", payload, event_id="a").json()["result"] == "credited"
+    # Same signed body, different (unsigned) header id: still a duplicate.
+    assert webhook(bh, "payment.captured", payload, event_id="b").json()["duplicate"]
+
+
+def test_oversized_webhook_bodies_are_refused_unread(bh):
+    big = b"{" + b" " * (1024 * 1024 + 10) + b"}"
+    r = bh.client.post("/webhooks/razorpay", content=big,
+                       headers={"X-Razorpay-Signature": hmac_hex(WEBHOOK_SECRET, big)})
+    assert r.status_code == 413
+
+    def chunks():  # no Content-Length: sent chunked
+        for _ in range(20):
+            yield b" " * 65536
+
+    r = bh.client.post("/webhooks/razorpay", content=chunks(),
+                       headers={"X-Razorpay-Signature": "0" * 64})
+    assert r.status_code == 413
+
+
+def test_full_pack_refund_takes_back_unspent_credits(bh):
+    paid_pack(bh)
+    set_user(bh, "buyer", pack_credits=3)  # seven already used
+    r = webhook(bh, "refund.processed", {**refund_body("rfnd_1", "pay_1", 4900),
+                                         **payment_entity("pay_1")})
+    assert r.json()["result"] == "refunded"
+    assert me(bh, "buyer")["pack_credits"] == 0
+    payment = rows(bh, Payment)[0]
+    assert (payment.status, payment.refunded_amount) == ("refunded", 4900)
+
+
+def test_partial_refunds_add_up_and_apply_once(bh):
+    paid_pack(bh)
+    webhook(bh, "refund.processed", refund_body("rfnd_1", "pay_1", 490))
+    assert me(bh, "buyer")["pack_credits"] == 9
+    # Same refund again in a different delivery (different body): once only.
+    r = webhook(bh, "refund.processed", refund_body("rfnd_1", "pay_1", 490, created_at=2))
+    assert r.json()["result"] == "already"
+    assert me(bh, "buyer")["pack_credits"] == 9
+    webhook(bh, "refund.processed", refund_body("rfnd_2", "pay_1", 1000))
+    assert me(bh, "buyer")["pack_credits"] == 6  # ceil(10 * 1000 / 4900) = 3
+    payment = rows(bh, Payment)[0]
+    assert (payment.status, payment.refunded_amount) == ("partially_refunded", 1490)
+
+
+def test_refund_of_subscription_payment(bh):
+    sid = start_subscription(bh)
+    now = int(time.time())
+    webhook(bh, "subscription.charged", {**sub_entity(sid, "active", now, now + 30 * DAY),
+                                         **payment_entity("pay_s1", amount=9900,
+                                                          subscription_id=sid)})
+    webhook(bh, "refund.processed", refund_body("rfnd_s1", "pay_s1", 5000))
+    assert me(bh, "subber")["plan"] == "student"  # partial: plan stays
+    webhook(bh, "refund.processed", refund_body("rfnd_s2", "pay_s1", 4900))
+    assert me(bh, "subber")["plan"] == "free"  # now fully refunded
+
+
+def test_refund_for_unknown_payment_is_ignored(bh):
+    r = webhook(bh, "refund.processed", refund_body("rfnd_x", "pay_unknown", 100))
+    assert r.json()["result"] == "ignored"
+
+
+def test_dispute_freezes_pack_credits_until_resolved(make_harness):
+    h = make_harness(OPENROUTER_API_KEY="sk-or-server", RAZORPAY_KEY_ID=KEY_ID,
+                     RAZORPAY_KEY_SECRET=KEY_SECRET, RAZORPAY_WEBHOOK_SECRET=WEBHOOK_SECRET)
+    h.svc.payments = Razorpay(KEY_ID, KEY_SECRET, WEBHOOK_SECRET, client=httpx.Client(
+        transport=httpx.MockTransport(FakeRazorpayApi())))
+    paid_pack(h, user="d1")
+    set_user(h, "d1", ai_used=2, ai_period=datetime.now(UTC).strftime("%Y-%m"))  # allowance spent
+    r = webhook(h, "payment.dispute.created", dispute_body("disp_1", "pay_1"))
+    assert r.json()["result"] == "disputed"
+    assert rows(h, Payment)[0].disputed is True
+    r = ai(h, "octo/one", "d1")
+    assert r.json()["error"]["code"] == "quota_exceeded"  # credits frozen
+    assert me(h, "d1")["pack_credits"] == 10
+
+    webhook(h, "payment.dispute.won", dispute_body("disp_1", "pay_1"))
+    assert ai(h, "octo/one", "d1").status_code == 202  # spendable again
+
+
+def test_lost_dispute_is_a_refund(bh):
+    paid_pack(bh)
+    webhook(bh, "payment.dispute.created", dispute_body("disp_1", "pay_1"))
+    webhook(bh, "payment.dispute.lost", dispute_body("disp_1", "pay_1"))
+    assert me(bh, "buyer")["pack_credits"] == 0
+    user = [u for u in rows(bh, User) if u.id == "buyer"][0]
+    assert user.packs_frozen is False
+    assert rows(bh, Payment)[0].status == "refunded"
+
+
+def test_repeat_checkout_reuses_the_open_subscription(bh):
+    first = start_subscription(bh)
+    assert start_subscription(bh) == first
+    assert [c[1] for c in bh.api.calls].count("/subscriptions") == 1
+
+
+def test_switching_plan_mid_checkout_cancels_the_old_one(bh):
+    first = start_subscription(bh, plan="student")
+    second = start_subscription(bh, plan="pro")
+    assert second != first
+    cancels = [c for c in bh.api.calls if c[1] == f"/subscriptions/{first}/cancel"]
+    assert cancels and cancels[0][2] == {"cancel_at_cycle_end": 0}
+    status = {s.provider_subscription_id: s.status for s in rows(bh, Subscription)}
+    assert status == {first: "cancelled", second: "created"}
+
+
+def test_one_live_subscription_per_user_is_enforced(bh, monkeypatch):
+    from holt_server.billing import routes
+
+    start_subscription(bh)
+
+    async def none(svc, user_id):  # as if a concurrent checkout had not been seen
+        return None
+
+    monkeypatch.setattr(routes, "_live_subscription", none)
+    r = bh.post("/v1/billing/checkout", {"plan": "pro"}, user="subber")
+    assert r.status_code == 409
+    # The duplicate created at the provider was cancelled straight away.
+    assert bh.api.calls[-1][1] == "/subscriptions/sub_2/cancel"
+    assert [s.provider_subscription_id for s in rows(bh, Subscription)] == ["sub_1"]
+
+
+def test_tax_notes_from_config(tmp_path):
+    from holt_server import plans
+
+    path = tmp_path / "p.toml"
+    path.write_text('tax_note = "Taxes added at checkout."\n'
+                    '[tax_notes]\nINR = "Includes 18% GST."\nUSD = ""\n'
+                    '[plans.free]\nai_reports_per_month = 1\n', encoding="utf-8")
+    body = plans.load(path).public()
+    assert body["tax_note"] == "Taxes added at checkout."
+    assert body["tax_notes"] == {"INR": "Includes 18% GST."}
+
+
+def test_empty_internal_key_header_is_rejected(bh):
+    for value in ("", " "):
+        r = bh.client.get("/v1/plans", headers={"X-Holt-Internal-Key": value})
+        assert r.status_code == 401, repr(value)

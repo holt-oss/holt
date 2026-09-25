@@ -120,12 +120,26 @@ async def checkout(body: CheckoutIn, request: Request,
         raise ApiError("not_implemented", f"The {plan.name} plan can't be bought yet.",
                        status=501)
     current = quota.effective_plan(user, svc.catalog, svc.grace)
-    latest = await _latest_subscription(svc, user_id)
-    if quota.is_paid(current) and latest is not None and latest.status in service.LIVE \
-            and not latest.cancel_at_period_end:
+    live = await _live_subscription(svc, user_id)
+    if live is not None and live.status in ("active", "pending"):
         raise ApiError("already_subscribed",
                        f"You're already on the {current.name} plan. Cancel it first "
                        "to switch; you keep it until the end of the month you paid for.")
+    if live is not None:
+        # An unfinished checkout (created, or mandate set but not yet charged).
+        if live.plan == plan.id and live.currency == price.currency:
+            # Same thing again: hand back the same subscription, never a second one.
+            return {**base, "kind": "subscription",
+                    "subscription_id": live.provider_subscription_id,
+                    "amount": live.amount, "name": "Holt",
+                    "description": f"{plan.name} plan", "short_url": None}
+        # They changed their mind: cancel the old one at once so it can never charge.
+        await call(pay.cancel_subscription, live.provider_subscription_id,
+                   at_period_end=False)
+        async with svc.db.session() as s:
+            row = await s.get(Subscription, live.id)
+            row.status, row.cancel_at_period_end = "cancelled", True
+            await s.commit()
     sub = await call(pay.create_subscription, provider_plan_id=price.razorpay_plan_id,
                      total_count=svc.settings.subscription_cycles,
                      notes={"user_id": user_id, "plan": plan.id})
@@ -134,17 +148,31 @@ async def checkout(body: CheckoutIn, request: Request,
                            provider_subscription_id=sub.id, plan=plan.id,
                            currency=price.currency, amount=price.amount,
                            status="created"))
-        await s.commit()
+        try:
+            await s.commit()
+        except IntegrityError:
+            # Another checkout for this user won the race (one live subscription
+            # per user). Make sure the one we just created can never charge.
+            await s.rollback()
+            try:
+                await call(pay.cancel_subscription, sub.id, at_period_end=False)
+            except ApiError:
+                log.error("could not cancel duplicate subscription %s", sub.id)
+            raise ApiError("already_subscribed", "A checkout for a plan is already "
+                           "open. Finish it, or try again in a minute.") from None
     return {**base, "kind": "subscription", "subscription_id": sub.id,
             "amount": price.amount, "name": "Holt", "description": f"{plan.name} plan",
             "short_url": sub.short_url}
 
 
-async def _latest_subscription(svc, user_id: str) -> Subscription | None:
+async def _live_subscription(svc, user_id: str) -> Subscription | None:
+    """The user's one live, renewing subscription (see db.LIVE_SUBSCRIPTION)."""
     async with svc.db.session() as s:
         return (await s.execute(
-            select(Subscription).where(Subscription.user_id == user_id)
-            .order_by(Subscription.created_at.desc(), Subscription.id.desc()).limit(1)
+            select(Subscription).where(Subscription.user_id == user_id,
+                                       Subscription.status.in_(service.LIVE),
+                                       Subscription.cancel_at_period_end.is_(False))
+            .order_by(Subscription.created_at.desc()).limit(1)
         )).scalar_one_or_none()
 
 
@@ -231,20 +259,47 @@ async def cancel(request: Request, who: Caller = Depends(caller)) -> dict[str, A
     svc = services(request)
     user_id = signed_in(who)
     pay = provider(svc)
-    sub = await _latest_subscription(svc, user_id)
-    if sub is None or sub.status not in service.LIVE or sub.cancel_at_period_end:
+    sub = await _live_subscription(svc, user_id)
+    if sub is None:
         raise ApiError("not_found", "You don't have a subscription to cancel.")
-    # At period end: they keep what they paid for. The provider's
-    # `subscription.cancelled` webhook finalises it.
-    await call(pay.cancel_subscription, sub.provider_subscription_id, at_period_end=True)
+    # Paid: at period end, so they keep what they paid for; the provider's
+    # `subscription.cancelled` webhook finalises it. Not yet paid: at once.
+    paid = sub.status in ("active", "pending")
+    await call(pay.cancel_subscription, sub.provider_subscription_id, at_period_end=paid)
     async with svc.db.session() as s:
         row = await s.get(Subscription, sub.id)
         row.cancel_at_period_end = True
+        if not paid:
+            row.status = "cancelled"
         await s.commit()
     return await me_body(svc, await get_user(svc, user_id))
 
 
 # --- webhook -----------------------------------------------------------------------------
+
+
+# Razorpay webhook bodies are a few KB. Anything near this is not one.
+MAX_WEBHOOK_BYTES = 1024 * 1024
+
+
+async def bounded_body(request: Request, limit: int = MAX_WEBHOOK_BYTES) -> bytes:
+    """The request body, refusing to read more than `limit` bytes, declared or
+    streamed (chunked bodies have no Content-Length to check up front)."""
+    too_big = ApiError("invalid_request", "Request body too large.", status=413)
+    declared = request.headers.get("content-length")
+    if declared is not None:
+        try:
+            if int(declared) > limit:
+                raise too_big
+        except ValueError:
+            raise ApiError("invalid_request", "Bad Content-Length.") from None
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > limit:
+            raise too_big
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 @webhooks.post("/webhooks/razorpay")
@@ -257,11 +312,12 @@ async def razorpay_webhook(
     pay = svc.payments
     if pay is None or pay.name != "razorpay":
         raise ApiError("not_found", "There is nothing at this address.")
-    body = await request.body()
+    body = await bounded_body(request)
     if not x_razorpay_signature or not pay.verify_webhook(body, x_razorpay_signature):
         raise ApiError("invalid_signature", "Bad webhook signature.")
     try:
-        event = pay.parse_webhook(body, x_razorpay_event_id)
+        # Deduplicated on the signed body; the event-id header is only logged.
+        event = pay.parse_webhook(body)
     except (ValueError, KeyError, TypeError) as exc:
         raise ApiError("invalid_request", "Malformed webhook body.") from exc
 
@@ -283,5 +339,6 @@ async def razorpay_webhook(
             s.add(WebhookEvent(provider=pay.name, event_id=event.id, type=event.type))
             await s.commit()
             result = "conflict"
-    log.info("webhook %s %s -> %s", event.id, event.type, result)
+    log.info("webhook %s (header id %s) %s -> %s", event.id, x_razorpay_event_id,
+             event.type, result)
     return {"ok": True, "result": result}

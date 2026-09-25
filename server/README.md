@@ -118,8 +118,13 @@ Setting up Razorpay (once the account exists):
    same amount as `plans.toml`), and put the ids in `RAZORPAY_PLAN_<PLAN>_<CURRENCY>`.
 2. Add a webhook to `https://<api host>/webhooks/razorpay` with a secret
    (`RAZORPAY_WEBHOOK_SECRET`) and these events: `payment.captured`,
-   `payment.failed`, `order.paid`, and all `subscription.*`.
+   `payment.failed`, `order.paid`, all `subscription.*`, `refund.processed`
+   and all `payment.dispute.*`.
 3. Set `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`. Use test-mode keys first.
+4. **Turn on automatic capture** (Settings → Payment capture → automatic).
+   `/v1/billing/verify` credits a pack as soon as the payment signature checks
+   out, which Razorpay issues on *authorization*; with manual capture a payment
+   could be credited and then never captured. Auto-capture closes that gap.
 
 ## Tests
 

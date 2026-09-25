@@ -82,7 +82,8 @@ async def charge(s: AsyncSession, user: User, plan: Plan) -> tuple[str, str]:
     if took.rowcount == 1:
         return PLAN, key
     took = await s.execute(
-        update(User).where(User.id == user.id, User.pack_credits > 0)
+        update(User).where(User.id == user.id, User.pack_credits > 0,
+                           User.packs_frozen.is_(False))
         .values(pack_credits=User.pack_credits - 1))
     if took.rowcount == 1:
         return PACK, key

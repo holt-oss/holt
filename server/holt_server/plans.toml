@@ -8,6 +8,15 @@
 #
 # BYOK (a user's own model key) is always free and unlimited; it is not a plan.
 
+# Shown next to prices by the web app (e.g. whether GST is included). The
+# wording is a business decision; empty means nothing is shown. A per-currency
+# note, when set, is used for that currency instead of the general one.
+tax_note = ""
+
+[tax_notes]
+# INR = ""
+# USD = ""
+
 [plans.free]
 name = "Free"
 ai_reports_per_month = 3

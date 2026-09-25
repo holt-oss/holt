@@ -22,10 +22,12 @@ from typing import Any
 import httpx
 
 from holt_server.billing.provider import (
+    DisputeInfo,
     Event,
     Order,
     PaymentInfo,
     ProviderError,
+    RefundInfo,
     SubscriptionInfo,
 )
 
@@ -134,17 +136,29 @@ class Razorpay:
 
     # --- webhooks -------------------------------------------------------------
 
-    def parse_webhook(self, body: bytes, event_id: str | None) -> Event:
+    def parse_webhook(self, body: bytes) -> Event:
         data = json.loads(body)
         kind = data.get("event", "")
         payload = data.get("payload") or {}
-        payment_entity = (payload.get("payment") or {}).get("entity")
-        sub_entity = (payload.get("subscription") or {}).get("entity")
-        payment = _payment(payment_entity) if payment_entity else None
-        subscription = _subscription(sub_entity) if sub_entity else None
-        # Razorpay sends the id in the X-Razorpay-Event-Id header. A delivery
-        # without one is keyed on its content, so an exact replay still matches.
-        eid = event_id or "sha256:" + hashlib.sha256(body).hexdigest()
+
+        def entity(name: str) -> dict[str, Any] | None:
+            return (payload.get(name) or {}).get("entity")
+
+        payment = _payment(e) if (e := entity("payment")) else None
+        subscription = _subscription(e) if (e := entity("subscription")) else None
+        refund = dispute = None
+        if e := entity("refund"):
+            refund = RefundInfo(id=e["id"], payment_id=e["payment_id"],
+                                amount=int(e.get("amount") or 0),
+                                currency=(e.get("currency") or "").upper())
+        if e := entity("dispute"):
+            dispute = DisputeInfo(id=e["id"], payment_id=e["payment_id"],
+                                  amount=int(e.get("amount") or 0),
+                                  currency=(e.get("currency") or "").upper())
+        # Idempotency key: the signed body itself. Razorpay's X-Razorpay-Event-Id
+        # header is not covered by the signature, so anyone replaying a captured
+        # delivery could change it; a retry of the same event has the same body.
+        eid = "sha256:" + hashlib.sha256(body).hexdigest()
 
         if kind in ("payment.captured", "order.paid"):
             etype = "payment.paid"
@@ -152,7 +166,11 @@ class Razorpay:
             etype = "payment.failed"
         elif kind in SUBSCRIPTION_EVENTS:
             etype = kind
+        elif kind == "refund.processed" and refund:
+            etype = "refund.processed"
+        elif kind.startswith("payment.dispute.") and dispute:
+            etype = "dispute." + kind.removeprefix("payment.dispute.")
         else:
             etype = "ignored"
         return Event(id=eid, type=etype, payment=payment, subscription=subscription,
-                     raw=data)
+                     refund=refund, dispute=dispute, raw=data)

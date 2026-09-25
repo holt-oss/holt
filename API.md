@@ -186,10 +186,13 @@ receiving the webhook as well, credits once.
   "packs": [ { "id": "pack10", "name": "10 AI reports", "reports": 10,
                "prices": [ { "currency": "INR", "amount": 4900 } ] } ],
   "byok": { "price": 0, "unlimited": true },
+  "tax_note": "",                          // general note to show by prices ("" = none)
+  "tax_notes": { "INR": "…" },             // per-currency notes; use instead of tax_note
   "provider": "razorpay" | null            // null: payments not set up on this server
 }
 ```
-Plans and prices come from server config (`server/holt_server/plans.toml`).
+Plans, prices and tax notes come from server config
+(`server/holt_server/plans.toml`).
 
 ### `POST /v1/billing/checkout`
 Body: `{"pack": "pack10"}` or `{"plan": "student"}`, plus optional
@@ -203,9 +206,12 @@ Body: `{"pack": "pack10"}` or `{"plan": "student"}`, plus optional
   "subscription_id": "sub_…", "amount": 9900, "currency": "INR", "name": "Holt",
   "description": "Student plan", "short_url": "https://rzp.io/…" }
 ```
-Grants nothing by itself. Errors: `invalid_request` (unknown item, not sold in
-that currency), `already_subscribed` (a renewing paid plan; cancel first),
-`not_implemented` (payments or that plan not set up yet).
+Grants nothing by itself. A user has at most one live subscription: asking
+again for the same plan returns the same open `subscription_id`; asking for a
+different plan while a checkout is still unpaid cancels the unpaid one first.
+Errors: `invalid_request` (unknown item, not sold in that currency),
+`already_subscribed` (a renewing paid plan, cancel first; or a concurrent
+checkout), `not_implemented` (payments or that plan not set up yet).
 
 ### `POST /v1/billing/verify`
 Body: exactly what Razorpay Checkout's success handler returns —
@@ -218,17 +224,30 @@ from Razorpay, not from the browser; `authenticated` means the mandate is set
 but the first charge has not landed yet (the webhook will finish it).
 
 ### `POST /v1/billing/cancel`
-Cancels the user's subscription at the end of the period already paid for.
+Cancels the user's subscription at the end of the period already paid for (an
+unpaid checkout is cancelled at once).
 Returns the `GET /v1/me` body (`renews_at` null, `ends_at` set). `not_found`
 if there is nothing to cancel.
 
 ### `POST /webhooks/razorpay` (no internal key; Razorpay calls it)
 Verified with HMAC-SHA256 of the raw body using `RAZORPAY_WEBHOOK_SECRET`
-(`X-Razorpay-Signature`); `invalid_signature` 400 otherwise. Idempotent by
-`X-Razorpay-Event-Id`. Handles `payment.captured`, `order.paid`,
-`payment.failed` and `subscription.*` (authenticated, activated, charged,
-pending, halted, cancelled, completed, expired, paused, resumed). Always 200
-once verified, including for events it ignores.
+(`X-Razorpay-Signature`); `invalid_signature` 400 otherwise. Bodies over 1 MB
+get 413 without being read. Idempotent on a hash of the signed body (the
+`X-Razorpay-Event-Id` header is not signed, so it is only logged). Handles
+`payment.captured`, `order.paid`, `payment.failed`, `subscription.*`
+(authenticated, activated, charged, pending, halted, cancelled, completed,
+expired, paused, resumed), `refund.processed` and `payment.dispute.*`.
+Always 200 once verified, including for events it ignores.
+
+- A subscription's events only affect the plan that subscription granted; an
+  older or cancelled subscription cannot end or overwrite a newer one, and an
+  event for an older billing period than the one stored is ignored.
+- Refunds (full or partial, each applied once): a pack loses the refunded
+  share of its reports (rounded up, never below zero); a fully refunded
+  subscription payment ends the plan it paid for.
+- Disputes: the payment is flagged and the user's pack credits are frozen
+  (kept, not spendable) until the dispute closes; a lost dispute counts as a
+  refund.
 
 ## Public proxy for the browser extension (implemented by `web/`)
 

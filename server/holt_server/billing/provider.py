@@ -48,6 +48,22 @@ class PaymentInfo:
 
 
 @dataclass(frozen=True)
+class RefundInfo:
+    id: str
+    payment_id: str
+    amount: int
+    currency: str
+
+
+@dataclass(frozen=True)
+class DisputeInfo:
+    id: str
+    payment_id: str
+    amount: int
+    currency: str
+
+
+@dataclass(frozen=True)
 class Event:
     """One webhook delivery, provider-neutral.
 
@@ -55,13 +71,20 @@ class Event:
       payment.paid, payment.failed,
       subscription.authenticated | activated | charged | pending | halted |
       cancelled | completed | expired | paused | resumed,
+      refund.processed,
+      dispute.created | dispute.won | dispute.lost | dispute.closed,
       or "ignored" for anything we do not act on.
+
+    `id` identifies the delivery for idempotency. It must be derived from what
+    the signature covers (e.g. a hash of the body), never from an unsigned header.
     """
 
     id: str
     type: str
     payment: PaymentInfo | None = None
     subscription: SubscriptionInfo | None = None
+    refund: RefundInfo | None = None
+    dispute: DisputeInfo | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -89,4 +112,4 @@ class PaymentProvider(Protocol):
 
     def verify_webhook(self, body: bytes, signature: str) -> bool: ...
 
-    def parse_webhook(self, body: bytes, event_id: str | None) -> Event: ...
+    def parse_webhook(self, body: bytes) -> Event: ...

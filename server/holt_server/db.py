@@ -65,6 +65,11 @@ class User(Base):
     ai_period: Mapped[str] = mapped_column(String(20), default="")
     # One-time pack credits. Never expire; spent after the monthly allowance.
     pack_credits: Mapped[int] = mapped_column(Integer, default=0)
+    # Set while a pack payment is disputed: credits stay but cannot be spent.
+    packs_frozen: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The provider subscription that granted `plan`. Only that subscription's
+    # events (or a newer one's) may change or end it.
+    plan_subscription_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     byok_provider: Mapped[str | None] = mapped_column(String(40), nullable=True)
     byok_model: Mapped[str | None] = mapped_column(String(200), nullable=True)
     byok_cipher: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -173,6 +178,9 @@ class Database:
 
 
 # --- billing ------------------------------------------------------------------
+
+LIVE_SUBSCRIPTION = ("status IN ('created', 'authenticated', 'active', 'pending') "
+                     "AND NOT cancel_at_period_end")
 #
 # No card data is ever stored or seen: the provider's checkout collects it.
 # Amounts are integers in minor units (paise, cents) with their currency.
@@ -197,6 +205,15 @@ class Subscription(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now,
                                                  onupdate=now)
 
+    # At most one live, renewing subscription per user: a second checkout
+    # reuses or cancels the first (billing/routes.py), and this makes a race
+    # between two checkouts fail instead of billing twice.
+    __table_args__ = (
+        Index("ux_subscriptions_one_live", "user_id", unique=True,
+              postgresql_where=text(LIVE_SUBSCRIPTION),
+              sqlite_where=text(LIVE_SUBSCRIPTION)),
+    )
+
 
 class Payment(Base):
     __tablename__ = "payments"
@@ -218,13 +235,31 @@ class Payment(Base):
     # Pack credits were added for this payment. Set in the same transaction as
     # the credit, under a conditional UPDATE, so no event credits twice.
     credited: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Minor units refunded so far (partial refunds add up).
+    refunded_amount: Mapped[int] = mapped_column(Integer, default=0)
+    disputed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now,
                                                  onupdate=now)
 
 
+class Refund(Base):
+    """Each provider refund, applied once however many events mention it."""
+
+    __tablename__ = "refunds"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String(20))
+    provider_refund_id: Mapped[str] = mapped_column(String(100), unique=True)
+    payment_id: Mapped[int] = mapped_column(Integer, index=True)
+    amount: Mapped[int] = mapped_column(Integer)
+    currency: Mapped[str] = mapped_column(String(3))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 class WebhookEvent(Base):
-    """Every webhook delivery we acted on, by the provider's event id."""
+    """Every webhook delivery we acted on, keyed by a hash of its signed body
+    (the event-id header is not covered by the signature)."""
 
     __tablename__ = "webhook_events"
 
