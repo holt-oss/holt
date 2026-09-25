@@ -385,7 +385,7 @@ def test_find(h, fake_starter):
     assert [x["repo"] for x in body["results"]] == ["octo/one"]
     assert body["results"][0]["headline"] == "Worth your time"
     assert body["results"][0]["stats"] == {"outsider_merged": 4}
-    assert fake_starter["find"] == (["python"], [], True, 5)
+    assert fake_starter["find"] == (["python"], [], True, 20)  # computed for >= 20
     # find jobs are not analyses
     assert h.get(f"/v1/analyses/{r.json()['job_id']}").status_code == 404
 
