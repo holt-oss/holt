@@ -26,6 +26,7 @@ What they check:
   redirects to the report.
 - `/find` with Python + Hacktoberfest lists at least one repo with a GitHub
   issue link. If the site is rate limiting us, the test is skipped, not failed.
+- The Hacktoberfest pill's × hides it, and it stays hidden after a reload (skipped outside the season).
 - The theme toggle survives a reload.
 - `/pricing` shows the plans.
 - The extension's `/api/public/*` endpoints answer JSON with CORS headers.

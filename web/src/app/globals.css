@@ -314,11 +314,6 @@
     content: "";
   }
 
-  /* Hacktoberfest pill: hidden once dismissed (set before paint by the head script). */
-  :root[data-hf-dismissed] .hf-pill {
-    display: none;
-  }
-
   .btn-primary {
     display: inline-flex;
     min-height: 48px;
@@ -550,4 +545,11 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Hacktoberfest pill: hidden once dismissed (the head script sets the
+   attribute before paint). Deliberately outside @layer: unlayered rules beat
+   layered ones, so the pill's own `inline-flex` utility can't override it. */
+:root[data-hf-dismissed] .hf-pill {
+  display: none;
 }
