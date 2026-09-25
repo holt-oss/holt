@@ -5,7 +5,7 @@ import { ErrorPanel } from "@/components/error-panel";
 import { FindResults } from "@/components/find/find-results";
 import { FindRunner } from "@/components/find/find-runner";
 import { ShareBar } from "@/components/report/share-bar";
-import { find } from "@/lib/api";
+import { cachedFind } from "@/lib/find-cached";
 import { caller } from "@/lib/session";
 import { hacktoberfest, SITE_URL } from "@/lib/site";
 
@@ -53,7 +53,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
   const sp = await searchParams;
   const tab = LANGS.find((l) => l.id === sp.lang) ?? LANGS[0];
   const hf = hacktoberfest();
-  const result = await find({ languages: [...tab.langs], topics: [], days: 7, hacktoberfest: true, limit: 12 }, await caller());
+  const result = await cachedFind({ languages: [...tab.langs], topics: [], days: 7, hacktoberfest: true, limit: 12 }, await caller());
   const here = `/hacktoberfest${tab.id === "all" ? "" : `?lang=${tab.id}`}`;
 
   return (
