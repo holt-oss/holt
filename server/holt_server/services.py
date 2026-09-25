@@ -28,7 +28,12 @@ class Services:
         # One connection pool for every GitHub call this process makes.
         self.http = httpx.Client(timeout=30.0)
         self.lookup = GitHubLookup(self.pool, self.http)
+        # Work (new analyses, find) and reads (cache misses on starter issues)
+        # draw on separate counters.
         self.limiter = RateLimiter()
+        self.read_limiter = RateLimiter()
+        # Single-flight: concurrent cache misses for one repo share one fetch.
+        self.inflight: dict[str, Any] = {}
         # Its own counters: badge traffic never uses up what user requests draw on.
         self.badge_limiter = RateLimiter()
         self.runner = JobRunner(self, settings.job_concurrency, settings.badge_concurrency)
