@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     )
     internal_key: str = Field("", alias="HOLT_INTERNAL_KEY")
     secret_key: str = Field("", alias="HOLT_SECRET_KEY")
-    # Where the badge links to: `{web_url}/r/{owner}/{repo}`.
+    # Where the badge links to: `{web_url}/{owner}/{repo}`.
     web_url: str = Field("https://holt.dev", alias="HOLT_WEB_URL")
 
     github_tokens: str = Field("", alias="GITHUB_TOKENS")

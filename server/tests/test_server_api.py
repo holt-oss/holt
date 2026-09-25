@@ -319,7 +319,7 @@ def test_badge(h):
     h.wait(jobs[0].id)
     r = h.client.get("/badge/Pallets/Flask.svg")
     assert "newcomer-friendly" in r.text and "not newcomer" not in r.text
-    assert "/r/pallets/flask" in r.text
+    assert "https://holt.dev/pallets/flask\"" in r.text
 
 
 # --- starter issues and find ---------------------------------------------------------

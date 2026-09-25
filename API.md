@@ -122,7 +122,7 @@ StarterIssue:
 ### `GET /badge/{owner}/{repo}.svg` (no internal key; public, cached 1 day)
 Shields-style SVG badge showing the rules verdict ("Holt | newcomer-friendly").
 Maintainers embed it in READMEs; it links back to the report page at
-`{HOLT_WEB_URL}/r/{owner}/{repo}`. Uses the latest 7-day rules report; when
+`{HOLT_WEB_URL}/{owner}/{repo}`. Uses the latest 7-day rules report; when
 there is none, or it is over 24h old, it shows what it has ("not checked yet")
 and queues a rules check behind it.
 

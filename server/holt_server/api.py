@@ -182,7 +182,7 @@ async def badge_svg(owner: str, repo: str, request: Request) -> Response:
             pass
         except Exception:  # noqa: BLE001 -- a badge must always render
             pass
-    link = f"{svc.settings.web_url.rstrip('/')}/r/{shown}"
+    link = f"{svc.settings.web_url.rstrip('/')}/{shown}"
     return Response(
         badge.render(verdict, link),
         media_type="image/svg+xml",
