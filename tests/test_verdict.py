@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from holt.agent.findings import Findings
 from holt.agent.signals import Signals
-from holt.agent.verdict import classify, contested_kind
+from holt.agent.verdict import classify, contested_kind, rule_codes
 from holt.report import Verdict
 
 
@@ -44,7 +44,8 @@ def test_registries_are_not_viable_however_active():
         signals(outsider_merged=400, distinct_outsider_authors=150),
     )
     assert v is Verdict.NOT_VIABLE
-    assert "not a software contribution" in trace[0]
+    assert trace[0].code == "non_software_kind"
+    assert "software" in trace[0]
 
 
 def test_archived_beats_every_other_signal():
@@ -59,7 +60,7 @@ def test_mirrors_are_not_viable():
 def test_no_attempts_is_insufficient_not_hostile():
     v, trace = classify(findings(repo_kind="real_software"), signals(outsider_threads=0))
     assert v is Verdict.INSUFFICIENT_EVIDENCE
-    assert "nothing to judge" in trace[0]
+    assert "nothing to judge" in trace[0] and trace[0].code == "no_attempts"
 
 
 def test_ignored_attempts_with_no_merges_is_not_viable():
@@ -83,7 +84,7 @@ def test_a_response_slower_than_a_week_blocks_viable():
         findings(repo_kind="real_software"), signals(median_first_response_hours=400.0)
     )
     assert v is Verdict.INSUFFICIENT_EVIDENCE
-    assert any("exceeds" in t for t in trace)
+    assert "slow" in rule_codes(trace)
 
 
 def test_classify_is_pure():
@@ -100,7 +101,7 @@ def test_a_handful_of_ignored_attempts_is_not_proof_of_hostility():
                 median_first_response_hours=None, distinct_outsider_authors=3),
     )
     assert v is Verdict.INSUFFICIENT_EVIDENCE
-    assert any("too thin" in t for t in trace)
+    assert "too_few_attempts" in rule_codes(trace)
 
 
 def test_many_ignored_attempts_still_reads_as_hostile():
@@ -118,7 +119,7 @@ def test_a_rubber_stamp_is_rejected_even_when_everything_else_looks_healthy():
         signals(reviewed_share=0.09, merge_rate=0.69),
     )
     assert v is Verdict.NOT_VIABLE
-    assert any("waved through unread" in t for t in trace)
+    assert "rubber_stamp" in rule_codes(trace)
 
 
 def test_unreviewed_but_hard_to_land_is_not_a_rubber_stamp():
@@ -147,7 +148,7 @@ def test_the_time_budget_changes_what_counts_as_too_slow():
     assert classify(findings(repo_kind="real_software"), s, contributor_days=90)[0] is Verdict.VIABLE
     v, trace = classify(findings(repo_kind="real_software"), s, contributor_days=3)
     assert v is Verdict.INSUFFICIENT_EVIDENCE
-    assert any("3-day budget" in t for t in trace)
+    assert any("3 days you have" in t for t in trace)
 
 
 # ─── contesting the kind ────────────────────────────────────────────────────
@@ -182,7 +183,7 @@ def test_a_catalogue_claim_over_work_that_spans_the_tree_is_contested():
     f = findings(repo_kind="registry")
     s = signals(merged_with_files=66, merged_files_median=9.5, merged_dirs_median=3.0)
     reason = contested_kind(f, s)
-    assert reason and "is dropped and decided nothing" in reason
+    assert reason and "set aside" in reason and reason.code == "kind_contested"
 
 
 def test_a_contested_kind_decides_nothing_and_the_arithmetic_decides_instead():
@@ -215,7 +216,7 @@ def test_a_mirror_that_merges_outsiders_is_contested():
     f = findings(repo_kind="mirror")
     s = signals(outsider_merged=15, distinct_merged_authors=15)
     reason = contested_kind(f, s, {"is_mirror": False})
-    assert reason and "does not report this repository as a mirror" in reason
+    assert reason and "doesn't mark it as a mirror" in reason
 
 
 def test_a_real_mirror_keeps_its_verdict():

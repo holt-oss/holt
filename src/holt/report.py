@@ -201,12 +201,14 @@ class Assessment:
         """
         from datetime import UTC, datetime
 
+        from holt.agent.verdict import headline
+
         return {
             "repo": self.repo,
             "mode": mode or ("ai" if self.models else "rules"),
             "days": self.contributor_days,
             "verdict": self.verdict.value,
-            "headline": VERDICT_HEADLINES[self.verdict],
+            "headline": headline(self.verdict),
             "bottom_line": self.bottom_line or None,
             "summary": self.summary or None,
             "stats": stats,

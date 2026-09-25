@@ -9,11 +9,12 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from holt import baseline, credentials, model, paths
+from holt import baseline, credentials, model, paths, reponame
 from holt.agent import entry, pipeline
 from holt.evidence.fixtures import FixtureProvider
 from holt.evidence.provider import EvidenceProvider
-from holt.report import VERDICT_HEADLINES, EntryPoint
+from holt.agent.verdict import headline
+from holt.report import EntryPoint
 from holt.types import T_CUTOFF, Window
 
 ISSUES_URL = "https://github.com/holt-oss/holt/issues"
@@ -27,10 +28,19 @@ PATHFINDER_TRAJECTORIES = "pathfinder"
 
 
 def normalise(repo: str) -> str:
-    repo = repo.strip().rstrip("/")
-    if "github.com" in repo:
-        repo = repo.split("github.com", 1)[1].lstrip("/:")
-    return "/".join(repo.split("/")[:2])
+    """Best-effort `owner/repo`, never raising.
+
+    Kept lenient for the TUI, which calls it on stored and half-typed names.
+    Commands use `reponame.normalise`, which rejects what is not a GitHub
+    repository with a message that says what to type instead.
+    """
+    try:
+        return reponame.normalise(repo)
+    except ValueError:
+        repo = repo.strip().rstrip("/")
+        if "github.com" in repo:
+            repo = repo.split("github.com", 1)[1].lstrip("/:")
+        return "/".join(repo.split("/")[:2])
 
 
 def as_of_from(args: argparse.Namespace) -> datetime:
@@ -99,7 +109,8 @@ def require_github_token() -> None:
 
 
 def recording_path(repo: str, kind: str = "verdict") -> Path:
-    """Where a live model run on this machine records its calls. Never the
+    """Where a live model run on this machine records its calls, when
+    recording is on (`HOLT_RECORD_TRAJECTORIES=1`; off by default). Never the
     committed recordings, and never the current directory."""
     stamp = _STARTED
     return paths.runs_dir() / repo.replace("/", "__") / stamp / f"{kind}.jsonl"
@@ -202,7 +213,7 @@ def add_entry_points(assessment, repo: str, provider, args) -> None:
 
 
 def cmd_analyze(args: argparse.Namespace) -> int:
-    repo = normalise(args.repo)
+    repo = reponame.normalise(args.repo)
     choose_live(args, [repo])
     as_of = as_of_from(args)
     provider = make_provider(args.live, as_of)
@@ -263,7 +274,7 @@ COMPARE_HEADERS = ("repository", "answer", "outsiders in", "first reply", "why")
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
-    repos = [normalise(raw) for raw in args.repos]
+    repos = [reponame.normalise(raw) for raw in args.repos]
     choose_live(args, repos)
     as_of = as_of_from(args)
     provider = make_provider(args.live, as_of)
@@ -285,7 +296,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
         # inventing a reason.
         why = assessment.rules[0] if assessment.rules else "no rule fired"
         why = why if len(why) <= 58 else why[:57].rstrip(" ,;:") + "…"
-        rows.append((repo, VERDICT_HEADLINES[assessment.verdict], landed, reply, why))
+        rows.append((repo, headline(assessment.verdict), landed, reply, why))
         reports.append(assessment.to_dict(
             stats=stats_from(signals), mode="ai" if client is not None else "rules"))
 
@@ -356,7 +367,6 @@ def cmd_tui(args: argparse.Namespace) -> int:
         run(None)
         return 0
 
-    repo = normalise(repo)
     options = RunOptions(
         repo=repo,
         replay=args.replay,
@@ -385,7 +395,7 @@ def cmd_next(args: argparse.Namespace) -> int:
     from holt.agent.signals import build_threads
     from holt.issues import open_at_cutoff
 
-    repo = normalise(args.repo)
+    repo = reponame.normalise(args.repo)
     choose_live(args, [repo])
     as_of = as_of_from(args)
     records = make_provider(args.live, as_of).fetch(repo)
@@ -566,8 +576,24 @@ def friendly_error(exc: BaseException, repo: str | None = None) -> str:
     lowered = text.lower()
     retry = f"holt analyze {target}"
 
+    from holt.evidence import errors as gh
+
     if isinstance(exc, UserError):
         return text
+    if isinstance(exc, gh.RepoNotFound):
+        return (f"Holt could not find {target} on GitHub. Check the spelling "
+                "(it is owner/name, as in the repository's URL). Private "
+                "repositories are not supported.")
+    if isinstance(exc, gh.AuthError):
+        return ("GitHub did not accept your token (it may have expired or "
+                f"been revoked). Create a new one at {credentials.TOKEN_URL}\n"
+                "then save it with: holt token")
+    if isinstance(exc, gh.RateLimited):
+        return f"{text} Then run: {retry}"
+    if isinstance(exc, gh.UpstreamError):
+        return f"{text} Run: {retry}"
+    if isinstance(exc, ValueError) and reponame.EXAMPLE in text:
+        return text  # `reponame.normalise` already says what to type instead
     if "GITHUB_TOKEN" in text and "not set" in text:
         return credentials.missing_token_message()
     if name in {"RepoNotFound", "NotFound"} or "not found or not public" in lowered:

@@ -55,8 +55,9 @@ class RunOptions:
     #: measured decision.
     entry_points: bool = False
     contributor_days: int = 7
-    #: Where a live model run records its calls: the user data directory
-    #: (`~/.local/share/holt/runs` on Linux), never the current directory and
+    #: Where a live model run records its calls, *if* recording is on
+    #: (`HOLT_RECORD_TRAJECTORIES=1`; off by default). The user data directory
+    #: (`~/.local/share/holt/runs` on Linux): never the current directory and
     #: never the committed recordings the eval harness replays.
     run_root: Path = field(default_factory=paths.runs_dir)
     #: Stamped once so every call in a run lands in the same file.
@@ -663,7 +664,8 @@ def _client(repo: str, opts: RunOptions, kind: str):
     Replay reads the committed trajectory, exactly as the CLI does. A live run
     uses whichever provider `holt models` chose (`model.live_client`), and when
     no model is set up at all the run is rules-only rather than a failure.
-    Recordings go under the user data directory, never the committed ones.
+    Nothing is recorded unless `HOLT_RECORD_TRAJECTORIES=1`, and then only
+    under the user data directory, never over the committed recordings.
     """
     if opts.replay:
         directory = (

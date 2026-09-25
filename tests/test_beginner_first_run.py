@@ -122,7 +122,7 @@ def test_json_output(home, monkeypatch, capsys):
     assert data["repo"] == "NixOS/nixpkgs"
     assert data["mode"] == "rules"
     assert data["headline"] in {"Worth your time", "Not worth your time",
-                                "Not enough evidence to say"}
+                                "Not enough evidence"}
     assert data["stats"]["outsider_attempts"] > 0
     assert err == ""  # nothing chatty around machine-readable output
 
@@ -167,7 +167,7 @@ def _status(code: int) -> httpx.HTTPStatusError:
         (httpx.ConnectError("boom"), "internet connection"),
         (RuntimeError("a/b not found or not public"), "could not find a/b"),
         (RuntimeError("GITHUB_TOKEN is not set. Live mode needs a token"), credentials.TOKEN_URL),
-        (ValueError("weird"), "report it"),
+        (ZeroDivisionError("weird"), "report it"),
     ],
 )
 def test_errors_are_plain_english(exc, expected):
@@ -175,6 +175,21 @@ def test_errors_are_plain_english(exc, expected):
     assert expected.lower() in message.lower()
     for jargon in ("fixture", "replay", "pre_t", "Stage D", "Traceback"):
         assert jargon not in message
+
+
+def test_typed_github_errors_are_reworded():
+    from holt.evidence import errors
+
+    assert "holt token" in cli.friendly_error(errors.AuthError(), "a/b")
+    assert "could not find a/b" in cli.friendly_error(errors.RepoNotFound("a/b"), "a/b").lower()
+    assert "holt analyze a/b" in cli.friendly_error(errors.RateLimited(120), "a/b")
+    assert "holt analyze a/b" in cli.friendly_error(errors.UpstreamError(), "a/b")
+
+
+def test_a_bad_repository_name_says_what_to_type(capsys):
+    assert cli.main(["analyze", "gitlab.com/a/b"]) == 1
+    err = capsys.readouterr().err
+    assert "pallets/flask" in err and "Traceback" not in err
 
 
 def test_main_catches_what_a_command_raises(home, monkeypatch, capsys):
