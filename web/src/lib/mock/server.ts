@@ -252,7 +252,7 @@ export function badge(repoIn: string): Response {
 /** Shields-style badge. Opaque fills so it reads on light and dark READMEs. */
 export function badgeSvg(label: string, message: string, color: string): string {
   const w = (s: string) => Math.round(s.length * 6.6 + 12);
-  const lw = 30 + Math.round(label.length * 6.6) + 6;
+  const lw = 36 + Math.round(label.length * 6.6) + 6;
   const mw = w(message);
   const total = lw + mw;
   const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!);
@@ -261,6 +261,6 @@ export function badgeSvg(label: string, message: string, color: string): string 
 <clipPath id="r"><rect width="${total}" height="20" rx="3"/></clipPath>
 <g clip-path="url(#r)"><rect width="${lw}" height="20" fill="#1b1d1c"/><rect x="${lw}" width="${mw}" height="20" fill="${color}"/></g>
 <g fill="#83a9ff" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11"><text x="5" y="13.5" font-size="8.5">=^.^=</text></g>
-<g fill="#fff" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11"><text x="30" y="14">${esc(label)}</text><text x="${lw + 6}" y="14">${esc(message)}</text></g>
+<g fill="#fff" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11"><text x="36" y="14">${esc(label)}</text><text x="${lw + 6}" y="14">${esc(message)}</text></g>
 </svg>`;
 }

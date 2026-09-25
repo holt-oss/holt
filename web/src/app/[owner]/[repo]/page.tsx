@@ -70,11 +70,11 @@ export default async function RepoPage({ params, searchParams }: Props) {
             <span className="text-muted">{dOwner}/</span>
             {dRepo}
           </p>
-          <a href={`https://github.com/${display}`} target="_blank" rel="noopener noreferrer" className="text-[0.75rem] text-faint hover:text-blue">
+          <a href={`https://github.com/${display}`} target="_blank" rel="noopener noreferrer" className="block truncate text-[0.75rem] text-faint hover:text-blue">
             github.com/{display} ↗
           </a>
         </div>
-        <nav aria-label="Report type" className="flex border border-line-strong text-[0.78rem]">
+        <nav aria-label="Report type" className="grid w-full grid-cols-2 border border-line-strong text-center text-[0.78rem] sm:flex sm:w-auto">
           <Link
             href={`/${display}`}
             aria-current={mode === "rules" ? "page" : undefined}

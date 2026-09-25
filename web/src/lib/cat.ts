@@ -4,7 +4,7 @@ export type CatMood = "ready" | "startled" | "heartbroken" | "determined" | "cel
 export const CAT: Record<CatMood, { eyes: [string, string]; mouth: string; ears: [string, string]; tone: "blue" | "green" | "orange" | "amber" }> = {
   ready: { eyes: ["•", "•"], mouth: "ω", ears: ["^", "^"], tone: "blue" },
   startled: { eyes: ["◉", "◉"], mouth: "o", ears: ["^", "^"], tone: "blue" },
-  heartbroken: { eyes: ["╥", "╥"], mouth: "︵", ears: ["˘", "˘"], tone: "orange" },
+  heartbroken: { eyes: ["╥", "╥"], mouth: "_", ears: ["˘", "˘"], tone: "orange" },
   determined: { eyes: ["¬", "¬"], mouth: "_", ears: ["^", "^"], tone: "blue" },
   celebrating: { eyes: ["˘", "˘"], mouth: "ᴗ", ears: ["^", "^"], tone: "green" },
   adoring: { eyes: ["♥", "♥"], mouth: "ᴗ", ears: ["^", "^"], tone: "green" },

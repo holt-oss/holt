@@ -20,7 +20,6 @@ export function useAnalysis(repo: string, mode: Mode, days: number, enabled = tr
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    setState({ phase: "starting" });
     (async () => {
       let res: Response;
       try {
@@ -72,6 +71,9 @@ export function useAnalysis(repo: string, mode: Mode, days: number, enabled = tr
     };
   }, [repo, mode, days, attempt, enabled]);
 
-  const retry = useCallback(() => setAttempt((a) => a + 1), []);
+  const retry = useCallback(() => {
+    setState({ phase: "starting" });
+    setAttempt((a) => a + 1);
+  }, []);
   return { state, retry };
 }

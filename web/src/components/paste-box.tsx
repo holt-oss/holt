@@ -57,7 +57,7 @@ export function PasteBox({ autoFocus = false, examples = true, size = "lg" }: { 
           autoCorrect="off"
           spellCheck={false}
           enterKeyHint="go"
-          placeholder="paste a repo: owner/name or github.com URL"
+          placeholder="owner/name or a GitHub URL"
           aria-invalid={Boolean(error)}
           aria-describedby={error ? "repo-error" : undefined}
           className={`min-w-0 bg-transparent px-4 text-ink outline-none placeholder:text-faint sm:px-3 ${size === "lg" ? "h-16 text-[1rem] sm:text-[1.05rem]" : "h-13 text-[0.95rem]"}`}

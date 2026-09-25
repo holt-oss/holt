@@ -12,7 +12,7 @@ export function HacktoberfestBanner() {
         style={{ backgroundImage: "repeating-linear-gradient(135deg, var(--orange) 0 10px, transparent 10px 22px)" }}
       />
       <Link
-        href="/find?hacktoberfest=1"
+        href="/find?go=1&hacktoberfest=1"
         className="wrap relative flex min-h-11 flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 text-center text-[0.78rem]"
       >
         <span className="inline-flex items-center gap-2 font-semibold text-orange">

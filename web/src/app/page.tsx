@@ -43,7 +43,7 @@ export default function Home() {
       <HacktoberfestBanner />
 
       {/* 01 — start here */}
-      <section data-hero data-cat-section="ready" className="relative border-b border-line pb-16 pt-8 md:pb-24 md:pt-10">
+      <section data-hero data-cat-section="ready" className="relative border-b border-line pb-14 pt-8 md:pb-20 md:pt-10">
         <CatCompanion />
         <Grid>
           <Rail n="01" label="start here" className="hidden pt-1 md:block" />

@@ -12,7 +12,7 @@ export function CatCompanion() {
   const root = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches || !matchMedia("(min-width: 1024px)").matches) return;
     let cleanup: (() => void) | undefined;
     let cancelled = false;
     const idle = (cb: () => void) =>
@@ -35,7 +35,7 @@ export function CatCompanion() {
       type="button"
       aria-label="Play with Holt, the site cat"
       data-cat-companion
-      className="pointer-events-auto absolute right-0 top-0 z-0 h-[84px] w-[150px] origin-top-left text-blue opacity-45 [touch-action:manipulation] lg:fixed lg:right-auto lg:left-[calc(50%+380px)] lg:top-[160px] lg:h-[172px] lg:w-[250px] lg:opacity-85"
+      className="pointer-events-auto absolute right-0 top-0 z-0 hidden lg:block h-[84px] w-[150px] origin-top-left text-blue opacity-45 [touch-action:manipulation] lg:fixed lg:right-auto lg:left-[calc(50%+380px)] lg:top-[160px] lg:h-[172px] lg:w-[250px] lg:opacity-85"
     >
       <span className="cat-character grid size-full place-items-center">
         <span
