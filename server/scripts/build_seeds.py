@@ -1,4 +1,4 @@
-"""Build server/seeds/repos.txt, the warm cache's seed list.
+"""Build server/holt_server/seeds/repos.txt, the warm cache's seed list.
 
     GITHUB_TOKEN=... uv run python server/scripts/build_seeds.py [--total 300]
 
@@ -17,7 +17,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parents[1] / "seeds" / "repos.txt"
+OUT = Path(__file__).resolve().parents[1] / "holt_server" / "seeds" / "repos.txt"
 LANGUAGES = ["python", "javascript", "typescript", "java", "go", "rust", "c++", "c",
              "c#", "php", "ruby", "kotlin"]
 HACKTOBERFEST_SHARE = 0.4

@@ -15,7 +15,7 @@ export function HacktoberfestPill({ year, short }: { year: number; short: string
   }
   return (
     <div className="hf-pill inline-flex max-w-full items-stretch overflow-hidden rounded-full border border-hf-line bg-hf-bg text-[0.74rem] leading-none">
-      <Link href="/hacktoberfest" className="flex min-h-9 min-w-0 items-center gap-2 py-1.5 pl-3 pr-2 text-hf hover:underline">
+      <Link href="/hacktoberfest" className="flex min-h-11 min-w-0 items-center gap-2 py-1.5 pl-3 pr-2 text-hf hover:underline sm:min-h-9">
         <span aria-hidden="true" className="relative flex size-2 shrink-0">
           <span className="absolute inset-0 rounded-full bg-orange motion-safe:animate-ping" />
           <span className="relative size-2 rounded-full bg-orange" />
@@ -30,7 +30,7 @@ export function HacktoberfestPill({ year, short }: { year: number; short: string
       <button
         type="button"
         onClick={dismiss}
-        className="grid w-9 shrink-0 place-items-center border-l border-hf-line text-muted hover:text-ink"
+        className="grid min-h-11 w-11 shrink-0 place-items-center border-l border-hf-line text-[1rem] text-muted hover:text-ink sm:min-h-9 sm:w-9"
         aria-label="Hide the Hacktoberfest notice"
       >
         <span aria-hidden="true">×</span>

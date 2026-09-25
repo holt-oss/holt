@@ -49,12 +49,16 @@ from holt_server.errors import ApiError
 
 log = logging.getLogger("holt_server.warm")
 
-SEEDS = Path(__file__).resolve().parents[1] / "seeds" / "repos.txt"
+# Package data, so it ships in the wheel and the image.
+SEEDS = Path(__file__).with_name("seeds") / "repos.txt"
 DAYS = 7
 JOB_TIMEOUT_S = 15 * 60
 POLL_S = 1.0
 # Budget is checked before the first step and then every this many steps.
 BUDGET_EVERY = 5
+# A job that never finishes fails its repository and the pass goes on; this
+# many in a row means nothing is working the queue, and the pass stops.
+MAX_TIMEOUTS_IN_A_ROW = 3
 # Refresh a cached find or starter list once this share of its lifetime is gone.
 REFRESH_AFTER = 0.8
 FIND_LIMIT = 20
@@ -141,6 +145,7 @@ class Warmer:
         self.dry_run = dry_run
         self.result = Result()
         self._steps = 0
+        self._timeouts = 0
 
     # --- budget -------------------------------------------------------------
 
@@ -181,7 +186,22 @@ class Warmer:
 
     # --- jobs ---------------------------------------------------------------
 
-    async def run_job(self, job: Job) -> Job:
+    async def run_job(self, job: Job) -> Job | None:
+        """The finished job, or None if it timed out (counted as a failure)."""
+        if self._timeouts >= MAX_TIMEOUTS_IN_A_ROW:
+            raise OutOfBudget(
+                f"{self._timeouts} jobs in a row were never finished; is anything "
+                "working the queue (HOLT_BADGE_CONCURRENCY > 0)?")
+        try:
+            done = await self._run_job(job)
+        except TimeoutError as exc:
+            self._timeouts += 1
+            self.say(str(exc))
+            return None
+        self._timeouts = 0
+        return done
+
+    async def _run_job(self, job: Job) -> Job:
         """Queue (or join an identical queued job) and wait for it to finish."""
         from holt_server.api import active_job, insert_or_join
 
@@ -231,7 +251,10 @@ class Warmer:
         done = await self.run_job(Job(
             kind="analysis", repo=repo, repo_key=key, mode="rules", days=DAYS, params={},
             priority=BADGE_PRIORITY, dedupe_key=dedupe_key(key, "rules", DAYS)))
-        if done.status == "done":
+        if done is None:
+            self.result.reports_failed += 1
+            self.result.failures.append(f"{repo}: timed out")
+        elif done.status == "done":
             self.result.reports_run += 1
             self.say(f"{repo}: {(done.result or {}).get('headline', 'done')}")
         else:
@@ -281,7 +304,9 @@ class Warmer:
         done = await self.run_job(Job(
             kind="find", mode="rules", days=profile.days, params=params,
             priority=BADGE_PRIORITY, dedupe_key=f"find:{profile.key}"))
-        if done.status == "done":
+        if done is None:
+            self.result.failures.append(f"find {label}: timed out")
+        elif done.status == "done":
             self.result.finds_run += 1
             self.say(f"find {label}: {len((done.result or {}).get('results') or [])} repos")
         else:
@@ -347,7 +372,7 @@ async def schedule(svc, first_delay_s: float = 60.0) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m holt_server.warm",
                                      description=__doc__.split("\n\n")[0])
-    parser.add_argument("--seeds", help="seed list (default: server/seeds/repos.txt)")
+    parser.add_argument("--seeds", help="seed list (default: the one shipped in the package)")
     parser.add_argument("--limit", type=int, help="only the first N seed repositories")
     parser.add_argument("--no-reports", action="store_true")
     parser.add_argument("--no-starter", action="store_true")
