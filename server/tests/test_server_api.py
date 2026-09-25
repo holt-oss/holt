@@ -374,7 +374,7 @@ def test_starter_issues(h, fake_starter):
         "why": ["Labelled good first issue"],
     }]
     assert fake_starter["issues"][0] == "pallets/flask"
-    assert fake_starter["issues"][2] == 5
+    assert fake_starter["issues"][2] == 50  # ranked once at the cache size, sliced here
 
 
 def test_find(h, fake_starter):
