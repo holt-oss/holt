@@ -52,8 +52,11 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | `HOLT_CACHE_HOURS` | `24` | How long a finished report is served instead of re-running. |
 | `HOLT_FREE_AI_LIMIT` | `3` | AI reports per user per calendar month on the server's key (plan `free`). `0` turns free AI reports off. |
 | `HOLT_PLAN_AI_LIMIT` | `100` | The same, for any other plan (set by hand in the `users` table for now). |
-| `HOLT_ANON_RATE_PER_HOUR` | `10` | New jobs / starter-issue lookups per hour per IP for anonymous callers (`X-Holt-Client-Ip`). Cached answers are free. |
+| `HOLT_ANON_RATE_PER_HOUR` | `10` | Work bucket: new analyses and find per hour per IP for anonymous callers (`X-Holt-Client-Ip`). Cached answers are free. |
 | `HOLT_USER_RATE_PER_HOUR` | `60` | The same, per signed-in user. |
+| `HOLT_ANON_READ_RATE_PER_HOUR` | `120` | Read bucket, per IP: starter-issue lookups that miss the cache. Separate from the work bucket above, so page views never block analyses. |
+| `HOLT_USER_READ_RATE_PER_HOUR` | `600` | The same, per signed-in user. |
+| `HOLT_STARTER_CACHE_HOURS` | `1` | How long starter issues per repository are served from the cache. |
 | `HOLT_BADGE_RATE_PER_IP` | `20` | Rules checks a single client can trigger per hour by loading badges (client = `CF-Connecting-IP`, else the socket address). |
 | `HOLT_BADGE_RATE_TOTAL` | `60` | The same, across all clients. |
 | `HOLT_BADGE_CONCURRENCY` | `1` | Badge-triggered checks running at once; always fewer than `HOLT_JOB_CONCURRENCY`, and they queue behind user jobs. |

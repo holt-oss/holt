@@ -161,7 +161,10 @@ def run_find(*, languages: list[str], topics: list[str], hacktoberfest: bool, da
     kwargs: dict[str, Any] = {}
     params = inspect.signature(fn).parameters
     if cached is not None and "screen" in params:
-        kwargs["screen"] = cached_screen(cached, token, days, http)
+        try:
+            kwargs["screen"] = cached_screen(cached, token, days, http)
+        except (ImportError, AttributeError):
+            pass  # an engine without the screen helpers: find screens itself
     if "progress" in params:
         def progress(*args: Any, **kw: Any) -> None:
             values = list(args) + list(kw.values())

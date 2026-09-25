@@ -171,3 +171,14 @@ def find_key(languages: list[str], topics: list[str], hacktoberfest: bool, days:
     langs = ",".join(sorted({x.strip().lower() for x in languages if x.strip()}))
     tops = ",".join(sorted({x.strip().lower() for x in topics if x.strip()}))
     return f"l={langs};t={tops};h={int(bool(hacktoberfest))};d={days}"[:300]
+
+
+class StarterCache(Base):
+    """Starter issues per repository, so a report page view costs no GitHub call."""
+
+    __tablename__ = "starter_cache"
+
+    repo_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    repo: Mapped[str] = mapped_column(String(200))
+    issues: Mapped[list] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
