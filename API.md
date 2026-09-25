@@ -174,7 +174,10 @@ Proxies `GET /v1/repos/{owner}/{repo}/starter-issues?limit=20` →
 `why`. `404` when nothing is known.
 
 Both routes:
-- Accept `GET` and `OPTIONS` only, no cookies or auth. Rate-limit per IP.
+- Accept `GET` and `OPTIONS` only, no cookies or auth. Forward the caller's
+  IP as `X-Holt-Client-Ip` like any anonymous request. A `501` from the
+  server (starter issues not shipped yet) may pass through; the extension
+  just shows no marks.
 - Send `Cache-Control: public, max-age=900` (15 min) on `200` and
   `max-age=300` on `404`, so a new analysis shows up soon.
 - Send `Access-Control-Allow-Origin: *`. The extension fetches from its
