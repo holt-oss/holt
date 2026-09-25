@@ -200,9 +200,13 @@ def test_reproduction_promises_the_real_test_count():
     """`128 passed` sat on the page while the suite was elsewhere entirely.
 
     The default install includes the product's terminal interface, so the guide
-    states one complete count. The number in front of the reader must match it.
+    states one complete count. It is a floor, not an exact number: several
+    branches add tests at once, and an exact count turned every one of them
+    into a docs edit and a merge conflict. What must never happen is the page
+    promising more tests than exist.
     """
-    promised = [int(n) for n in re.findall(r"`(\d+) passed", REPRODUCTION.read_text())]
+    promised = [int(n) for n in re.findall(
+        r"at least `(\d+) passed", REPRODUCTION.read_text(encoding="utf-8"))]
     assert promised, "REPRODUCTION.md no longer states an expected test count"
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider"],
@@ -210,7 +214,7 @@ def test_reproduction_promises_the_real_test_count():
     )
     collected = re.search(r"(\d+) tests? collected", result.stdout)
     assert collected, f"could not read a collection count:\n{result.stdout[-2000:]}"
-    assert int(collected.group(1)) in promised, (
+    assert int(collected.group(1)) >= max(promised), (
         f"the suite collects {collected.group(1)} tests; "
-        f"REPRODUCTION.md promises {promised}"
+        f"REPRODUCTION.md promises at least {max(promised)}"
     )

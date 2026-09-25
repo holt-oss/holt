@@ -12,7 +12,7 @@ from collections.abc import Iterable
 
 from holt.agent.findings import Findings
 from holt.agent.signals import Thread
-from holt.model import ModelClient
+from holt.model import ModelClient, guarded, untrusted
 from holt.types import EvidenceRecord
 
 REPO_KINDS = [
@@ -100,25 +100,28 @@ def classify(
         p = meta.payload
         parts += [
             f"Metadata (evidence id: {meta.evidence_id})",
-            f"  description: {p.get('description')!r}",
+            f"  description: {untrusted(repr(p.get('description')), 'repository description')}",
             f"  primary language: {p.get('primary_language')!r}",
-            f"  homepage: {p.get('homepage_url')!r}",
+            f"  homepage: {untrusted(repr(p.get('homepage_url')), 'repository homepage')}",
             f"  archived: {p.get('is_archived')}  fork: {p.get('is_fork')}  mirror: {p.get('is_mirror')}",
             "",
         ]
     if readme:
-        parts += [f"README (evidence id: {readme[1]})", readme[0][:6000], ""]
+        parts += [f"README (evidence id: {readme[1]})", untrusted(readme[0][:6000], "README"), ""]
     if contributing:
-        parts += [f"CONTRIBUTING (evidence id: {contributing[1]})", contributing[0][:3000], ""]
+        parts += [f"CONTRIBUTING (evidence id: {contributing[1]})",
+                  untrusted(contributing[0][:3000], "CONTRIBUTING"), ""]
     if paths:
         parts += ["Files touched by merged pull requests (evidence ids shown):"]
-        parts += [f"  {key}  {files}" for key, files in paths]
+        parts += [untrusted(
+            "\n".join(f"  {key}  {files}" for key, files in paths), "file paths"
+        )]
     else:
         parts += ["No merged pull requests with file information were available."]
 
     result = model.complete(
         label="classify",
-        system=CLASSIFY_SYSTEM,
+        system=guarded(CLASSIFY_SYSTEM),
         prompt="\n".join(parts),
         schema=CLASSIFY_SCHEMA,
     )
@@ -247,16 +250,19 @@ def _render_thread(t: Thread) -> str:
     lines = [
         f"--- evidence id: {cite_id(t.key)}  ({state})",
         f"    opened by {t.author}; {t.changed_files} files, +{t.additions}/-{t.deletions}",
-        f"    files: {t.files[:4]}",
+        untrusted(f"    files: {t.files[:4]}", "file paths"),
     ]
     if not t.responses:
         # Deliberately not a quotable sentence. The previous wording read like
         # thread content and the model quoted it back as evidence, which the
         # evidence-integrity check caught: 80 of 528 quotes were this scaffold.
         lines.append("    NO_REPLIES")
+    replies = []
     for when, who, body in sorted(t.responses)[:6]:
         speaker = "AUTHOR" if who == t.author else who
-        lines.append(f"    [{speaker}] {' '.join((body or '').split())[:600]}")
+        replies.append(f"    [{speaker}] {' '.join((body or '').split())[:600]}")
+    if replies:
+        lines.append(untrusted("\n".join(replies), "pull request comments"))
     return "\n".join(lines)
 
 
@@ -283,7 +289,7 @@ def read_outcomes(
     )
     result = model.complete(
         label="outcomes",
-        system=OUTCOMES_SYSTEM,
+        system=guarded(OUTCOMES_SYSTEM),
         prompt=prompt,
         schema=OUTCOMES_SCHEMA,
     )
@@ -338,15 +344,16 @@ def assess_opportunity(
     contributing = _doc(records, ":contributing")
     parts = [f"Repository: {repo}", ""]
     if contributing:
-        parts += [f"CONTRIBUTING (evidence id: {contributing[1]})", contributing[0][:6000], ""]
+        parts += [f"CONTRIBUTING (evidence id: {contributing[1]})",
+                  untrusted(contributing[0][:6000], "CONTRIBUTING"), ""]
     else:
         parts += ["No CONTRIBUTING file was present at the cutoff.", ""]
     if readme:
-        parts += [f"README (evidence id: {readme[1]})", readme[0][:4000]]
+        parts += [f"README (evidence id: {readme[1]})", untrusted(readme[0][:4000], "README")]
 
     result = model.complete(
         label="opportunity",
-        system=OPPORTUNITY_SYSTEM,
+        system=guarded(OPPORTUNITY_SYSTEM),
         prompt="\n".join(parts),
         schema=OPPORTUNITY_SCHEMA,
     )
@@ -426,13 +433,19 @@ def narrate(
     lines += ["Why the rules landed there:"] + [f"  - {t}" for t in trace]
     lines += ["", "Measured in the sampled window:"]
     lines += [f"  {k}: {v}" for k, v in signals_dict.items()]
+    # Findings passed Stage D, so their citations resolve -- but the values and
+    # notes are a model's reading of repository text, and quotes are that text.
+    # Both are fenced: resolving is not the same as being true.
     lines += ["", "Verified findings:"]
     for item in findings:
-        note = f" -- {item.note}" if item.note else ""
-        lines.append(f"  {item.field} = {item.value}{note}")
+        note = f" -- {untrusted(item.note, 'AI rationale, not verified')}" if item.note else ""
+        value = str(item.value)
+        if isinstance(item.value, dict) and item.value.get("quote"):
+            value = untrusted(value, "AI reading with a quote from a thread")
+        lines.append(f"  {item.field} = {value}{note}")
     return model.complete(
         label="narrate",
-        system=NARRATE_SYSTEM,
+        system=guarded(NARRATE_SYSTEM),
         prompt="\n".join(lines),
         schema=NARRATE_SCHEMA,
     )
@@ -493,8 +506,8 @@ def _render_issue(record: EvidenceRecord) -> str:
         f"--- evidence id: {record.evidence_id}",
         f"    opened {record.timestamp.date()} by {p.get('author')}; "
         f"{p.get('comments', 0)} comments; labels: {p.get('labels') or 'none'}",
-        f"    title: {p.get('title')}",
-        f"    {body or '(no description)'}",
+        untrusted(f"    title: {p.get('title')}\n    {body or '(no description)'}",
+                  "issue title and body"),
     ])
 
 
@@ -528,6 +541,6 @@ def find_paths(
         + [_render_issue(r) for r in shown]
     )
     return model.complete(
-        label="pathfinder", system=PATHFINDER_SYSTEM, prompt=prompt,
+        label="pathfinder", system=guarded(PATHFINDER_SYSTEM), prompt=prompt,
         schema=PATHFINDER_SCHEMA,
     )["ranked"]

@@ -32,6 +32,12 @@ class ContaminationError(AssertionError):
 
 
 class EvidenceProvider(ABC):
+    # Whether "too new to judge" applies to what this provider returns. True for
+    # anything read from GitHub now. A committed capture is a frozen benchmark:
+    # its numbers, recordings and published results were produced without the
+    # guard, and applying it retroactively would change 44 of 74 of them.
+    judges_recency: bool = True
+
     def __init__(self, window: Window, cutoff: datetime = T_CUTOFF) -> None:
         self.window = window
         self.cutoff = cutoff
