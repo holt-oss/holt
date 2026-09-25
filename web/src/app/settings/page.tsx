@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { deleteByok, me, putByok } from "@/lib/api";
+import { CancelPlan } from "@/components/billing/cancel-plan";
 import { shortDate } from "@/lib/format";
 import { currentUser } from "@/lib/session";
 import type { ByokProvider } from "@/lib/types";
@@ -64,27 +65,49 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       {!account.ok && <p role="alert" className="mt-6 border border-orange/50 px-4 py-3 font-sans text-[0.9rem] text-orange">{account.error.message}</p>}
 
       {m && (
-        <section aria-labelledby="quota" className="mt-8 grid gap-px border border-line bg-line sm:grid-cols-2">
-          <div className="bg-panel p-5">
-            <p id="quota" className="text-[0.72rem] uppercase tracking-[0.08em] text-faint">Plan</p>
-            <p className="mt-1 text-[1.3rem] font-semibold capitalize">{m.plan}</p>
-            <Link href="/pricing" className="text-[0.78rem] text-green hover:underline">see plans →</Link>
-          </div>
-          <div className="bg-panel p-5">
-            <p className="text-[0.72rem] uppercase tracking-[0.08em] text-faint">Free AI reports this month</p>
-            <p className="mt-1 text-[1.3rem] font-semibold">
-              {Math.max(0, m.quota.ai_limit - m.quota.ai_used)} <span className="text-[0.9rem] font-normal text-muted">of {m.quota.ai_limit} left</span>
-            </p>
-            <div className="meter mt-2" aria-hidden="true">
-              <span className="bg-blue" style={{ width: `${m.quota.ai_limit ? Math.min(100, ((m.quota.ai_limit - m.quota.ai_used) / m.quota.ai_limit) * 100) : 0}%` }} />
+        <section aria-labelledby="plan" className="mt-8 border border-line-strong bg-panel" data-plan-card>
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line p-5 sm:p-6">
+            <div>
+              <p className="text-[0.72rem] uppercase tracking-[0.08em] text-faint">Your plan</p>
+              <h2 id="plan" className="mt-1 text-[1.6rem] font-semibold tracking-tight">{m.plan_name}</h2>
+              <p className="mt-1 text-[0.82rem] text-muted">
+                {m.renews_at
+                  ? `Renews ${shortDate(m.renews_at)}. Cancel anytime; you keep access until the period ends.`
+                  : m.ends_at
+                    ? `Cancelled. You keep ${m.plan_name} until ${shortDate(m.ends_at)}, then move to Free.`
+                    : "Free forever. Upgrade only if you want AI reports without your own key."}
+              </p>
             </div>
-            <p className="mt-2 text-[0.75rem] text-faint">Resets {shortDate(m.quota.resets_at)}</p>
+            <div className="flex flex-wrap gap-2">
+              {m.renews_at && <CancelPlan planName={m.plan_name} until={shortDate(m.renews_at)} />}
+              <Link href="/pricing" className="btn-ghost">{m.plan === "free" ? "see plans" : "plans & packs"}</Link>
+            </div>
+          </div>
+          <div className="grid gap-px bg-line sm:grid-cols-2">
+            <div className="bg-panel p-5 sm:p-6">
+              <p className="text-[0.72rem] uppercase tracking-[0.08em] text-faint">AI reports this {m.plan === "free" ? "month" : "billing period"}</p>
+              <p className="mt-1 text-[1.3rem] font-semibold">
+                {m.quota.ai_used} <span className="text-[0.9rem] font-normal text-muted">of {m.quota.ai_limit} used</span>
+              </p>
+              <div className="meter mt-2" aria-hidden="true">
+                <span className="bg-blue" style={{ width: `${m.quota.ai_limit ? Math.min(100, (m.quota.ai_used / m.quota.ai_limit) * 100) : 0}%` }} />
+              </div>
+              <p className="mt-2 text-[0.75rem] text-faint">Resets {shortDate(m.quota.resets_at)}</p>
+            </div>
+            <div className="bg-panel p-5 sm:p-6">
+              <p className="text-[0.72rem] uppercase tracking-[0.08em] text-faint">Pack credits</p>
+              <p className="mt-1 text-[1.3rem] font-semibold">{m.pack_credits}</p>
+              <p className="mt-2 text-[0.75rem] text-faint">Never expire. Used after your monthly allowance.</p>
+            </div>
           </div>
         </section>
       )}
 
-      <section aria-labelledby="byok" className="mt-10 border border-line-strong bg-panel p-5 sm:p-8">
-        <h2 id="byok" className="text-[1.3rem] font-semibold tracking-tight">Bring your own key</h2>
+      <section id="byok" aria-labelledby="byok-title" className="mt-10 scroll-mt-24 border border-line-strong bg-panel p-5 sm:p-8">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 id="byok-title" className="text-[1.3rem] font-semibold tracking-tight">Bring your own key</h2>
+          <span className="chip border-green/60 text-green">free, unlimited</span>
+        </div>
         <p className="prose-sans mt-2 text-[0.95rem]">
           Use your own model provider for unlimited AI reports. Always free on Holt; you pay your provider directly
           (a report is usually well under $0.05). Keys are encrypted at rest and never shown again, not even to you.

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { KeyOrPlan } from "../billing/key-or-plan";
 
 export function UpgradeCard({ repo, signedIn }: { repo: string; signedIn: boolean }) {
   const aiHref = `/${repo}?mode=ai`;
@@ -16,9 +17,11 @@ export function UpgradeCard({ repo, signedIn }: { repo: string; signedIn: boolea
           upgrade to AI report <span aria-hidden="true">→</span>
         </Link>
         <span className="text-[0.75rem] text-faint">
-          {signedIn ? "free monthly quota, or bring your own key" : "sign in, then use the free quota or your own key"}
+          {signedIn ? "uses your free monthly AI reports" : "sign in first; a few AI reports a month are free"}
         </span>
       </div>
+      <p className="mb-2 mt-5 text-[0.72rem] uppercase tracking-[0.08em] text-faint">Need more than the free ones?</p>
+      <KeyOrPlan />
     </div>
   );
 }

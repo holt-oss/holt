@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ApiError } from "@/lib/types";
+import { KeyOrPlan } from "./billing/key-or-plan";
 import { CatFace } from "./cat-face";
 
 const HEAD: Record<string, string> = {
@@ -8,7 +9,7 @@ const HEAD: Record<string, string> = {
   invalid_request: "That request didn't make sense to us",
   not_implemented: "Coming soon",
   rate_limited: "Too many checks at once",
-  quota_exceeded: "You've used this month's free AI reports",
+  quota_exceeded: "You've used your AI reports for now",
   needs_key: "AI reports need a plan or your own key",
   unauthorized: "Sign in first",
   upstream: "GitHub or the AI model didn't answer",
@@ -25,14 +26,13 @@ export function ErrorPanel({ error, repo, onRetry, retryHref }: { error: ApiErro
         {error.message}
         {error.code === "rate_limited" && error.retry_after ? ` Try again in about ${Math.ceil(error.retry_after / 60)} minute${error.retry_after > 60 ? "s" : ""}.` : ""}
       </p>
+      {account && (
+        <div className="mt-6">
+          <KeyOrPlan wide />
+        </div>
+      )}
       <div className="mt-5 flex flex-wrap gap-3">
-        {account && (
-          <>
-            <Link href="/settings" className="btn-primary">add your own key (free)</Link>
-            <Link href="/pricing" className="btn-ghost">see plans</Link>
-            {repo && <Link href={`/${repo}`} className="btn-ghost">back to the free report</Link>}
-          </>
-        )}
+        {account && repo && <Link href={`/${repo}`} className="btn-ghost">back to the free report</Link>}
         {error.code === "unauthorized" && (
           <Link href={`/signin${repo ? `?callbackUrl=${encodeURIComponent(`/${repo}?mode=ai`)}` : ""}`} className="btn-primary">sign in</Link>
         )}

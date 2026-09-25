@@ -2,7 +2,7 @@
 // reports return at once, anything else becomes a job with stages over SSE.
 import "server-only";
 import type {
-  AnalysisStart, ApiError, ByokProvider, FindJobStatus, FindQuery, FindResult, FindStart, HistoryItem,
+  AnalysisStart, ApiError, BillingItem, ByokProvider, Checkout, Plans, RazorpaySuccess, VerifyResult, FindJobStatus, FindQuery, FindResult, FindStart, HistoryItem,
   JobStatus, Me, Mode, Report, Result, StarterIssue,
 } from "../types";
 import { canonicalName, isMockNotFound, mockFindPool, mockIssues, mockReport, PRECACHED } from "./fixtures";
@@ -26,6 +26,15 @@ interface Job {
   started: number;
 }
 
+interface MockUser {
+  me: Me;
+  history: HistoryItem[];
+  /** A subscription whose first charge is "waiting for the webhook". */
+  pending?: { plan: string; at: number };
+  /** Checkouts this user started, so verify can check ownership. */
+  checkouts: Map<string, BillingItem>;
+}
+
 interface FindJob {
   id: string;
   q: FindQuery;
@@ -36,7 +45,7 @@ interface State {
   cache: Map<string, Report>;
   jobs: Map<string, Job>;
   findJobs: Map<string, FindJob>;
-  users: Map<string, { me: Me; history: HistoryItem[] }>;
+  users: Map<string, MockUser>;
 }
 
 // globalThis so route handlers and pages share one state in dev.
@@ -63,8 +72,13 @@ function user(id: string) {
   let u = s.users.get(id);
   if (!u) {
     u = {
+      checkouts: new Map(),
       me: {
         plan: "free",
+        plan_name: "Free",
+        renews_at: null,
+        ends_at: null,
+        pack_credits: 0,
         quota: { ai_used: 0, ai_limit: FREE_AI, resets_at: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1)).toISOString() },
         byok: null,
       },
@@ -101,8 +115,10 @@ export async function startAnalysis(
     if (!userId) return err(401, "unauthorized", "Sign in to get an AI report.");
     const u = user(userId);
     if (!u.me.byok) {
-      if (u.me.quota.ai_limit <= 0) return err(403, "needs_key", "AI reports need a plan or your own API key.");
-      if (u.me.quota.ai_used >= u.me.quota.ai_limit) return err(402, "quota_exceeded", "You've used this month's free AI reports. Add your own API key to keep going, free.");
+      if (u.me.quota.ai_limit <= 0 && u.me.pack_credits <= 0) return err(403, "needs_key", "AI reports need a plan or your own API key.");
+      if (u.me.quota.ai_used >= u.me.quota.ai_limit && u.me.pack_credits <= 0) {
+        return err(402, "quota_exceeded", "You've used all your AI reports for now. Add your own API key (free, unlimited) or pick a plan.");
+      }
     }
   }
   const s = state();
@@ -113,7 +129,11 @@ export async function startAnalysis(
   }
   const id = `job_${crypto.randomUUID().slice(0, 12)}`;
   s.jobs.set(id, { id, repo, mode, days, userId, started: Date.now() });
-  if (mode === "ai" && userId && !user(userId).me.byok) user(userId).me.quota.ai_used++;
+  if (mode === "ai" && userId && !user(userId).me.byok) {
+    const q = user(userId).me;
+    if (q.quota.ai_used < q.quota.ai_limit) q.quota.ai_used++;
+    else q.pack_credits--;
+  }
   return { ok: true, data: { status: "queued", job_id: id } };
 }
 
@@ -265,18 +285,104 @@ function findResults(q: FindQuery): FindResult[] {
 }
 
 export async function me(userId: string): Promise<Result<Me>> {
-  return { ok: true, data: user(userId).me };
+  return { ok: true, data: currentMe(userId) };
+}
+
+// ---- Billing ---------------------------------------------------------------
+// Mirrors server/holt_server/plans.toml. Checkout is faked in the browser
+// (see components/billing/fake-checkout.tsx), so no Razorpay keys are needed.
+
+const PLANS: Plans = {
+  plans: [
+    { id: "free", name: "Free", ai_reports_per_month: FREE_AI, priority: false, features: [], prices: [] },
+    { id: "student", name: "Student", ai_reports_per_month: 40, priority: true, features: ["Priority queue"], prices: [{ currency: "INR", amount: 9900, interval: "month" }] },
+    {
+      id: "pro", name: "Pro", ai_reports_per_month: 250, priority: true, features: ["Priority queue", "API access (coming later)"],
+      prices: [{ currency: "INR", amount: 29900, interval: "month" }, { currency: "USD", amount: 500, interval: "month" }],
+    },
+  ],
+  packs: [{ id: "pack10", name: "10 AI reports", reports: 10, prices: [{ currency: "INR", amount: 4900 }] }],
+  byok: { price: 0, unlimited: true },
+  provider: "razorpay",
+};
+
+export async function plans(): Promise<Result<Plans>> {
+  return { ok: true, data: PLANS };
+}
+
+function applyPlan(u: MockUser, planId: string) {
+  const p = PLANS.plans.find((x) => x.id === planId)!;
+  const renews = new Date(Date.now() + 30 * 86_400_000).toISOString();
+  u.me = { ...u.me, plan: p.id, plan_name: p.name, renews_at: renews, ends_at: null, quota: { ai_used: 0, ai_limit: p.ai_reports_per_month, resets_at: renews } };
+}
+
+/** The pending "webhook" lands 8 s after verify. */
+function currentMe(userId: string): Me {
+  const u = user(userId);
+  if (u.pending && Date.now() >= u.pending.at) {
+    applyPlan(u, u.pending.plan);
+    u.pending = undefined;
+  }
+  return u.me;
+}
+
+export async function checkout(userId: string, item: BillingItem, currency: string): Promise<Result<Checkout>> {
+  const u = user(userId);
+  const cur = (currency || "INR").toUpperCase();
+  const base = { provider: "razorpay" as const, key_id: "rzp_test_mock", currency: cur, name: "Holt" };
+  if ("plan" in item) {
+    const p = PLANS.plans.find((x) => x.id === item.plan && x.prices.length);
+    const price = p?.prices.find((x) => x.currency === cur);
+    if (!p || !price) return err(400, "invalid_request", "That plan isn't sold in that currency.");
+    if (currentMe(userId).renews_at) return err(409, "already_subscribed", "You already have a plan that renews. Cancel it in Settings first.");
+    const id = `sub_mock_${crypto.randomUUID().slice(0, 10)}`;
+    u.checkouts.set(id, item);
+    return { ok: true, data: { ...base, kind: "subscription", subscription_id: id, amount: price.amount, description: `${p.name} plan` } };
+  }
+  const pack = PLANS.packs.find((x) => x.id === item.pack);
+  const price = pack?.prices.find((x) => x.currency === cur);
+  if (!pack || !price) return err(400, "invalid_request", "That pack isn't sold in that currency.");
+  const id = `order_mock_${crypto.randomUUID().slice(0, 10)}`;
+  u.checkouts.set(id, item);
+  return { ok: true, data: { ...base, kind: "order", order_id: id, amount: price.amount, description: pack.name } };
+}
+
+export async function verifyPayment(userId: string, body: RazorpaySuccess): Promise<Result<VerifyResult>> {
+  const u = user(userId);
+  const id = body.razorpay_subscription_id ?? body.razorpay_order_id ?? "";
+  const item = u.checkouts.get(id);
+  if (!item) return err(404, "not_found", "We couldn't find that checkout on your account.");
+  if (!body.razorpay_signature?.startsWith("mock_sig")) return err(400, "invalid_signature", "We couldn't confirm that payment with Razorpay.");
+  u.checkouts.delete(id); // idempotent enough for a mock: a second verify is not_found
+  if ("pack" in item) {
+    u.me = { ...u.me, pack_credits: u.me.pack_credits + (PLANS.packs.find((p) => p.id === item.pack)?.reports ?? 0) };
+    return { ok: true, data: { status: "paid", me: u.me } };
+  }
+  if (body.razorpay_signature === "mock_sig_pending") {
+    u.pending = { plan: item.plan, at: Date.now() + 8000 };
+    return { ok: true, data: { status: "authenticated", me: u.me } };
+  }
+  applyPlan(u, item.plan);
+  return { ok: true, data: { status: "active", me: u.me } };
+}
+
+export async function cancelPlan(userId: string): Promise<Result<Me>> {
+  const u = user(userId);
+  const m = currentMe(userId);
+  if (!m.renews_at) return err(404, "not_found", "There's no renewing plan to cancel.");
+  u.me = { ...m, ends_at: m.renews_at, renews_at: null };
+  return { ok: true, data: u.me };
 }
 
 export async function putByok(userId: string, provider: ByokProvider, _apiKey: string, model: string): Promise<Result<Me>> {
   const u = user(userId);
-  u.me.byok = { provider, model, set: true };
+  u.me = { ...u.me, byok: { provider, model, set: true } };
   return { ok: true, data: u.me };
 }
 
 export async function deleteByok(userId: string): Promise<Result<Me>> {
   const u = user(userId);
-  u.me.byok = null;
+  u.me = { ...u.me, byok: null };
   return { ok: true, data: u.me };
 }
 

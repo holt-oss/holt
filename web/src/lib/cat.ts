@@ -8,7 +8,7 @@ export const CAT: Record<CatMood, { eyes: [string, string]; mouth: string; ears:
   determined: { eyes: ["¬", "¬"], mouth: "_", ears: ["^", "^"], tone: "blue" },
   celebrating: { eyes: ["˘", "˘"], mouth: "ᴗ", ears: ["^", "^"], tone: "green" },
   adoring: { eyes: ["♥", "♥"], mouth: "ᴗ", ears: ["^", "^"], tone: "green" },
-  thinking: { eyes: ["･", "･"], mouth: "_", ears: ["^", "^"], tone: "amber" },
+  thinking: { eyes: ["•", "•"], mouth: "_", ears: ["^", "^"], tone: "amber" },
 };
 
 export const TONE_TEXT = { blue: "text-blue", green: "text-green", orange: "text-orange", amber: "text-amber" } as const;

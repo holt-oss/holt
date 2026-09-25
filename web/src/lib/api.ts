@@ -2,8 +2,8 @@
 // internal key must never reach the browser.
 import "server-only";
 import type {
-  AnalysisStart, ApiError, ByokProvider, FindQuery, FindResult, FindStart, HistoryItem, JobStatus, Me, Mode,
-  Report, Result, StarterIssue,
+  AnalysisStart, ApiError, BillingItem, ByokProvider, Checkout, FindQuery, FindResult, FindStart, HistoryItem,
+  JobStatus, Me, Mode, Plans, RazorpaySuccess, Report, Result, StarterIssue, VerifyResult,
 } from "./types";
 import { isJobId } from "./ids";
 import * as mock from "./mock/server";
@@ -142,6 +142,26 @@ export function putByok(userId: string, provider: ByokProvider, apiKey: string, 
 export function deleteByok(userId: string): Promise<Result<Me>> {
   if (MOCK) return mock.deleteByok(userId);
   return call("/v1/me/byok", { method: "DELETE", caller: { userId } });
+}
+
+export function plans(): Promise<Result<Plans>> {
+  if (MOCK) return mock.plans();
+  return call("/v1/plans");
+}
+
+export function checkout(userId: string, item: BillingItem, currency: string): Promise<Result<Checkout>> {
+  if (MOCK) return mock.checkout(userId, item, currency);
+  return call("/v1/billing/checkout", { method: "POST", body: JSON.stringify({ ...item, currency }), caller: { userId } });
+}
+
+export function verifyPayment(userId: string, body: RazorpaySuccess): Promise<Result<VerifyResult>> {
+  if (MOCK) return mock.verifyPayment(userId, body);
+  return call("/v1/billing/verify", { method: "POST", body: JSON.stringify(body), caller: { userId } });
+}
+
+export function cancelPlan(userId: string): Promise<Result<Me>> {
+  if (MOCK) return mock.cancelPlan(userId);
+  return call("/v1/billing/cancel", { method: "POST", caller: { userId } });
 }
 
 export function history(userId: string, limit = 50): Promise<Result<{ items: HistoryItem[] }>> {
