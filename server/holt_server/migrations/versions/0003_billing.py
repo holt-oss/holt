@@ -76,6 +76,7 @@ def upgrade() -> None:
         sa.Column("credits_left", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("credits_taken", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("disputed", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("reports", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
@@ -92,6 +93,8 @@ def upgrade() -> None:
                                      server_default="0"))
     add_column("payments", sa.Column("disputed", sa.Boolean(), nullable=False,
                                      server_default=sa.false()))
+    add_column("payments", sa.Column("reports", sa.Integer(), nullable=False,
+                                     server_default="0"))
     create_index("ix_payments_user_id", "payments", ["user_id"])
     create_index("ix_payments_provider_subscription_id", "payments",
                  ["provider_subscription_id"])

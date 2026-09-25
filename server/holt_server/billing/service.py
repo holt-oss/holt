@@ -56,9 +56,14 @@ async def credit_pack(s: AsyncSession, catalog: Catalog, payment: Payment,
 
     A refund can arrive before this (Razorpay sends events in any order); what
     was already refunded is subtracted, and a fully refunded pack credits nothing.
+    The row is locked and re-read first, so a refund landing at the same moment
+    is either seen here or sees the credit.
     """
-    pack = catalog.packs.get(payment.item)
-    if pack is None:
+    payment = await lock_payment(s, payment.id)
+    if payment is None or payment.credited:
+        return False
+    reports = pack_reports(payment, catalog)
+    if not reports:
         log.error("payment %s is for unknown pack %r", payment.id, payment.item)
         return False
     if paid is not None and (paid.amount != payment.amount
@@ -68,22 +73,20 @@ async def credit_pack(s: AsyncSession, catalog: Catalog, payment: Payment,
         log.error("payment %s amount mismatch: %s %s vs order %s %s", payment.id,
                   paid.amount, paid.currency, payment.amount, payment.currency)
         return False
-    if payment.credited:
-        return False
     if provider_payment_id:
         await _adopt_early_refunds(s, payment, provider_payment_id)
+        if not payment.provider_payment_id:
+            payment.provider_payment_id = provider_payment_id
     refunded = payment.refunded_amount or 0
-    taken = _share(pack.reports, refunded, payment.amount)
-    grant = pack.reports - taken
-    values = {"credited": True, "credits_left": grant, "credits_taken": taken,
-              "updated_at": now(),
-              "status": "paid" if not refunded else payment.status}
-    if provider_payment_id and not payment.provider_payment_id:
-        values["provider_payment_id"] = provider_payment_id
-    done = await s.execute(update(Payment).where(
-        Payment.id == payment.id, Payment.credited.is_(False)).values(**values))
-    if done.rowcount != 1:
-        return False
+    taken = _share(reports, refunded, payment.amount)
+    grant = reports - taken
+    payment.credited = True
+    payment.credits_left = grant
+    payment.credits_taken = taken
+    payment.reports = reports
+    payment.status = "paid" if not refunded else payment.status
+    payment.updated_at = now()
+    await s.flush()
     if grant:
         await s.execute(update(User).where(User.id == payment.user_id)
                         .values(pack_credits=User.pack_credits + grant))
@@ -95,7 +98,7 @@ async def _adopt_early_refunds(s: AsyncSession, payment: Payment, provider_payme
     """A refund recorded against this payment id before we knew its order."""
     early = (await s.execute(select(Payment).where(
         Payment.provider_payment_id == provider_payment_id,
-        Payment.kind == "unmatched"))).scalar_one_or_none()
+        Payment.kind == "unmatched").with_for_update())).scalar_one_or_none()
     if early is None:
         return
     payment.refunded_amount = min(payment.amount,
@@ -281,9 +284,46 @@ async def apply_event(s: AsyncSession, catalog: Catalog, event: Event) -> str:
 # --- refunds and disputes -------------------------------------------------------
 
 
-async def _payment_by_provider_id(s: AsyncSession, provider_payment_id: str) -> Payment | None:
-    return (await s.execute(select(Payment).where(
-        Payment.provider_payment_id == provider_payment_id))).scalar_one_or_none()
+async def _payment_by_provider_id(s: AsyncSession, provider_payment_id: str,
+                                  lock: bool = False) -> Payment | None:
+    query = select(Payment).where(Payment.provider_payment_id == provider_payment_id)
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    return (await s.execute(query)).scalar_one_or_none()
+
+
+async def lock_payment(s: AsyncSession, payment_id: int) -> Payment | None:
+    """The payment row and its user's row, locked for this transaction and
+    freshly read, in the documented order (user, then payment)."""
+    owner = (await s.execute(select(Payment.user_id).where(Payment.id == payment_id)
+                             )).scalar_one_or_none()
+    if owner is None:
+        return None
+    if owner:
+        await s.get(User, owner, with_for_update=True, populate_existing=True)
+    return await s.get(Payment, payment_id, with_for_update=True, populate_existing=True)
+
+
+def pack_reports(payment: Payment, catalog: Catalog | None = None) -> int:
+    """Reports the pack was sold with (rows from before the column: the catalog)."""
+    if payment.reports:
+        return payment.reports
+    pack = catalog.packs.get(payment.item) if catalog else None
+    return pack.reports if pack else 0
+
+
+async def clawback(s: AsyncSession, payment: Payment, reports: int) -> int:
+    """Bring a locked pack row's clawback up to its refunded share. Returns
+    the credits taken now (from this pack's unspent credits only)."""
+    target = _share(reports, payment.refunded_amount or 0, payment.amount)
+    take = min(max(0, target - (payment.credits_taken or 0)), payment.credits_left or 0)
+    payment.credits_taken = (payment.credits_taken or 0) + take
+    if take:
+        payment.credits_left -= take
+        await s.execute(update(User).where(User.id == payment.user_id).values(
+            pack_credits=case((User.pack_credits > take, User.pack_credits - take),
+                              else_=0)))
+    return take
 
 
 async def _payment_for_refund(s: AsyncSession, provider_payment_id: str,
@@ -295,7 +335,9 @@ async def _payment_for_refund(s: AsyncSession, provider_payment_id: str,
     if payment is None and order_id:
         payment = (await s.execute(select(Payment).where(
             Payment.provider_order_id == order_id))).scalar_one_or_none()
-        if payment is not None and not payment.provider_payment_id:
+    if payment is not None:
+        payment = await lock_payment(s, payment.id)
+        if order_id and not payment.provider_payment_id:
             payment.provider_payment_id = provider_payment_id
     if payment is None:
         payment = Payment(user_id="", provider="razorpay", kind="unmatched", item="",
@@ -334,15 +376,7 @@ async def apply_refund(s: AsyncSession, catalog: Catalog, refund_id: str,
     payment.updated_at = now()
 
     if payment.kind == "pack" and payment.credited:
-        pack = catalog.packs.get(payment.item)
-        target = _share(pack.reports if pack else 0, payment.refunded_amount, payment.amount)
-        take = min(max(0, target - (payment.credits_taken or 0)), payment.credits_left or 0)
-        payment.credits_taken = max(payment.credits_taken or 0, target)
-        if take:
-            payment.credits_left -= take
-            await s.execute(update(User).where(User.id == payment.user_id).values(
-                pack_credits=case((User.pack_credits > take, User.pack_credits - take),
-                                  else_=0)))
+        await clawback(s, payment, pack_reports(payment, catalog))
     elif payment.kind == "subscription" and full and payment.provider_subscription_id:
         sub = (await s.execute(select(Subscription).where(
             Subscription.provider_subscription_id == payment.provider_subscription_id
@@ -365,6 +399,8 @@ async def apply_dispute(s: AsyncSession, catalog: Catalog, phase: str,
     """A chargeback. While open, the payment is flagged and pack credits are
     frozen (kept, not spendable); lost is treated as a refund."""
     payment = await _payment_by_provider_id(s, dispute.payment_id)
+    if payment is not None:
+        payment = await lock_payment(s, payment.id)
     if payment is None:
         log.error("DISPUTE %s %s on unknown payment %s", phase, dispute.id, dispute.payment_id)
         return "ignored"

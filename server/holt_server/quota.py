@@ -81,12 +81,25 @@ async def charge(s: AsyncSession, user: User, plan: Plan) -> tuple[str, str, int
         .values(ai_used=User.ai_used + 1))
     if took.rowcount == 1:
         return PLAN, key, None
+    # Pack pool. User row first, then the pack row, as everywhere (see
+    # db.Payment). Locked explicitly: an UPDATE that matched nothing above
+    # took no lock.
+    await s.get(User, user.id, with_for_update=True)
+    pack = (await s.execute(
+        select(Payment).where(Payment.user_id == user.id, Payment.kind == "pack",
+                              Payment.credits_left > 0)
+        .order_by(Payment.created_at, Payment.id).limit(1)
+        .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
     took = await s.execute(
         update(User).where(User.id == user.id, User.pack_credits > 0,
                            User.packs_frozen.is_(False))
         .values(pack_credits=User.pack_credits - 1))
     if took.rowcount == 1:
-        return PACK, key, await _spend_from_oldest_pack(s, user.id)
+        pack_id = None
+        if pack is not None and pack.credits_left > 0:
+            pack.credits_left -= 1
+            pack_id = pack.id
+        return PACK, key, pack_id
     await s.rollback()
     limit = plan.ai_reports_per_month
     raise ApiError(
@@ -97,26 +110,6 @@ async def charge(s: AsyncSession, user: User, plan: Plan) -> tuple[str, str, int
     )
 
 
-async def _spend_from_oldest_pack(s: AsyncSession, user_id: str) -> int | None:
-    """Take the credit from the oldest pack that has one; returns its payment id.
-
-    None when the credit had no pack behind it (granted by hand).
-    """
-    for _ in range(5):  # a concurrent spend may empty the row we picked
-        pid = (await s.execute(
-            select(Payment.id).where(Payment.user_id == user_id, Payment.kind == "pack",
-                                     Payment.credits_left > 0)
-            .order_by(Payment.created_at, Payment.id).limit(1))).scalar_one_or_none()
-        if pid is None:
-            return None
-        took = await s.execute(update(Payment).where(Payment.id == pid,
-                                                     Payment.credits_left > 0)
-                               .values(credits_left=Payment.credits_left - 1))
-        if took.rowcount == 1:
-            return pid
-    return None
-
-
 async def refund(s: AsyncSession, job: Job) -> None:
     """Give a failed job's report back to the pool it came from. Caller commits."""
     if not job.charged or not job.user_id:
@@ -125,13 +118,20 @@ async def refund(s: AsyncSession, job: Job) -> None:
     if job.quota_pool == PACK:
         pack_payment = params.get("pack_payment_id")
         if pack_payment is not None:
-            # Back to the same pack, unless that pack has since been fully
-            # refunded: the money is back with the payer already.
-            back = await s.execute(update(Payment).where(
-                Payment.id == pack_payment, Payment.status != "refunded")
-                .values(credits_left=Payment.credits_left + 1))
-            if back.rowcount != 1:
+            from holt_server.billing.service import clawback, lock_payment, pack_reports
+
+            # Back to the same pack (locked first, then the user row). Fully
+            # refunded: the money is already back with the payer, so no credit.
+            pack = await lock_payment(s, pack_payment)
+            if pack is None or pack.status == "refunded":
                 return
+            pack.credits_left += 1
+            await s.execute(update(User).where(User.id == job.user_id)
+                            .values(pack_credits=User.pack_credits + 1))
+            # Partly refunded: the returned credit may be one the refund could
+            # not take back earlier, because it was in use. Take it now.
+            await clawback(s, pack, pack_reports(pack))
+            return
         await s.execute(update(User).where(User.id == job.user_id)
                         .values(pack_credits=User.pack_credits + 1))
         return

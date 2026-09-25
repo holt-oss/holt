@@ -104,6 +104,7 @@ async def checkout(body: CheckoutIn, request: Request,
                            notes={"user_id": user_id, "pack": pack.id})
         async with svc.db.session() as s:
             s.add(Payment(user_id=user_id, provider=pay.name, kind="pack", item=pack.id,
+                          reports=pack.reports,
                           provider_order_id=order.id, amount=price.amount,
                           currency=price.currency, status="created"))
             await s.commit()

@@ -223,6 +223,15 @@ class Subscription(Base):
 
 
 class Payment(Base):
+    """One payment. Pack rows double as a credit ledger.
+
+    Lock order, everywhere a pack row and a user row change together: the
+    user row first, then the payment row (SELECT ... FOR UPDATE). Spending
+    (which updates the user row before touching a pack), refunds, crediting
+    and returning a credit all follow it, so they serialise per user instead
+    of losing each other's updates or deadlocking.
+    """
+
     __tablename__ = "payments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -245,11 +254,16 @@ class Payment(Base):
     # Minor units refunded so far (partial refunds add up).
     refunded_amount: Mapped[int] = mapped_column(Integer, default=0)
     # Pack ledger. `credits_left`: this pack's unspent reports (packs are spent
-    # oldest first). `credits_taken`: reports clawed back for refunds so far,
-    # as ceil(reports * refunded / amount); each new refund takes only the
-    # difference, and only from this pack's unspent credits.
+    # oldest first). `credits_taken`: reports actually clawed back (or never
+    # granted) for refunds. The refunded share is ceil(reports * refunded /
+    # amount); whatever of it is not yet taken is owed, and is taken from this
+    # pack's unspent credits as soon as there are any (a later refund, or a
+    # credit coming back from a failed job).
     credits_left: Mapped[int] = mapped_column(Integer, default=0)
     credits_taken: Mapped[int] = mapped_column(Integer, default=0)
+    # Reports this pack was sold with, fixed at checkout: later price or pack
+    # changes in plans.toml do not change what was bought.
+    reports: Mapped[int] = mapped_column(Integer, default=0)
     disputed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now,
