@@ -36,7 +36,7 @@ def rerecord(slug: str, provider: FixtureProvider, path: Path, patch: bool) -> f
         client = PatchModel(path)
     else:
         path.unlink(missing_ok=True)
-        client = OpenAIModel(path)
+        client = OpenAIModel(path, record=True)
     assessment, _ = analyze(slug, provider, client)
     note = f"  patched {client.patched}" if patch else ""
     print(f"  {time.monotonic() - started:5.0f}s  ${client.usage.cost_usd:.4f}  "

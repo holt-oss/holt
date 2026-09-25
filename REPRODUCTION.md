@@ -41,7 +41,7 @@ uv sync
 uv run pytest -rs
 ```
 
-**Expected:** `388 passed`, no skips. **Runtime:** about two minutes.
+**Expected:** at least `388 passed` (the suite only grows), no failures, no skips. **Runtime:** about three minutes.
 
 The `-rs` flag reports skipped tests explicitly — a skipped test is not a
 passing one.
