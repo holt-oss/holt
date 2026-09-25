@@ -37,6 +37,7 @@ from holt.tui.widgets.evidence import EvidenceDetail, cite
 class InspectorScreen(Screen):
     BINDINGS = [
         ("escape", "back", "back"),
+        ("o", "open_on_github", "open on GitHub"),
         ("q", "quit", "quit"),
     ]
 
@@ -93,6 +94,14 @@ class InspectorScreen(Screen):
 
     def action_back(self) -> None:
         self.app.pop_screen()
+
+    def action_open_on_github(self) -> None:
+        from holt.report import evidence_url
+        from holt.tui.screens.token import open_url
+
+        url = getattr(self.record, "url", "") or evidence_url(self.evidence_id)
+        if url:
+            open_url(url)
 
     def action_quit(self) -> None:
         self.app.exit()

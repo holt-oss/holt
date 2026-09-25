@@ -17,7 +17,6 @@ threshold, so asking it would be decoration.
 
 from __future__ import annotations
 
-import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,8 +34,9 @@ CONTRIBUTION_AREAS: dict[str, tuple[str, ...]] = {
 
 
 def config_path() -> Path:
-    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(base) / "holt" / "profile.toml"
+    from holt import paths
+
+    return paths.config_dir() / "profile.toml"
 
 
 @dataclass(slots=True)
@@ -66,7 +66,7 @@ def load(path: Path | None = None) -> Profile | None:
     path = path or config_path()
     if not path.exists():
         return None
-    data = tomllib.loads(path.read_text())
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
     return Profile(
         languages=_csv(data.get("languages")),
         topics=_csv(data.get("topics")),
@@ -86,7 +86,8 @@ def save(profile: Profile, path: Path | None = None) -> Path:
         f"languages = {toml_list(profile.languages)}\n"
         f"topics = {toml_list(profile.topics)}\n"
         f"contributions = {toml_list(profile.contributions)}\n"
-        f"days = {profile.days}\n"
+        f"days = {profile.days}\n",
+        encoding="utf-8",
     )
     return path
 

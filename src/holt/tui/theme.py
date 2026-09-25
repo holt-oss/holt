@@ -413,6 +413,21 @@ ConfirmScreen {{
 #confirm-detail {{ color: {FAINT}; padding: 1 0 0 0; }}
 #confirm-keys {{ color: {FAINT}; padding: 1 0 0 0; }}
 
+/* The first-run token prompt and the ? help overlay: the same boxed modal. */
+TokenScreen, HelpScreen {{ align: center middle; }}
+#token-box, #help-box {{
+    width: 76;
+    max-width: 100%;
+    height: auto;
+    max-height: 90%;
+    padding: 1 3;
+    border: round {RULE};
+    background: $surface;
+}}
+#token-box Line, #help-box Line {{ width: 100%; }}
+#token-input {{ margin: 1 0 0 0; }}
+#token-error {{ color: {DROP}; }}
+
 /* The command palette.
  *
  * Textual's own styling is a full-width panel between two heavy `hkey` bars,
