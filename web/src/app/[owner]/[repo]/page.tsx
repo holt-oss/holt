@@ -9,7 +9,9 @@ import { StarterIssues } from "@/components/report/starter-issues";
 import { getReport, starterIssues } from "@/lib/api";
 import { isValidRepo } from "@/lib/repo";
 import { caller, currentUser, type SessionUser } from "@/lib/session";
-import type { Mode } from "@/lib/types";
+import { humanHours } from "@/lib/format";
+import { SITE_URL } from "@/lib/site";
+import type { Mode, Report } from "@/lib/types";
 
 type Props = PageProps<"/[owner]/[repo]">;
 
@@ -19,22 +21,46 @@ function opts(sp: Record<string, string | string[] | undefined>): { mode: Mode; 
   return { mode, days: Number.isFinite(d) && d >= 1 && d <= 90 ? d : 7 };
 }
 
+function describe(report: Report | null, name: string): string {
+  if (!report) return `Holt reads ${name}'s recent pull requests and tells you whether newcomers get replies and get merged.`;
+  const s = report.stats;
+  const reply = s.median_first_response_hours == null ? "" : `, and the typical first reply takes ${humanHours(s.median_first_response_hours)}`;
+  return `${report.headline}. ${s.outsider_merged} of ${s.outsider_attempts} pull requests from outside contributors were merged${reply}. See the evidence and starter issues.`;
+}
+
+const titleFor = (name: string) => `${name}: Worth your time? | Holt`;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { owner, repo } = await params;
   if (!isValidRepo(owner, repo)) return {};
   const r = await getReport(`${owner}/${repo}`);
   const name = r.ok ? r.data.repo : `${owner}/${repo}`;
-  const title = r.ok ? `${name}: ${r.data.headline}` : `Is ${name} worth your time?`;
-  const description = r.ok
-    ? `${r.data.stats.outsider_merged} of ${r.data.stats.outsider_attempts} pull requests from outside contributors were merged. See the evidence, and where newcomer work lands.`
-    : `Holt reads ${name}'s recent pull requests and tells you whether newcomers get replies and get merged.`;
+  const title = titleFor(name);
+  const description = describe(r.ok ? r.data : null, name);
   return {
-    title,
+    title: { absolute: title },
     description,
     alternates: { canonical: `/${name}` },
-    openGraph: { title, description, url: `/${name}` },
+    openGraph: { title, description, url: `/${name}`, type: "article" },
     twitter: { card: "summary_large_image", title, description },
   };
+}
+
+/** schema.org description of the page, for search engines. */
+function JsonLd({ report, name }: { report: Report | null; name: string }) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: titleFor(name),
+    url: `${SITE_URL}/${name}`,
+    description: describe(report, name),
+    ...(report ? { dateModified: report.generated_at } : {}),
+    isPartOf: { "@type": "WebSite", name: "Holt", url: SITE_URL },
+    about: { "@type": "SoftwareSourceCode", name, codeRepository: `https://github.com/${name}` },
+  };
+  // Escape "<" so repo-controlled text can never close the script tag.
+  const json = JSON.stringify(data).replace(/</g, "\\u003c");
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: json }} />;
 }
 
 export default async function RepoPage({ params, searchParams }: Props) {
@@ -59,6 +85,7 @@ export default async function RepoPage({ params, searchParams }: Props) {
 
   return (
     <div className="wrap py-8 sm:py-12">
+      {mode === "rules" && <JsonLd report={report.ok ? report.data : null} name={display} />}
       <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

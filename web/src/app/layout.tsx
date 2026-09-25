@@ -27,6 +27,8 @@ export const metadata: Metadata = {
     description: "See how a project treats outside contributors before you spend your week on it.",
   },
   twitter: { card: "summary_large_image" },
+  // Staging and previews: keep search engines out (robots.txt disallows too).
+  ...(process.env.ROBOTS_NOINDEX === "1" ? { robots: { index: false, follow: false } } : {}),
 };
 
 export const viewport: Viewport = {
