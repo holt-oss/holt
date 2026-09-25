@@ -1,22 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Mode, StarterIssue } from "@/lib/types";
+import type { Mode } from "@/lib/types";
 import { AnalysisProgress } from "../analysis-progress";
 import { ErrorPanel } from "../error-panel";
 import { useAnalysis } from "../use-analysis";
 import { ReportView } from "./report-view";
+import type { IssuesState } from "./starter-issues";
 
-export function AnalysisRunner({ repo, mode, days, signedIn, initialIssues }: { repo: string; mode: Mode; days: number; signedIn: boolean; initialIssues: StarterIssue[] | null }) {
+export function AnalysisRunner({ repo, mode, days, signedIn, initialIssues }: { repo: string; mode: Mode; days: number; signedIn: boolean; initialIssues: IssuesState }) {
   const { state, retry } = useAnalysis(repo, mode, days);
-  const [issues, setIssues] = useState<StarterIssue[] | null>(initialIssues);
+  const [issues, setIssues] = useState<IssuesState>(initialIssues);
 
   useEffect(() => {
     if (state.phase !== "done" || issues) return;
     fetch(`/api/repos/${repo}/starter-issues`)
-      .then((r) => (r.ok ? r.json() : { issues: [] }))
-      .then((d) => setIssues(d.issues ?? []))
-      .catch(() => setIssues([]));
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setIssues(d?.issues ?? "unavailable"))
+      .catch(() => setIssues("unavailable"));
   }, [state.phase, repo, issues]);
 
   if (state.phase === "error") return <ErrorPanel error={state.error} repo={repo} onRetry={retry} />;

@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { shortDate, timeAgo, verdictLine, VERDICT_TONE } from "@/lib/format";
 import { SITE_URL } from "@/lib/site";
-import type { Report, StarterIssue } from "@/lib/types";
+import type { Report } from "@/lib/types";
 import { CatFace } from "../cat-face";
 import { BadgeSnippet } from "./badge-snippet";
 import { EvidenceList } from "./evidence-list";
 import { LandingMap } from "./landing-map";
 import { ShareBar } from "./share-bar";
-import { StarterIssues } from "./starter-issues";
+import { StarterIssues, type IssuesState } from "./starter-issues";
 import { StatsGrid } from "./stats-grid";
 import { TONE, VERDICT_MOOD } from "./tone";
 import { UpgradeCard } from "./upgrade-card";
@@ -58,7 +58,7 @@ export function ReportView({
   signedIn,
 }: {
   report: Report;
-  issues: StarterIssue[] | null;
+  issues: IssuesState;
   signedIn: boolean;
 }) {
   const repo = report.repo;

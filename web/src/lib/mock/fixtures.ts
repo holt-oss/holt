@@ -294,15 +294,38 @@ function toIssues(repo: string, seed: Seed["issues"]): StarterIssue[] {
   }));
 }
 
-function toEvidence(repo: string, ev: Seed["evidence"]): EvidenceItem[] {
-  return ev.map(([kind, pr, text, quote]) => ({
-    id: `pr:${repo}#${pr}:${kind}`,
-    url: `https://github.com/${repo}/pull/${pr}`,
-    kind,
-    value: kind === "no_reply" || kind === "closed" ? "negative" : "substantive",
-    text,
-    quote,
-  }));
+// API.md: rules mode lists the newcomer PRs behind the counts (kind
+// "outsider_pr", value "merged" | "no_reply"); AI mode cites model claims
+// ("outcome" per PR, or the engine field a claim is about).
+const RULES_VALUE: Record<string, string> = { onboarding: "merged", merged: "merged", review: "merged", no_reply: "no_reply" };
+const AI_CLAIM: Record<string, [kind: string, value: string]> = {
+  onboarding: ["outcome", "merged_first_contribution"],
+  review: ["outcome", "merged_after_review"],
+  merged: ["outcome", "merged"],
+  reply: ["outcome", "replied_quickly"],
+  closed: ["outcome", "closed_with_reason"],
+  no_reply: ["outcome", "no_reply"],
+  guidance: ["onboarding", "documented"],
+  policy: ["outsider_posture", "gated"],
+};
+
+function toEvidence(repo: string, ev: Seed["evidence"], mode: "rules" | "ai"): EvidenceItem[] {
+  if (mode === "rules") {
+    return ev
+      .filter(([kind]) => RULES_VALUE[kind])
+      .map(([kind, pr, text]) => ({
+        id: `pr:${repo}#${pr}:opened`,
+        url: `https://github.com/${repo}/pull/${pr}`,
+        kind: "outsider_pr",
+        value: RULES_VALUE[kind],
+        text,
+        quote: null,
+      }));
+  }
+  return ev.map(([k, pr, text, quote]) => {
+    const [kind, value] = AI_CLAIM[k] ?? ["outcome", k];
+    return { id: `pr:${repo}#${pr}:${value}`, url: `https://github.com/${repo}/pull/${pr}`, kind, value, text, quote };
+  });
 }
 
 const HEADLINES: Record<Verdict, string> = {
@@ -324,7 +347,7 @@ function fromSeed(seed: Seed, mode: "rules" | "ai", days: number): Report {
     unknowns: seed.unknowns,
     landing: seed.landing,
     never_landed: seed.never_landed,
-    evidence: toEvidence(seed.repo, seed.evidence),
+    evidence: toEvidence(seed.repo, seed.evidence, mode),
     evidence_until: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10) + "T00:00:00Z",
     generated_at: hoursAgo(2),
     cost: mode === "ai" ? { model: "anthropic/claude-sonnet-5", input_tokens: 9120, output_tokens: 1480 } : null,

@@ -149,21 +149,21 @@ export function statLines(s: Partial<Stats>): StatLine[] {
   return out;
 }
 
-const KIND_LABEL: Record<string, string> = {
-  onboarding: "Newcomer pull request",
-  merged: "Merged",
-  closed: "Closed without merging",
-  reply: "Maintainer reply",
-  no_reply: "No reply",
-  review: "Review",
-  guidance: "Contributor guidance",
-  policy: "Project policy",
-  label: "Label",
-  issue: "Issue",
-};
+const humanize = (k: string) => k.replace(/[_-]+/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+const NEGATIVE = /no_reply|ignored|closed|reject|stale|declin|abandon|negative|hostile/;
 
-export function evidenceKind(kind: string): string {
-  return KIND_LABEL[kind] ?? kind.replace(/[_-]+/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+/**
+ * Label and tone for an evidence item. Rules mode lists newcomer PRs as
+ * kind "outsider_pr" (value "merged" | "no_reply"); AI mode uses "outcome"
+ * (value like "merged_after_review") or the engine field a claim is about.
+ */
+export function evidenceLabel(e: { kind: string; value: string }): { label: string; bad: boolean } {
+  const bad = NEGATIVE.test(e.value);
+  if (e.kind === "outsider_pr") {
+    return { label: e.value === "merged" ? "Newcomer PR merged" : e.value === "no_reply" ? "Newcomer PR, no reply" : `Newcomer PR: ${humanize(e.value).toLowerCase()}`, bad };
+  }
+  if (e.kind === "outcome") return { label: humanize(e.value), bad };
+  return { label: humanize(e.kind), bad };
 }
 
 /** "#526518" or a short id for an evidence link. */

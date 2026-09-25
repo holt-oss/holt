@@ -7,11 +7,13 @@ export type ApiErrorCode =
   | "unauthorized"
   | "not_found"
   | "invalid_repo"
+  | "invalid_request"
   | "rate_limited"
   | "quota_exceeded"
   | "needs_key"
   | "upstream"
-  | "internal";
+  | "internal"
+  | "not_implemented";
 
 export interface ApiError {
   code: ApiErrorCode;
@@ -106,6 +108,14 @@ export interface FindResult {
 
 export type FindStart = { status: "done"; results: FindResult[] } | { status: "queued"; job_id: string };
 
+export interface FindJobStatus {
+  status: "queued" | "running" | "done" | "error";
+  stage: string;
+  progress: number;
+  results: FindResult[] | null;
+  error: ApiError | null;
+}
+
 export type ByokProvider = "openrouter" | "openai" | "anthropic" | "gemini";
 
 export interface Me {
@@ -114,8 +124,10 @@ export interface Me {
   byok: { provider: ByokProvider; model: string; set: boolean } | null;
 }
 
-/** API.md says "recent analyses by this user" without a shape; this is what web/ expects. */
+/** GET /v1/me/history -> {"items": HistoryItem[]} */
 export interface HistoryItem {
+  job_id: string;
+  status: "queued" | "running" | "done" | "error";
   repo: string;
   mode: Mode;
   days: number;

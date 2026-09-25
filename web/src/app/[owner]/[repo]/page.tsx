@@ -6,7 +6,7 @@ import { AnalysisRunner } from "@/components/report/analysis-runner";
 import { ReportView } from "@/components/report/report-view";
 import { getReport, starterIssues } from "@/lib/api";
 import { isValidRepo } from "@/lib/repo";
-import { currentUser } from "@/lib/session";
+import { caller, currentUser } from "@/lib/session";
 import type { Mode } from "@/lib/types";
 
 type Props = PageProps<"/[owner]/[repo]">;
@@ -44,7 +44,7 @@ export default async function RepoPage({ params, searchParams }: Props) {
   const signedIn = Boolean(user);
   if (mode === "ai" && !signedIn) redirect(`/signin?callbackUrl=${encodeURIComponent(`/${name}?mode=ai`)}`);
 
-  const [report, issues] = await Promise.all([getReport(name, mode, days), starterIssues(name, 6)]);
+  const [report, issues] = await Promise.all([getReport(name, mode, days), starterIssues(name, 6, await caller(user))]);
 
   // Normalise to GitHub's casing so shared links and caches agree.
   if (report.ok && report.data.repo !== name && report.data.repo.toLowerCase() === name.toLowerCase()) {
@@ -93,7 +93,7 @@ export default async function RepoPage({ params, searchParams }: Props) {
       </div>
 
       {report.ok ? (
-        <ReportView report={report.data} issues={issues.ok ? issues.data.issues : []} signedIn={signedIn} />
+        <ReportView report={report.data} issues={issues.ok ? issues.data.issues : "unavailable"} signedIn={signedIn} />
       ) : report.error.code === "not_found" ? (
         <AnalysisRunner repo={name} mode={mode} days={days} signedIn={signedIn} initialIssues={issues.ok ? issues.data.issues : null} />
       ) : (

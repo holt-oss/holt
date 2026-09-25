@@ -21,11 +21,11 @@ export async function Header() {
   const user = await currentUser();
   const initial = (user?.name || user?.email || "?").trim().charAt(0).toUpperCase();
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-header/95 backdrop-blur supports-[backdrop-filter]:bg-header/85">
+    <header className="sticky top-0 z-40 border-b border-line bg-header">
       <div className="wrap flex min-h-[60px] items-center gap-4">
-        <Link href="/" className="mr-auto inline-flex items-center gap-3" aria-label="Holt home">
+        <Link href="/" className="mr-auto inline-flex items-center gap-3">
           <CatFace className="text-[1.05rem]" />
-          <span className="text-[0.95rem] font-semibold tracking-tight">holt</span>
+          <span className="text-[0.95rem] font-semibold tracking-tight">holt<span className="sr-only"> home</span></span>
         </Link>
 
         <nav aria-label="Main" className="hidden items-center gap-6 text-[0.78rem] text-muted lg:flex">

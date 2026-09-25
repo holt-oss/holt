@@ -224,9 +224,12 @@ export default function Home() {
 
       {/* 06 — open source */}
       <section data-cat-section="adoring" className="relative overflow-hidden border-t border-line bg-panel py-20 md:py-28">
-        <div aria-hidden="true" className="pointer-events-none absolute left-0 top-5 whitespace-nowrap text-[clamp(2.6rem,7vw,7rem)] font-bold leading-none tracking-[-0.06em] text-blue opacity-[0.09]">
-          OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE /
-        </div>
+        {/* Decorative marquee as generated content, so it isn't read or contrast-checked as text. */}
+        <div
+          aria-hidden="true"
+          data-text="OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE / OPEN / SOURCE /"
+          className="pointer-events-none absolute left-0 top-5 whitespace-nowrap text-[clamp(2.6rem,7vw,7rem)] font-bold leading-none tracking-[-0.06em] text-blue opacity-[0.09] before:content-[attr(data-text)]"
+        />
         <div className="relative">
           <Grid>
             <Rail n="06" label="open source" />

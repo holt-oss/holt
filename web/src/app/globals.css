@@ -108,7 +108,12 @@
     text-rendering: optimizeLegibility;
     font-synthesis: none;
   }
-  /* Film grain from the original site. */
+  /* Film grain from the original site (desktop only: it costs paint time on phones). */
+  @media (max-width: 780px) {
+    body::before {
+      display: none;
+    }
+  }
   body::before {
     position: fixed;
     inset: 0;

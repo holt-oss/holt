@@ -23,7 +23,7 @@ export default async function HistoryPage() {
       <div className="mt-8">
         {!r.ok ? (
           <ErrorPanel error={r.error} retryHref="/me/history" />
-        ) : r.data.length === 0 ? (
+        ) : r.data.items.length === 0 ? (
           <div className="border border-dashed border-line-strong p-8 text-center">
             <CatFace mood="startled" className="text-[1.6rem]" />
             <p className="mt-4 font-sans text-muted">Nothing yet. Reports you run while signed in show up here.</p>
@@ -31,8 +31,8 @@ export default async function HistoryPage() {
           </div>
         ) : (
           <ul className="border-t border-line-strong">
-            {r.data.map((h, i) => (
-              <li key={`${h.repo}-${h.created_at}-${i}`}>
+            {r.data.items.map((h) => (
+              <li key={h.job_id}>
                 <Link
                   href={`/${h.repo}${h.mode === "ai" ? "?mode=ai" : ""}`}
                   className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 border-b border-line px-1 py-4 transition-colors hover:bg-panel sm:grid-cols-[1fr_auto_auto]"
@@ -43,7 +43,13 @@ export default async function HistoryPage() {
                       {h.mode === "ai" ? "AI report" : "free report"} · <time dateTime={h.created_at}>{timeAgo(h.created_at)}</time>
                     </span>
                   </span>
-                  {h.verdict ? <VerdictPill verdict={h.verdict} className="justify-self-end" /> : <span className="text-[0.75rem] text-faint">running</span>}
+                  {h.verdict ? (
+                    <VerdictPill verdict={h.verdict} className="justify-self-end" />
+                  ) : (
+                    <span className={`justify-self-end text-[0.75rem] ${h.status === "error" ? "text-orange" : "text-faint"}`}>
+                      {h.status === "error" ? "didn't finish" : "still running"}
+                    </span>
+                  )}
                   <span aria-hidden="true" className="hidden text-faint sm:inline">→</span>
                 </Link>
               </li>

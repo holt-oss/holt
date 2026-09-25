@@ -21,7 +21,7 @@ function headers(caller?: Caller): HeadersInit {
     Accept: "application/json",
   };
   if (caller?.userId) h["X-Holt-User"] = caller.userId;
-  else if (caller?.ip) h["X-Holt-Client-Ip"] = caller.ip;
+  if (caller?.ip) h["X-Holt-Client-Ip"] = caller.ip;
   return h;
 }
 
@@ -76,7 +76,7 @@ export function jobStatus(jobId: string): Promise<Result<JobStatus>> {
 
 /** Raw upstream SSE response for a job (analyses or find). */
 export async function jobEvents(kind: "analyses" | "find", jobId: string, signal: AbortSignal): Promise<Response> {
-  if (MOCK) return mock.jobEvents(jobId, signal);
+  if (MOCK) return mock.jobEvents(kind, jobId, signal);
   try {
     return await fetch(`${BASE}/v1/${kind}/${enc(jobId)}/events`, {
       headers: { ...headers(), Accept: "text/event-stream" },
@@ -94,20 +94,20 @@ export function getReport(repo: string, mode: Mode = "rules", days = 7): Promise
   return call(`/v1/reports/${repoPath(repo)}?mode=${mode}&days=${days}`);
 }
 
-export function starterIssues(repo: string, limit = 6): Promise<Result<{ repo: string; issues: StarterIssue[] }>> {
+export function starterIssues(repo: string, limit: number, caller: Caller): Promise<Result<{ repo: string; issues: StarterIssue[] }>> {
   if (MOCK) return mock.starterIssues(repo, limit);
-  return call(`/v1/repos/${repoPath(repo)}/starter-issues?limit=${limit}`);
+  return call(`/v1/repos/${repoPath(repo)}/starter-issues?limit=${limit}`, { caller });
 }
 
 export async function find(q: FindQuery, caller: Caller): Promise<Result<FindStart>> {
   if (MOCK) return mock.find(q);
-  const r = await call<{ job_id?: string; results?: FindResult[] }>("/v1/find", {
+  const r = await call<{ status?: string; job_id?: string; results?: FindResult[] }>("/v1/find", {
     method: "POST",
     body: JSON.stringify(q),
     caller,
   });
   if (!r.ok) return r;
-  // 200 -> {results}; 202 -> {status: "queued", job_id}
+  // The server answers 202 {status: "queued", job_id}; accept a direct {results} too.
   if (r.data.job_id) return { ok: true, data: { status: "queued", job_id: r.data.job_id } };
   return { ok: true, data: { status: "done", results: r.data.results ?? [] } };
 }
@@ -117,22 +117,19 @@ export function me(userId: string): Promise<Result<Me>> {
   return call("/v1/me", { caller: { userId } });
 }
 
-export function putByok(userId: string, provider: ByokProvider, apiKey: string, model: string): Promise<Result<unknown>> {
+export function putByok(userId: string, provider: ByokProvider, apiKey: string, model: string): Promise<Result<Me>> {
   if (MOCK) return mock.putByok(userId, provider, apiKey, model);
   return call("/v1/me/byok", { method: "PUT", body: JSON.stringify({ provider, api_key: apiKey, model }), caller: { userId } });
 }
 
-export function deleteByok(userId: string): Promise<Result<unknown>> {
+export function deleteByok(userId: string): Promise<Result<Me>> {
   if (MOCK) return mock.deleteByok(userId);
   return call("/v1/me/byok", { method: "DELETE", caller: { userId } });
 }
 
-export async function history(userId: string): Promise<Result<HistoryItem[]>> {
-  const r = MOCK ? await mock.history(userId) : await call<unknown>("/v1/me/history", { caller: { userId } });
-  if (!r.ok) return r;
-  // Accept either a bare list or {items: [...]}, since API.md leaves the shape open.
-  const d = r.data as HistoryItem[] | { items?: HistoryItem[] };
-  return { ok: true, data: Array.isArray(d) ? d : (d.items ?? []) };
+export function history(userId: string, limit = 50): Promise<Result<{ items: HistoryItem[] }>> {
+  if (MOCK) return mock.history(userId);
+  return call(`/v1/me/history?limit=${limit}`, { caller: { userId } });
 }
 
 export async function badge(owner: string, repo: string): Promise<Response> {

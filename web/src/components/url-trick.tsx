@@ -24,7 +24,7 @@ export function UrlTrick() {
       <p aria-hidden="true" className="pl-6 text-blue">↓</p>
       <Bar label={`After: the same URL on ${SITE_HOST}`}>
         <span className="text-faint">https://</span>
-        <span className="bg-green/15 px-1 font-semibold text-green">{SITE_HOST}</span>
+        <span className="bg-green px-1 font-semibold text-on-accent">{SITE_HOST}</span>
         <span className="text-ink">/pallets/flask</span>
       </Bar>
       <p className="pt-4 font-sans text-[0.9rem] text-muted">

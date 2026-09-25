@@ -5,6 +5,8 @@ import { CatFace } from "./cat-face";
 const HEAD: Record<string, string> = {
   not_found: "We couldn't find that repository",
   invalid_repo: "That doesn't look like a repository",
+  invalid_request: "That request didn't make sense to us",
+  not_implemented: "Coming soon",
   rate_limited: "Too many checks at once",
   quota_exceeded: "You've used this month's free AI reports",
   needs_key: "AI reports need a plan or your own key",

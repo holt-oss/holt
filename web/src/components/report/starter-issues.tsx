@@ -41,7 +41,21 @@ export function StarterIssueCard({ issue, compact = false }: { issue: StarterIss
   );
 }
 
-export function StarterIssues({ issues, repo }: { issues: StarterIssue[] | null; repo: string }) {
+/** null = still loading; "unavailable" = the server couldn't list them. */
+export type IssuesState = StarterIssue[] | null | "unavailable";
+
+export function StarterIssues({ issues, repo }: { issues: IssuesState; repo: string }) {
+  const ghLink = `https://github.com/${repo}/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22`;
+  if (issues === "unavailable") {
+    return (
+      <p className="font-sans text-muted">
+        Holt can&apos;t list starter issues for this repo right now.{" "}
+        <a className="text-link" href={ghLink} target="_blank" rel="noopener noreferrer">
+          See its good first issues on GitHub ↗
+        </a>
+      </p>
+    );
+  }
   if (issues === null) {
     return (
       <ul className="grid gap-3" aria-busy="true">
@@ -55,7 +69,7 @@ export function StarterIssues({ issues, repo }: { issues: StarterIssue[] | null;
     return (
       <p className="font-sans text-muted">
         No open, unclaimed starter issues right now.{" "}
-        <a className="text-link" href={`https://github.com/${repo}/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22`} target="_blank" rel="noopener noreferrer">
+        <a className="text-link" href={ghLink} target="_blank" rel="noopener noreferrer">
           Check GitHub for new ones ↗
         </a>
       </p>
