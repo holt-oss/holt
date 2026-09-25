@@ -47,7 +47,16 @@ Changelog = "https://github.com/holt-oss/holt/blob/main/CHANGELOG.md"
 Security = "https://github.com/holt-oss/holt/security/policy"
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+# holt-server is the web API in server/. It rides in the dev group so one
+# `uv sync` gives a working tree for both, and its tests run with the rest.
+# Dependency groups are never published, so the PyPI package is unaffected.
+dev = ["pytest>=8.0", "holt-server"]
+
+[tool.uv.workspace]
+members = ["server"]
+
+[tool.uv.sources]
+holt-server = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
@@ -63,6 +72,6 @@ packages = ["src/holt"]
 only-include = ["src/holt"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "eval"]
+testpaths = ["tests", "eval", "server/tests"]
 # eval/ lives at the repo root, outside the installed src/holt package.
 pythonpath = ["."]

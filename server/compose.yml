@@ -1,0 +1,29 @@
+# Postgres for the Holt API. The API itself runs with `uv run holt-server`
+# (see README.md); a container image for it comes with the deploy decision.
+#
+#   docker compose -f server/compose.yml up -d
+#
+# The project name comes from $COMPOSE_PROJECT_NAME when set, so parallel
+# checkouts do not share a database.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: holt
+      POSTGRES_PASSWORD: ${HOLT_DB_PASSWORD:-holt}
+      POSTGRES_DB: holt
+    ports:
+      - "127.0.0.1:${HOLT_DB_PORT:-20131}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U holt -d holt"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    # Small on purpose: the host is shared.
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=40"]
+
+volumes:
+  pgdata:

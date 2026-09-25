@@ -162,6 +162,25 @@ runs the full assessment on the survivors — so a 25-candidate session costs
 cents rather than dollars. Screening reads only the newest threads, so treat its
 numbers as a filter and the full report as the answer.
 
+## Find your first issue
+
+If you just want somewhere to start, ask for open issues in repositories that
+actually merge newcomers' work:
+
+```sh
+holt start --lang python
+holt start --lang javascript --topic cli,web --hacktoberfest
+holt start pallets/flask
+```
+
+Holt searches GitHub for issues labelled for beginners (`good first issue`,
+`help wanted`, `easy`, `hacktoberfest` and their variants), checks each
+repository's recent pull requests with the free rules, and lists only the ones
+worth your time, each with its best open, unassigned issues and the reasons
+they were picked. Several topics mean "any of these". It needs a
+`GITHUB_TOKEN` (no scopes) and takes about 20 seconds. Add `--json` for the
+same data as the web API returns.
+
 ## After you have landed something
 
 Once you have merged work in a repository, ask what to pick up next:
