@@ -1751,6 +1751,19 @@ def attach(app, repo: str, script: list):
     return session
 
 
+async def settle(pilot, check, timeout: float = 5.0, step: float = 0.05) -> None:
+    """Let the app run until `check()` holds, or `timeout` passes.
+
+    A fixed pause races the worker thread on a slow CI machine; this waits for
+    the state the test is about. It never asserts anything itself: the test's
+    own assertions still decide, after it returns.
+    """
+    waited = 0.0
+    while not check() and waited < timeout:
+        await pilot.pause(step)
+        waited += step
+
+
 async def watch(app, pilot):
     """Put the live screen up on whatever `app.session` currently is."""
     from holt.tui.screens.live import LiveScreen
@@ -1830,11 +1843,13 @@ def test_rejoining_a_run_shows_what_happened_while_you_were_away(tmp_path):
 
     async def body(app, pilot):
         session = attach(app, CLEAN, unfinished(CLEAN))
-        await pilot.pause(0.3)  # drains at home, with no live screen mounted
+        # Drains at home, with no live screen mounted.
+        await settle(pilot, lambda: len(session.log) > 5)
         assert len(session.log) > 5, "the app did not drain a run nobody was watching"
 
         app.watch_run(session)
-        await pilot.pause(0.3)
+        await settle(pilot, lambda: "evidence records" in screen_text(app)
+                     and "real_software" in screen_text(app))
 
         text = screen_text(app)
         assert "evidence records" in text
@@ -2009,7 +2024,7 @@ def test_a_stopped_run_reads_as_stopped_and_not_as_a_failure(tmp_path):
         session._queue.put(
             _events.RunCancelled(completed_stages=("classify", "opportunity"))
         )
-        await pilot.pause(0.3)
+        await settle(pilot, lambda: session.cancelled and "stopped" in screen_text(app))
 
         text = screen_text(app)
         assert "stopped" in text
