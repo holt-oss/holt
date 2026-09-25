@@ -107,6 +107,9 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     font-synthesis: none;
+    /* JetBrains Mono's contextual alternates draw "://" as ": /", which makes
+       every URL (paste box, URL trick, badge snippet) look wrong. */
+    font-variant-ligatures: none;
   }
   /* Film grain from the original site (desktop only: it costs paint time on phones). */
   @media (max-width: 780px) {

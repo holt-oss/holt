@@ -17,10 +17,10 @@ from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from holt_server import starter
-from holt_server.db import BADGE_PRIORITY, Job, Report, User, now
+from holt_server.db import BADGE_PRIORITY, FindCache, Job, Report, User, find_key, now
 from holt_server.errors import ApiError
 
 if TYPE_CHECKING:
@@ -176,7 +176,7 @@ class JobRunner:
 
         try:
             if job.kind == "find":
-                result = await asyncio.to_thread(self._find_sync, job, emit)
+                result = await asyncio.to_thread(self._find_sync, job, emit, loop)
             else:
                 # The key is decrypted here, per run, and only ever held in
                 # memory: the jobs table records where it came from, not what it is.
@@ -202,12 +202,20 @@ class JobRunner:
                               provider=provider, model=model, emit=emit,
                               as_of=getattr(provider, "cutoff", as_of))
 
-    def _find_sync(self, job: Job, emit) -> dict[str, Any]:
+    def _find_sync(self, job: Job, emit, loop) -> dict[str, Any]:
         p = job.params
+        svc = self.services
+
+        def cached(repo: str) -> dict[str, Any] | None:
+            # Called from find's worker threads; the database lives on the loop.
+            return asyncio.run_coroutine_threadsafe(
+                fresh_rules_report(svc, repo, job.days), loop).result(timeout=30)
+
         return starter.run_find(
             languages=p.get("languages") or [], topics=p.get("topics") or [],
             hacktoberfest=bool(p.get("hacktoberfest")), days=job.days,
-            limit=int(p.get("limit") or 20), token=self.services.pool.next(), emit=emit,
+            limit=int(p.get("limit") or 20), token=svc.pool.next(), emit=emit,
+            cached=cached, http=getattr(svc, "http", None),
         )
 
     # --- state changes ------------------------------------------------------
@@ -236,6 +244,8 @@ class JobRunner:
             if job.kind == "analysis":
                 s.add(Report(repo=job.repo, repo_key=job.repo_key, mode=job.mode,
                              days=job.days, report=result))
+            elif job.kind == "find":
+                await store_find(s, job.params or {}, job.days, result)
             await s.commit()
         self.hub.publish(job.id, "done", done_payload(job.kind, result))
 
@@ -255,6 +265,27 @@ class JobRunner:
                 ).values(ai_used=User.ai_used - 1))
             await s.commit()
         self.hub.publish(job.id, "error", {"error": err.body()})
+
+
+async def fresh_rules_report(svc, repo: str, days: int) -> dict[str, Any] | None:
+    """The newest rules report for `repo`, if younger than the report cache."""
+    cutoff = now() - timedelta(hours=svc.settings.cache_hours)
+    async with svc.db.session() as s:
+        return (await s.execute(
+            select(Report.report).where(Report.repo_key == repo.lower(),
+                                        Report.mode == "rules", Report.days == days,
+                                        Report.created_at >= cutoff)
+            .order_by(Report.created_at.desc(), Report.id.desc()).limit(1)
+        )).scalar_one_or_none()
+
+
+async def store_find(s, params: dict[str, Any], days: int, result: dict[str, Any]) -> None:
+    """Keep a finished search for `/v1/find` to serve again (replaces older)."""
+    key = find_key(params.get("languages") or [], params.get("topics") or [],
+                   bool(params.get("hacktoberfest")), days)
+    await s.execute(delete(FindCache).where(FindCache.key == key))
+    s.add(FindCache(key=key, params={**params, "days": days},
+                    results=list((result or {}).get("results") or [])))
 
 
 def done_payload(kind: str, result: dict[str, Any] | None) -> dict[str, Any]:

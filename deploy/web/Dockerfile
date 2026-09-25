@@ -14,8 +14,11 @@ COPY . .
 # NEXT_PUBLIC_* values are inlined into the client bundle at build time.
 ARG NEXT_PUBLIC_SITE_HOST=localhost:3000
 ARG NEXT_PUBLIC_FREE_AI_QUOTA=3
+# "1" on staging: statically prerendered pages bake their robots metadata in.
+ARG ROBOTS_NOINDEX=
 ENV NEXT_PUBLIC_SITE_HOST=$NEXT_PUBLIC_SITE_HOST \
     NEXT_PUBLIC_FREE_AI_QUOTA=$NEXT_PUBLIC_FREE_AI_QUOTA \
+    ROBOTS_NOINDEX=$ROBOTS_NOINDEX \
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build && rm -rf .next/cache
 RUN mkdir /out && \
