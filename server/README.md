@@ -59,10 +59,10 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | `HOLT_STARTER_CACHE_HOURS` | `1` | How long starter issues per repository are served from the cache. |
 | `HOLT_BADGE_RATE_PER_IP` | `20` | Rules checks a single client can trigger per hour by loading badges (client = `CF-Connecting-IP`, else the socket address). |
 | `HOLT_BADGE_RATE_TOTAL` | `60` | The same, across all clients. |
-| `HOLT_BADGE_CONCURRENCY` | `1` | Badge-triggered checks running at once; always fewer than `HOLT_JOB_CONCURRENCY`, and they queue behind user jobs. |
+| `HOLT_BADGE_CONCURRENCY` | `1` | Badge refreshes and warm-pass jobs running at once. Fewer than `HOLT_JOB_CONCURRENCY` when there are several workers; with a single worker they share it, but only when no user job is waiting. `0` turns them off. |
 | `HOLT_FIND_CACHE_HOURS` | `6` | How long a finished `/v1/find` search is served to anyone asking the same thing. |
 | `HOLT_WARM_INTERVAL_HOURS` | `0` (off) | Run a warm pass in the API process every N hours (one process at a time; Postgres advisory lock). |
-| `HOLT_WARM_SEEDS` | `server/seeds/repos.txt` | The warm pass's seed list. |
+| `HOLT_WARM_SEEDS` | the list shipped in the package (`holt_server/seeds/repos.txt`) | The warm pass's seed list. |
 | `HOLT_WARM_MAX_AGE_HOURS` | `20` | A warm pass skips repos whose report is younger than this. |
 | `HOLT_WARM_MIN_POINTS` | `1500` | A warm pass stops when any GitHub token has fewer GraphQL points left. |
 | `HOLT_MAX_PAGES` | `8` | Pull-request pages crawled per analysis (25 PRs a page). |
@@ -104,7 +104,7 @@ database (`docker compose -f server/compose.yml down -v`).
 `holt_server/warm.py` fills the caches before people arrive, so launch-day
 traffic mostly costs no GitHub quota at request time:
 
-1. **Reports** (7-day rules) for the ~300 repositories in `server/seeds/repos.txt`,
+1. **Reports** (7-day rules) for the ~300 repositories in `server/holt_server/seeds/repos.txt`,
    skipping any under 20 hours old.
 2. **Starter issues** for the same repositories.
 3. **`/v1/find`** for the searches the web app's own pages make: the nine
