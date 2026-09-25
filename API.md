@@ -45,6 +45,18 @@ signed in:
 
 `GET /v1/reports/…` reads only the cache and is not rate limited.
 
+## Rate limits
+
+Two separate hourly buckets, per IP for anonymous callers and per user when
+signed in:
+
+- **work** — new analyses (`POST /v1/analyses` that queues a job) and
+  `POST /v1/find`. Small (anonymous: 10/h). Cached answers are free.
+- **read** — cache misses on reads (`/starter-issues`). Generous (anonymous:
+  120/h). Viewing, reloading and sharing report pages can never use up work.
+
+`GET /v1/reports/…` reads only the cache and is not rate limited.
+
 ## Repo identifiers
 
 `{owner}/{repo}`, case-insensitive, normalised to GitHub's canonical casing in

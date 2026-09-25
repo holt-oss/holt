@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { ErrorPanel } from "@/components/error-panel";
 import { AnalysisRunner } from "@/components/report/analysis-runner";
 import { ReportView } from "@/components/report/report-view";
+import { StarterIssues } from "@/components/report/starter-issues";
 import { getReport, starterIssues } from "@/lib/api";
 import { isValidRepo } from "@/lib/repo";
-import { caller, currentUser } from "@/lib/session";
+import { caller, currentUser, type SessionUser } from "@/lib/session";
 import type { Mode } from "@/lib/types";
 
 type Props = PageProps<"/[owner]/[repo]">;
@@ -44,7 +46,8 @@ export default async function RepoPage({ params, searchParams }: Props) {
   const signedIn = Boolean(user);
   if (mode === "ai" && !signedIn) redirect(`/signin?callbackUrl=${encodeURIComponent(`/${name}?mode=ai`)}`);
 
-  const [report, issues] = await Promise.all([getReport(name, mode, days), starterIssues(name, 6, await caller(user))]);
+  // Only the report blocks the page; starter issues (a live GitHub call) stream in.
+  const report = await getReport(name, mode, days);
 
   // Normalise to GitHub's casing so shared links and caches agree.
   if (report.ok && report.data.repo !== name && report.data.repo.toLowerCase() === name.toLowerCase()) {
@@ -93,12 +96,25 @@ export default async function RepoPage({ params, searchParams }: Props) {
       </div>
 
       {report.ok ? (
-        <ReportView report={report.data} issues={issues.ok ? issues.data.issues : "unavailable"} signedIn={signedIn} />
+        <ReportView
+          report={report.data}
+          signedIn={signedIn}
+          issues={
+            <Suspense fallback={<StarterIssues issues={null} repo={report.data.repo} />}>
+              <IssuesSlot repo={report.data.repo} user={user} />
+            </Suspense>
+          }
+        />
       ) : report.error.code === "not_found" ? (
-        <AnalysisRunner repo={name} mode={mode} days={days} signedIn={signedIn} initialIssues={issues.ok ? issues.data.issues : null} />
+        <AnalysisRunner repo={name} mode={mode} days={days} signedIn={signedIn} />
       ) : (
         <ErrorPanel error={report.error} repo={name} retryHref={`/${name}${mode === "ai" ? "?mode=ai" : ""}`} />
       )}
     </div>
   );
+}
+
+async function IssuesSlot({ repo, user }: { repo: string; user: SessionUser | null }) {
+  const r = await starterIssues(repo, 6, await caller(user));
+  return <StarterIssues issues={r.ok ? r.data.issues : "unavailable"} repo={repo} />;
 }

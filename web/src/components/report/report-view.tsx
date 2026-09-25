@@ -1,7 +1,7 @@
 // The full report. Shared by the server page (cached report) and the client
 // runner (report that just finished streaming), so no server-only imports.
 import Link from "next/link";
-import { shortDate, timeAgo, verdictLine, VERDICT_TONE } from "@/lib/format";
+import { odds, ODDS_TONE, shortDate, timeAgo, verdictLine, VERDICT_TONE, type Odds } from "@/lib/format";
 import { SITE_URL } from "@/lib/site";
 import type { Report } from "@/lib/types";
 import { CatFace } from "../cat-face";
@@ -9,7 +9,6 @@ import { BadgeSnippet } from "./badge-snippet";
 import { EvidenceList } from "./evidence-list";
 import { LandingMap } from "./landing-map";
 import { ShareBar } from "./share-bar";
-import { StarterIssues, type IssuesState } from "./starter-issues";
 import { StatsGrid } from "./stats-grid";
 import { TONE, VERDICT_MOOD } from "./tone";
 import { UpgradeCard } from "./upgrade-card";
@@ -43,6 +42,7 @@ export function VerdictHero({ report }: { report: Report }) {
           <span className="text-ink">.</span>
         </h1>
         <p className="mt-4 max-w-2xl font-sans text-[1.05rem] leading-relaxed text-ink sm:text-[1.15rem]">{verdictLine(report)}</p>
+        {report.verdict !== "insufficient_evidence" && <OddsHint odds={odds(report.stats)} />}
         <p className="mt-4 text-[0.74rem] text-faint">
           Based on {report.stats.outsider_attempts} pull requests from outside contributors · data until {shortDate(report.evidence_until)} · checked{" "}
           <time dateTime={report.generated_at} suppressHydrationWarning>{timeAgo(report.generated_at)}</time>
@@ -52,13 +52,32 @@ export function VerdictHero({ report }: { report: Report }) {
   );
 }
 
+const ODDS_TEXT: Record<Odds, string> = {
+  good: "most outside pull requests get a reply, and plenty get merged",
+  fair: "some outside pull requests land; a well-chosen starter issue helps",
+  long: "most outside pull requests here don't land, so pick your first one carefully",
+};
+
+function OddsHint({ odds: o }: { odds: Odds | null }) {
+  if (!o) return null;
+  const t = TONE[ODDS_TONE[o]];
+  return (
+    <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-[0.82rem]">
+      <span className="text-faint">Your odds:</span>
+      <strong className={`font-semibold ${t.text}`}>{o}</strong>
+      <span className="font-sans text-muted">· {ODDS_TEXT[o]}</span>
+    </p>
+  );
+}
+
 export function ReportView({
   report,
   issues,
   signedIn,
 }: {
   report: Report;
-  issues: IssuesState;
+  /** The starter-issues block: streamed by the server page, fetched by the runner. */
+  issues: React.ReactNode;
   signedIn: boolean;
 }) {
   const repo = report.repo;
@@ -93,7 +112,7 @@ export function ReportView({
         )}
 
         <Section n="01" id="issues" title={viable ? "Your first contribution" : "Starter issues"} note="open and unclaimed, best first">
-          <StarterIssues issues={issues} repo={repo} />
+          {issues}
         </Section>
 
         <Section n="02" id="numbers" title="What happened to outside contributors">
