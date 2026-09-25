@@ -21,7 +21,9 @@ A PR that conflicts is left out and the reason is shown on `/__build`.
 
 **What's live:** https://holt-new.aahil-khan.xyz/__build lists the main
 commit, each included PR and its commit, skipped ones with the reason, the
-build time, and the last attempt (building / waiting / failed + why).
+build time, the smoke-test result for that build (`"smoke"`: passed or
+failed, with each failing test), and the last attempt (building / waiting /
+failed + why).
 
 ### How it runs
 
@@ -38,6 +40,10 @@ build time, and the last attempt (building / waiting / failed + why).
 - Images build on a buildx builder of its own (`holt-stage`, 3 GB memory
   cap), so after each build it prunes only its own cache and only images
   labelled `holt.stage=holt-new`. It never prunes anything else.
+- After each build goes live it runs the `e2e/` smoke suite once against the
+  public URL (one browser, `--workers=1`). A failure does not roll back; it
+  shows on `/__build`. Set `HOLT_STAGE_SMOKE=0` in the environment of the
+  service to skip it.
 - Memory limits: web 512m, server 512m, db 256m, edge 32m.
 - Sign-in has no OAuth app yet, so staging is anonymous: rules reports work,
   AI reports answer "needs a key". Add `AUTH_GITHUB_ID/SECRET` or
@@ -61,7 +67,7 @@ dc ps
 
 # logs
 journalctl --user -u holt-stage -f                 # the update loop
-ls -t ~/.local/share/holt-staging/logs | head -1   # latest build log
+ls -t ~/.local/share/holt-staging/logs | head -2   # latest build and smoke logs
 dc logs -f --tail 100 server web
 
 # rebuild now (skips the load check)

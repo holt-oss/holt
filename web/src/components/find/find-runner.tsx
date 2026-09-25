@@ -7,7 +7,7 @@ import { ErrorPanel } from "../error-panel";
 import { FindResults } from "./find-results";
 
 /** Follows a queued /v1/find job (API.md allows 202 for slow searches). */
-export function FindRunner({ jobId, days }: { jobId: string; days: number }) {
+export function FindRunner({ jobId, days, retryHref = "/find" }: { jobId: string; days: number; retryHref?: string }) {
   const [stage, setStage] = useState({ stage: "Fetching pull requests", progress: 0.05 });
   const [results, setResults] = useState<FindResult[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -28,7 +28,7 @@ export function FindRunner({ jobId, days }: { jobId: string; days: number }) {
     return () => src.close();
   }, [jobId]);
 
-  if (error) return <ErrorPanel error={error} retryHref="/find" />;
+  if (error) return <ErrorPanel error={error} retryHref={retryHref} />;
   if (results) return <FindResults results={results} days={days} />;
   return <AnalysisProgress repo="" kicker="searching · welcoming projects" note="Holt is checking which projects reply to newcomers and have issues you could take. This can take a minute." mode="rules" stage={stage.stage} progress={stage.progress} />;
 }
