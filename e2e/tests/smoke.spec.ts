@@ -81,7 +81,8 @@ test("public extension endpoints answer with CORS headers", async ({ request }) 
     expect(pre.headers()["access-control-allow-methods"]).toContain("GET");
 
     const res = await request.get(path, { headers: { Origin: origin } });
-    expect([200, 404], `${path} status`).toContain(res.status());
+    // 429 is a fair answer too (the API's per-IP limit); it must still carry CORS.
+    expect([200, 404, 429], `${path} status`).toContain(res.status());
     expect(["*", origin]).toContain(res.headers()["access-control-allow-origin"]);
     expect(res.headers()["content-type"]).toContain("application/json");
     await res.json();
