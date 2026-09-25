@@ -129,11 +129,42 @@ def run_starter_issues(repo: str, token: str, limit: int) -> list[dict[str, Any]
     return [issue(i, repo) for i in (fn(repo, token, limit) or [])][:limit]
 
 
+def cached_screen(cached, token: str, days: int, http=None):
+    """A `find` screen that answers from a fresh cached rules report when there
+    is one (no GitHub call) and crawls at screening depth otherwise."""
+    from datetime import UTC, datetime
+
+    from holt.agent.landing import Area
+    from holt.starter import GitHub, RepoScreen, rules_screen
+
+    fallback = rules_screen(GitHub(token=token, client=http), datetime.now(UTC), days)
+
+    def screen(repo: str):
+        report = cached(repo) if cached else None
+        if not report:
+            return fallback(repo)
+        return RepoScreen(
+            verdict=report["verdict"],
+            stats={k: v for k, v in (report.get("stats") or {}).items() if k in STAT_KEYS},
+            landing=[Area(a["path"], a["merged"], a["attempted"])
+                     for a in report.get("landing") or []],
+        )
+
+    return screen
+
+
 def run_find(*, languages: list[str], topics: list[str], hacktoberfest: bool, days: int,
-             limit: int, token: str, emit) -> dict[str, Any]:
+             limit: int, token: str, emit, cached=None, http=None) -> dict[str, Any]:
+    """`holt.starter.find`, normalised. `cached(repo)` returns a fresh cached
+    rules report (dict) or None; when given, screening uses it first."""
     fn = function("find")
     kwargs: dict[str, Any] = {}
     params = inspect.signature(fn).parameters
+    if cached is not None and "screen" in params:
+        try:
+            kwargs["screen"] = cached_screen(cached, token, days, http)
+        except (ImportError, AttributeError):
+            pass  # an engine without the screen helpers: find screens itself
     if "progress" in params:
         def progress(*args: Any, **kw: Any) -> None:
             values = list(args) + list(kw.values())

@@ -11,18 +11,20 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from holt_server import __version__, badge, crypto, llm, repos, starter
 from holt_server.db import (
     ACTIVE,
     BADGE_PRIORITY,
+    FindCache,
     Job,
     Report,
     StarterCache,
     User,
     dedupe_key,
+    find_key,
     iso,
     now,
     utc,
@@ -302,6 +304,30 @@ def job_copy(job: Job) -> Job:
                dedupe_key=job.dedupe_key)
 
 
+@router.get("/reports", dependencies=[Depends(internal)])
+async def list_reports(request: Request,
+                       limit: int = Query(500, ge=1, le=5000)) -> dict[str, Any]:
+    """The latest 7-day rules report per repository, newest first (sitemaps)."""
+    svc = services(request)
+    latest = (select(func.max(Report.id).label("id"))
+              .where(Report.mode == "rules", Report.days == 7)
+              .group_by(Report.repo_key).subquery())
+    async with svc.db.session() as s:
+        # Two fields out of each report in SQL, not 500 whole report bodies.
+        rows = (await s.execute(
+            select(Report.repo, Report.mode, Report.created_at,
+                   Report.report["generated_at"].as_string(),
+                   Report.report["verdict"].as_string())
+            .join(latest, Report.id == latest.c.id)
+            .order_by(Report.created_at.desc(), Report.id.desc()).limit(limit)
+        )).all()
+    return {"reports": [
+        {"repo": repo, "mode": mode, "generated_at": generated or iso(created),
+         "verdict": verdict}
+        for repo, mode, created, generated, verdict in rows
+    ]}
+
+
 @router.get("/reports/{owner}/{repo}", dependencies=[Depends(internal)])
 async def get_report(owner: str, repo: str, request: Request,
                      mode: Literal["rules", "ai"] = "rules",
@@ -541,19 +567,64 @@ async def starter_issues(owner: str, repo: str, request: Request,
     return {"repo": canonical, "issues": issues[:limit]}
 
 
+# A search is computed for at least this many results, so the default page
+# and anything smaller come from one cached answer.
+FIND_MIN_LIMIT = 20
+
+
+def find_params(body: FindIn) -> dict[str, Any]:
+    params = body.model_dump()
+    params["languages"] = sorted({x.strip().lower()[:40] for x in body.languages if x.strip()})
+    params["topics"] = sorted({x.strip().lower()[:60] for x in body.topics if x.strip()})
+    params["limit"] = max(body.limit, FIND_MIN_LIMIT)
+    return params
+
+
+async def cached_find(svc: Services, key: str, limit: int) -> list[dict] | None:
+    """Fresh cached results that can answer a request for `limit`, or None."""
+    cutoff = now() - timedelta(hours=svc.settings.find_cache_hours)
+    async with svc.db.session() as s:
+        row = await s.get(FindCache, key)
+    if row is None or utc(row.created_at) < cutoff:
+        return None
+    computed_for = int((row.params or {}).get("limit") or 0)
+    # Enough results, or the search ran out before its own limit (so asking
+    # for more would find nothing new).
+    if computed_for >= limit or len(row.results) < computed_for:
+        return row.results[:limit]
+    return None
+
+
+async def active_find(svc: Services, key: str) -> Job | None:
+    async with svc.db.session() as s:
+        return (await s.execute(select(Job).where(
+            Job.dedupe_key == f"find:{key}", Job.status.in_(ACTIVE)).limit(1)
+        )).scalar_one_or_none()
+
+
 @router.post("/find")
 async def find(body: FindIn, request: Request, who: Caller = Depends(caller)) -> JSONResponse:
     svc = services(request)
     starter.function("find")
+    params = find_params(body)
+    key = find_key(params["languages"], params["topics"], params["hacktoberfest"], body.days)
+    # Cached, or already being searched for someone else: free, no rate limit.
+    if (results := await cached_find(svc, key, body.limit)) is not None:
+        return JSONResponse({"status": "done", "results": results})
+    if (running := await active_find(svc, key)) is not None:
+        return queued(running.id)
     rate_limit(svc, who)
-    params = body.model_dump()
-    params["languages"] = [x.strip()[:40] for x in body.languages if x.strip()]
-    params["topics"] = [x.strip()[:60] for x in body.topics if x.strip()]
     async with svc.db.session() as s:
         job = Job(kind="find", mode="rules", days=body.days, params=params,
-                  user_id=who.user_id)
+                  user_id=who.user_id, dedupe_key=f"find:{key}")
         s.add(job)
-        await s.commit()
+        try:
+            await s.commit()
+        except IntegrityError:  # an identical search started a moment ago
+            await s.rollback()
+            if (running := await active_find(svc, key)) is not None:
+                return queued(running.id)
+            raise
     svc.runner.wake()
     return queued(job.id)
 

@@ -60,6 +60,11 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | `HOLT_BADGE_RATE_PER_IP` | `20` | Rules checks a single client can trigger per hour by loading badges (client = `CF-Connecting-IP`, else the socket address). |
 | `HOLT_BADGE_RATE_TOTAL` | `60` | The same, across all clients. |
 | `HOLT_BADGE_CONCURRENCY` | `1` | Badge-triggered checks running at once; always fewer than `HOLT_JOB_CONCURRENCY`, and they queue behind user jobs. |
+| `HOLT_FIND_CACHE_HOURS` | `6` | How long a finished `/v1/find` search is served to anyone asking the same thing. |
+| `HOLT_WARM_INTERVAL_HOURS` | `0` (off) | Run a warm pass in the API process every N hours (one process at a time; Postgres advisory lock). |
+| `HOLT_WARM_SEEDS` | `server/seeds/repos.txt` | The warm pass's seed list. |
+| `HOLT_WARM_MAX_AGE_HOURS` | `20` | A warm pass skips repos whose report is younger than this. |
+| `HOLT_WARM_MIN_POINTS` | `1500` | A warm pass stops when any GitHub token has fewer GraphQL points left. |
 | `HOLT_MAX_PAGES` | `8` | Pull-request pages crawled per analysis (25 PRs a page). |
 | `HOST`, `PORT` | `127.0.0.1`, `8000` | Where `holt-server` listens. |
 | `LOG_LEVEL` | `INFO` | |
@@ -93,6 +98,48 @@ fan-out is in memory but falls back to re-reading the jobs table every 15s.
 The schema is made with `create_all`, which adds missing tables but never
 alters existing ones. Pre-launch, after a schema change, recreate the dev
 database (`docker compose -f server/compose.yml down -v`).
+
+## Warm cache
+
+`holt_server/warm.py` fills the caches before people arrive, so launch-day
+traffic mostly costs no GitHub quota at request time:
+
+1. **Reports** (7-day rules) for the ~300 repositories in `server/seeds/repos.txt`,
+   skipping any under 20 hours old.
+2. **Starter issues** for the same repositories.
+3. **`/v1/find`** for the searches the web app's own pages make: the nine
+   `/hacktoberfest` tabs, and each `/find` language chip with and without
+   Hacktoberfest (23 searches, 7-day budget). Reports go first because a find
+   screens repositories through the report cache.
+
+Everything goes through the normal job queue at badge priority (user requests
+always run first; one warm job at a time) and the pass checks the GitHub
+points left before each step, stopping under `HOLT_WARM_MIN_POINTS`.
+
+```sh
+uv run python -m holt_server.warm --dry-run           # what would run
+uv run python -m holt_server.warm                     # the whole thing
+uv run python -m holt_server.warm --limit 50 --no-find
+```
+
+Or set `HOLT_WARM_INTERVAL_HOURS` to run it inside the API on a schedule.
+
+**GitHub cost, measured** (GraphQL points; a token has 5,000 an hour): a rules
+report ~10 (up to ~20 for very busy repositories), starter issues ~5, a find
+search ~60 when its repositories are not cached yet and much less when they
+are. A cold full pass is therefore roughly 300 × ~15–30 + 23 × ~20–60 ≈
+**5,000–10,000 points**: about two token-hours, e.g. two tokens in
+`GITHUB_TOKENS` for one hour, or one token over two runs (the second resumes
+where the first stopped, since finished reports are skipped). A daily re-warm
+costs about the same, because reports expire after 20 hours.
+
+The seed list is built by `server/scripts/build_seeds.py` (the same sourcing as
+`/v1/find`: the hacktoberfest topic, then beginner-friendly repositories in 12
+languages; ~30 points). Re-run it to refresh the list and commit the result:
+
+```sh
+GITHUB_TOKEN=... uv run python server/scripts/build_seeds.py --total 300
+```
 
 ## Tests
 
