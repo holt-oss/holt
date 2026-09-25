@@ -118,8 +118,8 @@ async def fail_payment(s: AsyncSession, payment: Payment) -> None:
                     .values(status="failed", updated_at=now()))
 
 
-async def _user(s: AsyncSession, user_id: str) -> User:
-    user = await s.get(User, user_id)
+async def _user(s: AsyncSession, user_id: str, lock: bool = False) -> User:
+    user = await s.get(User, user_id, with_for_update=lock, populate_existing=lock)
     if user is None:
         user = User(id=user_id, plan=FREE, ai_used=0, ai_period="")
         s.add(user)
@@ -164,7 +164,10 @@ async def apply_subscription(s: AsyncSession, event_type: str, info: Subscriptio
         log.warning("event %s for unknown subscription %s", event_type, info.id)
         return None
     kind = event_type.removeprefix("subscription.")
-    user = await _user(s, sub.user_id)
+    # Lock order as for packs (db.Payment): the user row, then the
+    # subscription row; both re-read, so concurrent events apply in turn.
+    user = await _user(s, sub.user_id, lock=True)
+    sub = await s.get(Subscription, sub.id, with_for_update=True, populate_existing=True)
 
     if payment is not None and kind == "charged":
         await _record_subscription_payment(s, sub, payment)
@@ -327,7 +330,7 @@ async def clawback(s: AsyncSession, payment: Payment, reports: int) -> int:
 
 
 async def _payment_for_refund(s: AsyncSession, provider_payment_id: str,
-                               order_id: str | None, amount_hint: int,
+                               order_id: str | None, amount_hint: int | None,
                                currency: str) -> Payment:
     """The payment a refund is about, found by payment id, else by order id,
     else recorded on its own until the order turns up (see credit_pack)."""
@@ -340,9 +343,12 @@ async def _payment_for_refund(s: AsyncSession, provider_payment_id: str,
         if order_id and not payment.provider_payment_id:
             payment.provider_payment_id = provider_payment_id
     if payment is None:
+        # amount 0 means "not known yet": refunds add up uncapped until the
+        # order is matched, where they are capped at the order's amount.
         payment = Payment(user_id="", provider="razorpay", kind="unmatched", item="",
-                          provider_payment_id=provider_payment_id, amount=amount_hint,
-                          currency=currency.upper(), status="created")
+                          provider_payment_id=provider_payment_id,
+                          amount=amount_hint or 0, currency=currency.upper(),
+                          status="created")
         s.add(payment)
     await s.flush()
     return payment
@@ -366,7 +372,7 @@ async def apply_refund(s: AsyncSession, catalog: Catalog, refund_id: str,
     if done is not None:
         return "already"
     payment = await _payment_for_refund(s, provider_payment_id, order_id,
-                                        payment_amount or amount, currency)
+                                        payment_amount, currency)
     s.add(Refund(provider=payment.provider, provider_refund_id=refund_id,
                  payment_id=payment.id, amount=amount, currency=currency.upper()))
     total = (payment.refunded_amount or 0) + amount

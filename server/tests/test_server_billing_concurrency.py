@@ -20,7 +20,12 @@ pytestmark = pytest.mark.skipif(not URL.startswith("postgresql"),
 
 CATALOG = Catalog(plans={"free": Plan("free", "Free", 0)},
                   packs={"pack10": Pack("pack10", "10", 10)})
-ROUNDS = 5
+# The first transaction holds whatever it locked this long before committing,
+# and the second starts inside that window, so the two always overlap: with
+# no lock, the second reads stale values and the final state comes out wrong
+# every time, not just when the scheduler happens to interleave them.
+HOLD_S = 0.4
+START_S = 0.1
 
 
 async def fresh(db: Database, *, credited: bool = True) -> None:
@@ -38,11 +43,19 @@ async def fresh(db: Database, *, credited: bool = True) -> None:
         await s.commit()
 
 
-async def in_tx(db: Database, fn):
+async def in_tx(db: Database, fn, hold: float = 0.0, delay: float = 0.0):
+    await asyncio.sleep(delay)
     async with db.session() as s:
         result = await fn(s)
+        if hold:
+            await s.execute(text("SELECT pg_sleep(:s)"), {"s": hold})
         await s.commit()
         return result
+
+
+async def race(db: Database, first, second):
+    """`first` runs and keeps its locks for HOLD_S; `second` starts meanwhile."""
+    await asyncio.gather(in_tx(db, first, hold=HOLD_S), in_tx(db, second, delay=START_S))
 
 
 async def state(db: Database):
@@ -72,21 +85,20 @@ def db():
 
 def test_two_refunds_at_once_both_count(db):
     async def go():
-        for i in range(ROUNDS):
-            await fresh(db)
-            await asyncio.gather(in_tx(db, refund(f"r{i}a", 490)),
-                                 in_tx(db, refund(f"r{i}b", 490)))
-            assert await state(db) == (8, 2, 980, 8)
+        await fresh(db)
+        await race(db, refund("ra", 490), refund("rb", 490))
+        assert await state(db) == (8, 2, 980, 8)
     asyncio.run(go())
 
 
 def test_refund_racing_a_spend(db):
     async def go():
-        for i in range(ROUNDS):
+        for i, (first, second) in enumerate([(refund("r0", 490), spend),
+                                             (spend, refund("r1", 490))]):
             await fresh(db)
-            await asyncio.gather(in_tx(db, refund(f"r{i}", 490)), in_tx(db, spend))
+            await race(db, first, second)
             # One spent, one clawed back, whichever went first.
-            assert await state(db) == (8, 1, 490, 8)
+            assert await state(db) == (8, 1, 490, 8), i
     asyncio.run(go())
 
 
@@ -96,11 +108,12 @@ def test_refund_racing_crediting(db):
         return await service.credit_pack(s, CATALOG, payment, "pay_1")
 
     async def go():
-        for i in range(ROUNDS):
+        for i, (first, second) in enumerate([(refund("r0", 2450), credit),
+                                             (credit, refund("r1", 2450))]):
             await fresh(db, credited=False)
-            await asyncio.gather(in_tx(db, refund(f"r{i}", 2450)), in_tx(db, credit))
+            await race(db, first, second)
             # Half refunded: five credited, five never granted or taken back.
-            assert await state(db) == (5, 5, 2450, 5)
+            assert await state(db) == (5, 5, 2450, 5), i
     asyncio.run(go())
 
 

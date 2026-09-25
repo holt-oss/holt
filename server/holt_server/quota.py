@@ -120,8 +120,9 @@ async def refund(s: AsyncSession, job: Job) -> None:
         if pack_payment is not None:
             from holt_server.billing.service import clawback, lock_payment, pack_reports
 
-            # Back to the same pack (locked first, then the user row). Fully
-            # refunded: the money is already back with the payer, so no credit.
+            # Back to the same pack (lock_payment takes the user row, then the
+            # pack row). Fully refunded: the money is already back with the
+            # payer, so no credit.
             pack = await lock_payment(s, pack_payment)
             if pack is None or pack.status == "refunded":
                 return

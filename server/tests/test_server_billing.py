@@ -863,3 +863,16 @@ def test_resumed_after_paused_in_the_same_period_restores_access(bh):
     assert me(bh, "subber")["plan"] == "free"
     webhook(bh, "subscription.resumed", sub_entity(sid, "active", *period))
     assert me(bh, "subber")["plan"] == "student"
+
+
+def test_early_refunds_without_a_payment_amount_are_not_capped_by_a_guess(bh):
+    order = buy_pack(bh)["order_id"]
+    webhook(bh, "refund.processed", refund_body("rfnd_1", "pay_1", 1000))
+    webhook(bh, "refund.processed", refund_body("rfnd_2", "pay_1", 1500))
+    early = rows(bh, Payment)[-1]
+    assert (early.kind, early.amount, early.refunded_amount) == ("unmatched", 0, 2500)
+    assert verify_order(bh, order, "pay_1").status_code == 200
+    # 2500 of 4900 refunded: ceil(10 * 2500 / 4900) = 6 never granted.
+    assert me(bh, "buyer")["pack_credits"] == 4
+    [payment] = rows(bh, Payment)
+    assert (payment.refunded_amount, payment.credits_taken) == (2500, 6)
