@@ -11,6 +11,7 @@ from holt_server import report as report_mod
 from holt_server.errors import ApiError
 
 from holt.agent import pipeline
+from holt.evidence.errors import AuthError, RateLimited, RepoNotFound, UpstreamError
 from holt.evidence.fixtures import FixtureProvider
 from holt.model import ReplayModel
 from holt.report import Assessment, Claim, Verdict
@@ -107,18 +108,15 @@ def test_claim_parsing():
     item = report_mod.evidence_item("ignored, nothing said", "pr:o/r#6:opened", records)
     assert item["kind"] == "outcome" and item["quote"] is None
     item = report_mod.evidence_item(
-        "onboarding: substantive — CONTRIBUTING explains setup", "repo:o/r:contributing",
-        records)
+        "onboarding: substantive (AI's reading, not a quote: CONTRIBUTING explains setup)",
+        "repo:o/r:contributing", records)
     assert (item["kind"], item["value"], item["text"]) == (
         "onboarding", "substantive", "CONTRIBUTING explains setup")
     assert item["url"] == "https://github.com/o/r"
     assert report_mod.evidence_item("x", None, records) is None
-
-
-def test_rules_are_plain_english():
-    assert report_mod.plain_rule("repo_kind=awesome_list: merged work here is not a "
-                                 "software contribution").startswith(
-        "The project type (awesome list)")
+    item = report_mod.evidence_item("is archived: True", "repo:o/r:meta", records)
+    assert (item["kind"], item["value"], item["text"]) == (
+        "is_archived", "True", "Is archived: True")
 
 
 def test_ai_all_claims_dropped_is_stated():
@@ -149,69 +147,51 @@ def test_claim_without_url_is_left_out():
 # --- progress ------------------------------------------------------------------
 
 
-def test_progress_never_goes_backwards():
+def test_progress_never_goes_backwards_and_holds_done():
     seen = []
     p = engine.Progress(lambda s, v: seen.append((s, v)))
     p("A", 0.5)
     p("B", 0.2)
     p("B", 0.2)
-    p(None, 1.5)
-    assert seen == [("A", 0.5), ("B", 0.5), ("B", 0.99)]
+    p("C", 1.5)
+    p("Done", 1.0)
+    assert seen == [("A", 0.5), ("B", 0.5), ("C", 0.99)]
 
 
-def test_engine_progress_callback_is_used_when_present(monkeypatch):
+def test_engine_stages_reach_the_job():
     calls = []
-    real = pipeline.analyze_without_model
-
-    def fake(repo, provider, contributor_days=7, as_of=None, progress=None):
-        progress("Counting merges", 0.6)
-        return real(repo, provider, contributor_days, as_of)
-
-    monkeypatch.setattr(pipeline, "analyze_without_model", fake)
     report = engine.analyze(repo=REPO, mode="rules", days=7, provider=fixture_provider(),
                             model=None, emit=lambda s, v: calls.append((s, v)),
                             as_of=T_CUTOFF)
-    # The engine's own stages win; the coarse ones are not interleaved.
-    assert calls == [("Counting merges", 0.6), (engine.WRITING, 0.95)]
+    stages = [s for s, _ in calls]
+    assert stages[0] == "Fetching pull requests"
+    assert stages[-1] == engine.FINAL_STAGE and "Done" not in stages
+    assert [v for _, v in calls] == sorted(v for _, v in calls)
     assert report["repo"] == REPO
 
 
-def test_coarse_stages_without_engine_callback(monkeypatch):
-    # Pinned to the no-callback shape, so this holds after the engine gains one.
-    real = pipeline.analyze_without_model
-    monkeypatch.setattr(pipeline, "analyze_without_model",
-                        lambda repo, provider, contributor_days=7, as_of=None:
-                        real(repo, provider, contributor_days, as_of))
-    calls = []
-    engine.analyze(repo=REPO, mode="rules", days=7, provider=fixture_provider(), model=None,
-                   emit=lambda s, v: calls.append(s), as_of=T_CUTOFF)
-    assert calls[:2] == [engine.FETCHING, engine.READING] and calls[-1] == engine.WRITING
+class Failing:
+    def __init__(self, exc):
+        self.exc = exc
+
+    def fetch(self, repo):
+        raise self.exc
 
 
-def test_engine_translates_not_found():
-    class Missing:
-        def fetch(self, repo):
-            raise RuntimeError("o/r not found or not public")
-
+@pytest.mark.parametrize("exc, code, retry", [
+    (RepoNotFound("o/r"), "not_found", None),
+    (RateLimited(42.4), "rate_limited", 42),
+    (RateLimited(None), "rate_limited", 600),
+    (AuthError("401"), "upstream", None),
+    (UpstreamError("HTTP 502"), "upstream", None),
+    (ZeroDivisionError(), "internal", None),
+])
+def test_engine_errors_map_to_api_codes(exc, code, retry):
     with pytest.raises(ApiError) as err:
-        engine.analyze(repo="o/r", mode="rules", days=7, provider=Missing(), model=None,
+        engine.analyze(repo="o/r", mode="rules", days=7, provider=Failing(exc), model=None,
                        emit=lambda *a: None, as_of=T_CUTOFF)
-    assert err.value.code == "not_found"
-
-
-def test_engine_translates_github_rate_limit():
-    import httpx
-
-    class Limited:
-        def fetch(self, repo):
-            req = httpx.Request("POST", "https://api.github.com/graphql")
-            resp = httpx.Response(403, request=req, headers={"retry-after": "42"})
-            raise httpx.HTTPStatusError("403", request=req, response=resp)
-
-    with pytest.raises(ApiError) as err:
-        engine.analyze(repo="o/r", mode="rules", days=7, provider=Limited(), model=None,
-                       emit=lambda *a: None, as_of=T_CUTOFF)
-    assert (err.value.code, err.value.retry_after) == ("rate_limited", 42)
+    assert (err.value.code, err.value.retry_after) == (code, retry)
+    assert "GITHUB_TOKEN" not in err.value.message
 
 
 # --- small pieces ----------------------------------------------------------------

@@ -7,6 +7,8 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
+import httpx
+
 from holt_server import crypto, engine, llm
 from holt_server.db import Database, Job, User
 from holt_server.errors import ApiError
@@ -23,7 +25,9 @@ class Services:
         self.settings = settings
         self.db = db or Database(settings.database_url)
         self.pool = TokenPool(settings.token_list)
-        self.lookup = GitHubLookup(self.pool)
+        # One connection pool for every GitHub call this process makes.
+        self.http = httpx.Client(timeout=30.0)
+        self.lookup = GitHubLookup(self.pool, self.http)
         self.limiter = RateLimiter()
         # Its own counters: badge traffic never uses up what user requests draw on.
         self.badge_limiter = RateLimiter()
@@ -35,7 +39,8 @@ class Services:
         self.analysis_fn: Callable[..., dict[str, Any]] = engine.analyze
 
     def _live_provider(self, repo: str, as_of: datetime):
-        return engine.live_provider(self.pool.next(), as_of, self.settings.max_pages)
+        return engine.live_provider(self.pool.next(), as_of, self.settings.max_pages,
+                                    http=self.http)
 
     async def canonical(self, repo: str) -> str:
         """GitHub's casing for `repo`, or `not_found`. Remembered per process."""

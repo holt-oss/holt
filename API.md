@@ -109,7 +109,9 @@ Open, unassigned issues in this repo that suit a newcomer, best first:
 ### `POST /v1/find`
 Body: `{"languages": ["python"], "topics": [], "days": 7, "hacktoberfest": true, "limit": 20}`
 Returns `{"results": [ { "repo": "owner/repo", "headline": "…", "verdict": "…",
-"stats": {…subset}, "issues": [StarterIssue] } ]}`, only repos whose rules
+"description": "string | null", "language": "string | null", "stars": 123 | null,
+"stats": {…subset}, "issues": [StarterIssue] } ]}` (`description`, `language`
+and `stars` are null when the finder did not supply them), only repos whose rules
 verdict is `viable`, ordered by starter-issue quality. May return `202` with a
 `job_id` like analyses if it takes long; same polling/SSE endpoints under
 `/v1/find/{job_id}`. (The server always answers `202`. Polling a find job

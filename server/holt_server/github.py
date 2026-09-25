@@ -1,23 +1,27 @@
-"""GitHub access for the server: the token pool and a cheap repo lookup."""
+"""GitHub access for the server: the token pool and a cheap repo lookup.
+
+Both go through the engine's own transport (`holt.evidence.github_graphql`),
+so retries, rate-limit handling and the typed errors are the engine's.
+"""
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 import threading
 from dataclasses import dataclass
-from datetime import UTC, datetime
 
 import httpx
 
-from holt_server.errors import ApiError, github_rate_limited, not_found_repo, upstream
-
-API = "https://api.github.com/graphql"
+from holt_server.errors import ApiError
 
 LOOKUP = """
 query($owner:String!, $name:String!) {
   repository(owner:$owner, name:$name) { nameWithOwner isPrivate }
 }
 """
+
+LOOKUP_TIMEOUT_S = 15.0
 
 
 class TokenPool:
@@ -53,52 +57,28 @@ class GitHubLookup:
     `not_found` at once instead of a failed job a minute later.
     """
 
-    def __init__(self, pool: TokenPool, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(self, pool: TokenPool, http: httpx.Client) -> None:
         self.pool = pool
-        self._client = client
+        self.http = http
 
     async def repo(self, repo: str) -> RepoInfo:
+        return await asyncio.to_thread(self._repo, repo)
+
+    def _repo(self, repo: str) -> RepoInfo:
+        from holt.evidence.github_graphql import GitHubGraphQL
+        from holt_server.engine import translate
+
         owner, _, name = repo.partition("/")
-        client = self._client or httpx.AsyncClient(timeout=15.0)
         try:
-            response = await client.post(
-                API,
-                headers={"Authorization": f"bearer {self.pool.next()}"},
-                json={"query": LOOKUP, "variables": {"owner": owner, "name": name}},
-            )
-        except httpx.HTTPError as exc:
-            raise upstream() from exc
-        finally:
-            if self._client is None:
-                await client.aclose()
-        raise_for_github(response)
-        body = response.json()
-        data = (body.get("data") or {}).get("repository")
-        if not data or data.get("isPrivate"):
+            data = GitHubGraphQL(token=self.pool.next(), client=self.http).query(
+                LOOKUP, timeout=LOOKUP_TIMEOUT_S, owner=owner, name=name)
+        except ApiError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise translate(exc, repo) from exc
+        found = data.get("repository")
+        if not found or found.get("isPrivate"):
+            from holt_server.errors import not_found_repo
+
             raise not_found_repo(repo)
-        return RepoInfo(name_with_owner=data["nameWithOwner"])
-
-
-def retry_after_from(response: httpx.Response) -> int:
-    if value := response.headers.get("retry-after"):
-        try:
-            return max(1, int(value))
-        except ValueError:
-            pass
-    if value := response.headers.get("x-ratelimit-reset"):
-        try:
-            return max(1, int(value) - int(datetime.now(UTC).timestamp()))
-        except ValueError:
-            pass
-    return 600
-
-
-def raise_for_github(response: httpx.Response) -> None:
-    if response.status_code in (403, 429):
-        raise github_rate_limited(retry_after_from(response))
-    if response.status_code >= 400:
-        raise upstream()
-    body = response.json()
-    for err in body.get("errors") or []:
-        if err.get("type") == "RATE_LIMITED":
-            raise github_rate_limited(retry_after_from(response))
+        return RepoInfo(name_with_owner=found["nameWithOwner"])

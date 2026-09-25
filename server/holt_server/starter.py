@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Any
 
 from holt_server.errors import ApiError
-from holt_server.report import HEADLINES, iso
+from holt_server.report import iso
 
 NOT_READY = (
     "Finding starter issues isn't available yet. It's coming soon; for now, "
@@ -93,7 +93,7 @@ STAT_KEYS = ("outsider_attempts", "outsider_merged", "distinct_outsiders",
 
 def find_result(obj: Any) -> dict[str, Any]:
     from holt.agent.signals import Signals
-    from holt.report import Verdict
+    from holt.agent.verdict import headline as headline_for
     from holt_server.report import stats as signal_stats
 
     repo = _get(obj, "repo") or _get(obj, "name_with_owner") or ""
@@ -104,13 +104,21 @@ def find_result(obj: Any) -> dict[str, Any]:
     else:
         stats = {k: v for k, v in _plain(raw_stats).items() if k in STAT_KEYS}
     try:
-        headline = HEADLINES[Verdict(verdict)]
+        headline = headline_for(verdict)
     except ValueError:
         headline = _get(obj, "headline") or ""
+    stars = _get(obj, "stars", _get(obj, "stargazer_count"))
+    language = _get(obj, "language", _get(obj, "primary_language"))
+    if isinstance(language, dict):  # GraphQL's `primaryLanguage { name }`
+        language = language.get("name")
     return {
         "repo": repo,
         "headline": headline,
         "verdict": verdict,
+        # Optional; null when the finder did not supply them.
+        "description": _get(obj, "description") or None,
+        "language": language or None,
+        "stars": int(stars) if isinstance(stars, (int, float)) else None,
         "stats": stats,
         "issues": [issue(i, repo) for i in (_get(obj, "issues") or [])],
     }

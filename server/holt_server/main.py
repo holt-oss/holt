@@ -29,6 +29,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             if run_jobs:
                 await svc.runner.stop()
             await svc.db.dispose()
+            svc.http.close()
 
     dev = svc.settings.env == "dev"
     app = FastAPI(title="Holt API", version=__version__, lifespan=lifespan,

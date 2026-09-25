@@ -15,15 +15,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from holt.agent import landing as landing_mod
+from holt.agent.pipeline import MODEL_NOTE_LABEL
 from holt.agent.signals import Signals, Thread, build_threads, newcomer_threads
-from holt.report import Assessment, Verdict
+from holt.agent.verdict import headline
+from holt.report import Assessment
 from holt.types import EvidenceRecord
-
-HEADLINES = {
-    Verdict.VIABLE: "Worth your time",
-    Verdict.NOT_VIABLE: "Not worth your time",
-    Verdict.INSUFFICIENT_EVIDENCE: "Not enough evidence",
-}
 
 RULES_ONLY_UNKNOWN = (
     "No AI read the conversations for this report, so it doesn't say how "
@@ -41,8 +37,10 @@ ALL_DROPPED_UNKNOWN = (
 
 _OUTCOME = re.compile(r"^(?P<outcome>[^—“]+?) — “(?P<quote>.*)”$", re.S)
 _NOTHING = re.compile(r"^(?P<outcome>.+), nothing said$", re.S)
-_FIELD = re.compile(r"^(?P<field>[a-z][a-z ]*?): (?P<value>.*?)(?: — (?P<note>.*))?$", re.S)
-_REPO_KIND = re.compile(r"repo_kind=([a-z_]+)")
+# `field words: value`, optionally `(AI's reading, not a quote: note)`.
+_FIELD = re.compile(
+    r"^(?P<field>[a-z][a-z ]*?): (?P<value>.*?)"
+    rf"(?: \({re.escape(MODEL_NOTE_LABEL)}: (?P<note>.*)\))?$", re.S)
 
 
 def iso(value: datetime | None) -> str | None:
@@ -126,12 +124,6 @@ def counted_examples(threads: dict[str, Thread],
     return out
 
 
-def plain_rule(rule: str) -> str:
-    """The engine's rule trace, minus the one internal name it can contain."""
-    rule = _REPO_KIND.sub(lambda m: f"the project type ({m.group(1).replace('_', ' ')})", rule)
-    return rule[:1].upper() + rule[1:] if rule else rule
-
-
 def split_limits(limits: str) -> list[str]:
     out = []
     for line in (limits or "").splitlines():
@@ -190,10 +182,10 @@ def build(
         "mode": mode,
         "days": assessment.contributor_days,
         "verdict": assessment.verdict.value,
-        "headline": HEADLINES[assessment.verdict],
+        "headline": headline(assessment.verdict),
         "summary": (assessment.summary or None) if mode == "ai" else None,
         "stats": stats(signals),
-        "decided_by": [plain_rule(r) for r in assessment.rules],
+        "decided_by": [str(r) for r in assessment.rules],
         "unknowns": unknowns,
         "landing": [{"path": a.path, "merged": a.landed, "attempted": a.attempted}
                     for a in where.landed],
