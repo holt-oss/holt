@@ -66,10 +66,14 @@ class Candidate:
     stars: int = 0
     language: str | None = None
     pushed_at: str | None = None
+    #: Open issues carrying a beginner label, as counted by GitHub at search
+    #: time. Orders candidates for screening; it never decides a verdict.
+    good_first_issues: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {"slug": self.slug, "description": self.description, "stars": self.stars,
-                "language": self.language, "pushed_at": self.pushed_at}
+                "language": self.language, "pushed_at": self.pushed_at,
+                "good_first_issues": self.good_first_issues}
 
 
 @dataclass(slots=True)
@@ -82,39 +86,51 @@ class Screened:
 
 
 def build_queries(profile: Profile, as_of: datetime) -> list[str]:
-    """One search query per language: GitHub ANDs repeated `language:` qualifiers,
-    so two languages in one query would match nothing."""
+    """One search query per language and per topic.
+
+    GitHub ANDs repeated qualifiers: `language:a language:b` or `topic:a topic:b`
+    in one query asks for a repository that is both, which matches almost
+    nothing. A person who says "cli, web" means either, so each pair is its own
+    query and `source` merges the results.
+    """
     pushed = (as_of - timedelta(days=RECENT_PUSH_DAYS)).date().isoformat()
-    base = [f"topic:{t}" for t in profile.topics]
-    base += [f"pushed:>{pushed}", "archived:false", "fork:false", "stars:>=10"]
-    if not profile.languages:
-        return [" ".join(base)]
-    return [" ".join([f"language:{lang}", *base]) for lang in profile.languages]
+    tail = [f"pushed:>{pushed}", "archived:false", "fork:false", "stars:>=10"]
+    languages = [f"language:{lang}" for lang in profile.languages] or [None]
+    topics = [f"topic:{t}" for t in profile.topics] or [None]
+    return [" ".join(q for q in (lang, topic, *tail) if q)
+            for lang in languages for topic in topics]
 
 
 def source(transport, profile: Profile, as_of: datetime, limit: int) -> tuple[list[Candidate], list[str]]:
-    """Candidates from GitHub repository search. Sourcing only — no claim."""
+    """Candidates from GitHub repository search. Sourcing only — no claim.
+
+    Within each query, repositories with more open beginner-labelled issues are
+    taken first: someone arriving here wants somewhere to start, and a
+    repository with none gives them nothing to do even if it is welcoming.
+    """
     queries = build_queries(profile, as_of)
     per_query = max(1, limit // len(queries))
     seen: set[str] = set()
     out: list[Candidate] = []
     for q in queries:
-        taken = 0
+        found: list[Candidate] = []
         for node in transport.search_repositories(q, max_pages=(per_query // 25) + 1):
             slug = node["nameWithOwner"]
             if slug in seen or node.get("isArchived") or node.get("isFork"):
                 continue
             seen.add(slug)
-            out.append(Candidate(
+            found.append(Candidate(
                 slug=slug,
                 description=node.get("description"),
                 stars=node.get("stargazerCount") or 0,
                 language=((node.get("primaryLanguage") or {}).get("name")),
                 pushed_at=node.get("pushedAt"),
+                good_first_issues=((node.get("goodFirstIssues") or {})
+                                   .get("totalCount") or 0),
             ))
-            taken += 1
-            if taken >= per_query:
-                break
+        # Stable, so search order still breaks ties.
+        found.sort(key=lambda c: -c.good_first_issues)
+        out.extend(found[:per_query])
     return out, queries
 
 
@@ -165,6 +181,22 @@ class PrefetchedProvider(EvidenceProvider):
 
     def _resolve_raw(self, evidence_id: str) -> EvidenceRecord | None:
         return self._by_id.get(evidence_id)
+
+
+def screen_slug(slug: str, transport, as_of: datetime, days: int,
+                candidate: Candidate | None = None
+                ) -> tuple[Screened, list[EvidenceRecord]]:
+    """Crawl one repository at screening depth and screen it. No model call.
+
+    Returns the records too, so a caller can derive more from the same crawl
+    (where outsider work landed) without fetching twice.
+    """
+    from holt.evidence.github_graphql import LiveGitHubProvider
+
+    provider = LiveGitHubProvider(Window.PRE_T, cutoff=as_of, transport=transport,
+                                  max_pages=SCREEN_PAGES)
+    records = list(provider.fetch(slug))
+    return screen_records(candidate or Candidate(slug=slug), records, days), records
 
 
 def manifest_path(name: str) -> Path:
@@ -225,26 +257,20 @@ class LiveSearch:
         Stops between candidates when `should_stop` says so, which is how an
         interface cancels a sweep without waiting for the rest of it.
         """
-        from holt.evidence.github_graphql import LiveGitHubProvider
-
         total = len(self.candidates)
         for index, cand in enumerate(self.candidates, 1):
             if should_stop():
                 return
-            provider = LiveGitHubProvider(Window.PRE_T, cutoff=self.as_of,
-                                          transport=self.transport,
-                                          max_pages=SCREEN_PAGES)
             try:
-                records = provider.fetch(cand.slug)
+                result, records = screen_slug(cand.slug, self.transport, self.as_of,
+                                              self.profile.days, cand)
             except Exception as err:  # a dead candidate must not abort the sweep
                 yield ScreenedStep(index, total, cand, error=str(err))
                 continue
             if self.record:
                 write_fixture(cand.slug, Window.PRE_T, records,
                               root=screen_root(self.record), cutoff=self.as_of)
-            yield ScreenedStep(index, total, cand,
-                               result=screen_records(cand, records,
-                                                     self.profile.days))
+            yield ScreenedStep(index, total, cand, result=result)
 
 
 def source_live(profile: Profile, limit: int = 25, *,
@@ -327,7 +353,9 @@ def render(profile: Profile, queries: list[str], screened: list[Screened],
                   f"{as_of.date().isoformat()}. No network, no model calls; "
                   "the query below is the recorded one, not a fresh search.", ""]
     lines += [f"Candidates come from GitHub repository search — "
-              f"{'; '.join(f'`{q}`' for q in queries)} — in search order. "
+              f"{'; '.join(f'`{q}`' for q in queries)} — "
+              # Recorded sessions predate the ordering and are replayed as captured.
+              f"{'in search order' if replayed else 'most beginner-labelled issues first, then search order'}. "
               "Holt claims the screening below, not the sourcing and not the "
               "ordering.", ""]
 
