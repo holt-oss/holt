@@ -3,10 +3,12 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { ErrorPanel } from "@/components/error-panel";
+import { AiStart } from "@/components/report/ai-start";
 import { AnalysisRunner } from "@/components/report/analysis-runner";
 import { ReportView } from "@/components/report/report-view";
 import { StarterIssues } from "@/components/report/starter-issues";
-import { getReport, starterIssues } from "@/lib/api";
+import { getReport, me, starterIssues } from "@/lib/api";
+import type { ModelAccess, ModelProvider } from "@/lib/models";
 import { isValidRepo } from "@/lib/repo";
 import { caller, currentUser, type SessionUser } from "@/lib/session";
 import { humanHours } from "@/lib/format";
@@ -14,6 +16,14 @@ import { SITE_URL } from "@/lib/site";
 import type { Mode, Report } from "@/lib/types";
 
 type Props = PageProps<"/[owner]/[repo]">;
+
+/** What the signed-in user may run: their own key, a paid plan, or the free tier. */
+async function modelAccess(userId: string): Promise<ModelAccess> {
+  const r = await me(userId);
+  if (!r.ok) return { kind: "free" };
+  if (r.data.byok?.set) return { kind: "byok", provider: r.data.byok.provider as ModelProvider, model: r.data.byok.model || null };
+  return r.data.plan && r.data.plan !== "free" ? { kind: "plan" } : { kind: "free" };
+}
 
 function opts(sp: Record<string, string | string[] | undefined>): { mode: Mode; days: number } {
   const mode: Mode = sp.mode === "ai" ? "ai" : "rules";
@@ -66,7 +76,9 @@ function JsonLd({ report, name }: { report: Report | null; name: string }) {
 export default async function RepoPage({ params, searchParams }: Props) {
   const { owner, repo } = await params;
   if (!isValidRepo(owner, repo)) notFound();
-  const { mode, days } = opts(await searchParams);
+  const sp = await searchParams;
+  const { mode, days } = opts(sp);
+  const requestedModel = typeof sp.model === "string" ? sp.model : undefined;
   const name = `${owner}/${repo}`;
   const user = await currentUser();
   const signedIn = Boolean(user);
@@ -142,7 +154,11 @@ export default async function RepoPage({ params, searchParams }: Props) {
           }
         />
       ) : report.error.code === "not_found" ? (
-        <AnalysisRunner repo={name} mode={mode} days={days} signedIn={signedIn} />
+        mode === "ai" && user ? (
+          <AiStart repo={name} days={days} signedIn={signedIn} access={await modelAccess(user.id)} requested={requestedModel} />
+        ) : (
+          <AnalysisRunner repo={name} mode={mode} days={days} signedIn={signedIn} />
+        )
       ) : (
         <ErrorPanel error={report.error} repo={name} retryHref={`/${name}${mode === "ai" ? "?mode=ai" : ""}`} />
       )}
