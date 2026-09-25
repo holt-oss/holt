@@ -37,9 +37,16 @@ import httpx
 
 from holt.agent import landing as landing_mod
 from holt.agent.landing import Area
-from holt.agent.verdict import DEFAULT_CONTRIBUTOR_DAYS
+from holt.agent.verdict import DEFAULT_CONTRIBUTOR_DAYS, headline
+from holt.evidence.errors import RateLimited, RepoNotFound
 from holt.evidence.github_graphql import GitHubGraphQL
-from holt.report import VERDICT_HEADLINES, Verdict
+from holt.reponame import normalise
+from holt.report import Verdict
+
+# Re-exported: callers of this module catch these without importing the
+# evidence layer.
+__all__ = ["FindResult", "GitHub", "RateLimited", "RepoNotFound", "RepoScreen",
+           "StarterIssue", "find", "rules_screen", "starter_issues"]
 
 # ---------------------------------------------------------------------------
 # Results
@@ -88,46 +95,8 @@ class RepoScreen:
     landing: list[Area] = field(default_factory=list)
 
 
-class RateLimited(RuntimeError):
-    """GitHub asked us to wait longer than is worth blocking a request for."""
-
-    def __init__(self, retry_after: int) -> None:
-        super().__init__(f"GitHub rate limit reached; try again in {retry_after} seconds.")
-        self.retry_after = retry_after
-
-
-class RepoNotFound(LookupError):
-    def __init__(self, repo: str) -> None:
-        super().__init__(f"{repo} was not found, or it is private.")
-        self.repo = repo
-
-
 # ---------------------------------------------------------------------------
 # Transport
-
-
-# A wait this short is cheaper to sit out than to surface as an error.
-MAX_RATE_LIMIT_WAIT = 10.0
-ATTEMPTS = 3
-
-
-def _rate_limit_wait(response: httpx.Response, now: float) -> float | None:
-    """Seconds GitHub wants us to wait, or None if this is not a rate limit."""
-    if response.status_code not in (403, 429):
-        return None
-    headers = response.headers
-    if retry := headers.get("retry-after"):
-        try:
-            return max(0.0, float(retry))
-        except ValueError:
-            return 60.0
-    if headers.get("x-ratelimit-remaining") == "0" and headers.get("x-ratelimit-reset"):
-        return max(0.0, float(headers["x-ratelimit-reset"]) - now)
-    if response.status_code == 429 or "rate limit" in response.text.lower():
-        # Secondary limits sometimes arrive with no header; GitHub's docs say
-        # to wait at least a minute.
-        return 60.0
-    return None
 
 
 def query_key(document: str, variables: dict[str, Any]) -> str:
@@ -137,59 +106,29 @@ def query_key(document: str, variables: dict[str, Any]) -> str:
 
 
 class GitHub(GitHubGraphQL):
-    """`GitHubGraphQL` with rate-limit handling, tolerant of partial errors.
+    """`GitHubGraphQL` that can write down what it was told.
 
-    Also usable as the transport for `LiveGitHubProvider`, so screening gets
-    the same handling. With `recorder`, every response is appended to it (the
-    token is in a header and is never recorded).
+    Retries, rate limits and typed errors are the base class's. With
+    `recorder`, every answer is appended to it, keyed by `query_key`, so a run
+    can be replayed in tests. The token is in a header and is never recorded.
     """
 
     def __init__(self, token: str | None = None, client: httpx.Client | None = None,
                  recorder: list[dict[str, Any]] | None = None,
                  sleep: Callable[[float], None] = time.sleep) -> None:
-        super().__init__(token=token, client=client or httpx.Client(timeout=20.0))
+        super().__init__(token=token, client=client, sleep=sleep)
         self.recorder = recorder
-        self._sleep = sleep
         self._lock = threading.Lock()
 
-    def query(self, document: str, **variables: object) -> dict[str, Any]:
-        for attempt in range(ATTEMPTS):
-            last = attempt == ATTEMPTS - 1
-            response = self._client.post(
-                "https://api.github.com/graphql",
-                headers={"Authorization": f"bearer {self.token}"},
-                json={"query": document, "variables": variables},
-            )
-            waited = _rate_limit_wait(response, time.time())
-            if waited is not None:
-                if waited > MAX_RATE_LIMIT_WAIT or last:
-                    raise RateLimited(math.ceil(waited))
-                self._sleep(waited)
-                continue
-            if response.status_code in (502, 503, 504) and not last:
-                self._sleep(1.0 + attempt)
-                continue
-            response.raise_for_status()
-            body = response.json()
-            errors = body.get("errors") or []
-            if any(e.get("type") == "RATE_LIMITED" for e in errors):
-                reset = response.headers.get("x-ratelimit-reset")
-                raise RateLimited(math.ceil(max(1.0, float(reset) - time.time()))
-                                  if reset else 60)
-            data = body.get("data")
-            # Partial errors (a repository NOT_FOUND, one cross-reference we may
-            # not see) come back beside data with a null in it; the caller
-            # decides what a null means. No data at all is a failure.
-            if not data:
-                raise RuntimeError(f"GitHub query failed: {errors or body}")
-            if limit := data.get("rateLimit"):
-                self.remaining = limit.get("remaining")
-            if self.recorder is not None:
-                with self._lock:
-                    self.recorder.append({"key": query_key(document, dict(variables)),
-                                          "variables": dict(variables), "response": body})
-            return data
-        raise AssertionError("unreachable")  # pragma: no cover
+    def query(self, document: str, *, timeout: float | None = None,
+              **variables: object) -> dict[str, Any]:
+        data = super().query(document, timeout=timeout, **variables)
+        if self.recorder is not None:
+            with self._lock:
+                self.recorder.append({"key": query_key(document, dict(variables)),
+                                      "variables": dict(variables),
+                                      "response": {"data": data}})
+        return data
 
 
 def _transport(token: str | None, transport: GitHubGraphQL | None) -> GitHubGraphQL:
@@ -515,26 +454,15 @@ def rank(nodes: Iterable[dict[str, Any]], as_of: datetime, *,
 # One repository
 
 
-def normalise_repo(repo: str) -> str:
-    repo = repo.strip().rstrip("/")
-    if "github.com" in repo:
-        repo = repo.split("github.com", 1)[1].lstrip("/:")
-    owner, _, rest = repo.partition("/")
-    name = rest.split("/")[0].split("?")[0].split("#")[0].removesuffix(".git")
-    if not owner or not name:
-        raise ValueError(f"{repo!r} is not a repository; use owner/name.")
-    return f"{owner}/{name}"
-
-
 def _scored_issues(repo: str, transport: GitHubGraphQL, as_of: datetime, limit: int,
                    landing: Sequence[Area], hacktoberfest: bool
                    ) -> list[tuple[float, StarterIssue]]:
-    owner, _, name = normalise_repo(repo).partition("/")
+    owner, _, name = normalise(repo).partition("/")
     labels = ",".join(SEARCH_LABELS)
     q = f"repo:{owner}/{name} is:issue is:open no:assignee label:{labels}"
     data = transport.query(REPO_ISSUES, owner=owner, name=name, q=q)
     repository = data.get("repository")
-    if repository is None:
+    if repository is None:  # the search half answered, so the base class did not raise
         raise RepoNotFound(f"{owner}/{name}")
     if repository.get("isArchived"):
         return []
@@ -731,7 +659,7 @@ def find(languages: Sequence[str], topics: Sequence[str], hacktoberfest: bool,
         verdict = Verdict(result.verdict)
         # Best issue counts most; more good options still help.
         quality = sum(s * w for (s, _), w in zip(scored, (1.0, 0.5, 0.25)))
-        return quality, FindResult(repo=slug, headline=VERDICT_HEADLINES[verdict],
+        return quality, FindResult(repo=slug, headline=headline(verdict),
                                    verdict=verdict.value, stats=dict(result.stats),
                                    issues=[issue for _, issue in scored])
 

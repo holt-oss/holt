@@ -347,7 +347,9 @@ def cmd_start(args: argparse.Namespace) -> int:
     progress = (lambda s: None) if args.json else (lambda s: print(s, file=sys.stderr))
     try:
         if args.repo:
-            repo = starter.normalise_repo(args.repo)
+            from holt import reponame
+
+            repo = reponame.normalise(args.repo)
             transport = starter.GitHub(token=token)
             as_of = datetime.now(UTC)
             landing = []

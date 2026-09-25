@@ -12,7 +12,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from holt import cli, discover, starter
+from holt import cli, discover, model, starter
 from holt.agent.landing import Area
 from holt.profile import Profile
 from holt.report import Verdict
@@ -211,16 +211,6 @@ def test_missing_repository_is_not_found():
         starter.starter_issues("nobody/nothing", None, as_of=AS_OF, transport=transport)
 
 
-@pytest.mark.parametrize("raw,slug", [
-    ("pallets/flask", "pallets/flask"),
-    ("https://github.com/pallets/flask/tree/main", "pallets/flask"),
-    ("github.com/pallets/flask.git", "pallets/flask"),
-    ("https://github.com/pallets/flask?tab=readme", "pallets/flask"),
-])
-def test_normalise_repo(raw, slug):
-    assert starter.normalise_repo(raw) == slug
-
-
 # --- find (recorded) -------------------------------------------------------
 
 FIND_ARGS = {"languages": ["python"], "topics": [], "hacktoberfest": True,
@@ -294,52 +284,30 @@ def test_source_queries():
     assert only.startswith("topic:hacktoberfest")
 
 
-# --- rate limits -----------------------------------------------------------
-
-OK = {"data": {"rateLimit": {"remaining": 10}, "x": 1}}
-
-
-def test_short_rate_limit_waits_and_retries():
-    sleeps: list[float] = []
-    transport = scripted([httpx.Response(403, headers={"retry-after": "2"}),
-                          httpx.Response(200, json=OK)], sleeps)
-    assert transport.query("q")["x"] == 1
-    assert sleeps == [2.0]
-    assert transport.remaining == 10
+# --- errors and recording --------------------------------------------------
+# Retries and rate limits belong to the base transport and are tested with it
+# (tests/test_github_transport.py). What starter adds is the recorder.
 
 
-def test_long_rate_limit_raises_with_retry_after():
-    transport = scripted([httpx.Response(429, headers={"retry-after": "120"})])
-    with pytest.raises(starter.RateLimited) as err:
-        transport.query("q")
-    assert err.value.retry_after == 120
+def test_starter_uses_the_engine_error_types():
+    from holt.evidence import errors
+
+    assert starter.RateLimited is errors.RateLimited
+    assert starter.RepoNotFound is errors.RepoNotFound
 
 
-def test_primary_limit_uses_the_reset_header():
-    reset = str(int(time.time()) + 600)
-    transport = scripted([httpx.Response(403, headers={
-        "x-ratelimit-remaining": "0", "x-ratelimit-reset": reset})])
-    with pytest.raises(starter.RateLimited) as err:
-        transport.query("q")
-    assert 590 <= err.value.retry_after <= 601
-
-
-def test_graphql_rate_limited_error():
-    transport = scripted([httpx.Response(200, json={
-        "data": None, "errors": [{"type": "RATE_LIMITED", "message": "slow down"}]})])
-    with pytest.raises(starter.RateLimited):
-        transport.query("q")
-
-
-def test_plain_forbidden_is_not_a_rate_limit():
-    transport = scripted([httpx.Response(403, text="Resource not accessible")])
-    with pytest.raises(httpx.HTTPStatusError):
-        transport.query("q")
-
-
-def test_transient_errors_retry():
-    transport = scripted([httpx.Response(502), httpx.Response(200, json=OK)])
-    assert transport.query("q")["x"] == 1
+def test_recorder_writes_replayable_answers():
+    recorded: list[dict] = []
+    ok = {"data": {"rateLimit": {"remaining": 10}, "x": 1}}
+    transport = starter.GitHub(
+        token="test", recorder=recorded,
+        client=httpx.Client(transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, json=ok))))
+    assert transport.query("q", a=1)["x"] == 1
+    (call,) = recorded
+    assert call["key"] == starter.query_key("q", {"a": 1})
+    assert call["response"]["data"]["x"] == 1
+    assert "test" not in json.dumps(recorded)
 
 
 def test_find_raises_rate_limit_when_nothing_was_found():
@@ -347,7 +315,7 @@ def test_find_raises_rate_limit_when_nothing_was_found():
         def __init__(self):
             pass
 
-        def query(self, document, **variables):
+        def query(self, document, *, timeout=None, **variables):
             raise starter.RateLimited(30)
 
     with pytest.raises(starter.RateLimited):
@@ -450,3 +418,54 @@ def test_cli_start_single_repo(monkeypatch, capsys):
     assert captured.out.startswith("# Where to start in ManimCommunity/manim")
     assert captured.out.count("https://github.com/ManimCommunity/manim/issues/") == 2
     assert "listing issues only" in captured.err
+
+
+# --- discover --record ------------------------------------------------------
+
+
+@pytest.mark.parametrize("record", [None, "session"])
+def test_discover_live_asks_for_recording_only_under_record(monkeypatch, tmp_path, record):
+    """Trajectory recording is opt-in, so `--record` has to ask for it."""
+    from holt.evidence import github_graphql
+
+    cand = discover.Candidate(slug="o/r")
+    survivor = discover.Screened(cand, Verdict.VIABLE, [], None, None)
+
+    class Search:
+        as_of, transport, queries, candidates = AS_OF, None, ["q"], [cand]
+
+        def screen(self):
+            yield discover.ScreenedStep(1, 1, cand, result=survivor)
+
+    class Provider:
+        def __init__(self, *a, **kw):
+            pass
+
+        def fetch(self, slug):
+            return []
+
+    asked = {}
+
+    def fake_client(path=None, record=None):
+        asked["record"] = record
+        raise RuntimeError("stop here")
+
+    monkeypatch.setattr(discover, "DISCOVER_ROOT", tmp_path)
+    monkeypatch.setattr(discover, "source_live", lambda *a, **kw: Search())
+    monkeypatch.setattr(discover, "write_fixture", lambda *a, **kw: None)
+    monkeypatch.setattr(github_graphql, "LiveGitHubProvider", Provider)
+    monkeypatch.setattr(model, "live_client", fake_client)
+    with pytest.raises(RuntimeError, match="stop here"):
+        discover.run_live(Profile(languages=["go"]), record=record)
+    assert asked["record"] is bool(record)
+
+
+def test_discover_table_shows_headlines_not_enum_values():
+    row = discover.SurvivorRow(slug="o/r", verdict="not_viable", landed="0/3",
+                               reply="never", why="w", notes=[])
+    screened = [discover.Screened(discover.Candidate(slug="o/r"), Verdict.NOT_VIABLE,
+                                  [], None, None)]
+    out = discover.render(Profile(languages=["go"]), ["q"], screened, [row],
+                          replayed=False, as_of=AS_OF, skipped=[], unanalysed=0)
+    assert "| Not worth your time |" in out
+    assert "not_viable" not in out

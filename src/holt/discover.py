@@ -33,7 +33,7 @@ from holt.agent import landing as landing_mod
 from holt.agent.findings import Findings
 from holt.agent.pipeline import analyze
 from holt.agent.signals import Signals, build_threads, compute
-from holt.agent.verdict import classify
+from holt.agent.verdict import classify, headline
 from holt.evidence.fixtures import FixtureProvider, write_fixture
 from holt.evidence.provider import EvidenceProvider
 from holt.profile import CONTRIBUTION_AREAS, Profile
@@ -398,7 +398,8 @@ def render(profile: Profile, queries: list[str], screened: list[Screened],
     lines.append("")
 
     headers = ("repository", "verdict", "outsiders in", "first reply", "why")
-    table = [(r.slug, r.verdict, r.landed, r.reply, r.why) for r in rows]
+    # The row keeps the raw verdict value; the table shows the words for it.
+    table = [(r.slug, headline(r.verdict), r.landed, r.reply, r.why) for r in rows]
     widths = [max(len(str(row[i])) for row in (*table, headers)) for i in range(5)]
 
     def line(cells) -> str:
@@ -503,12 +504,14 @@ def run_live(profile: Profile, limit: int = 25, max_analyze: int = 8,
             write_fixture(slug, Window.PRE_T, records,
                           root=full_root(record), cutoff=as_of)
         cached = PrefetchedProvider(Window.PRE_T, as_of, records)
-        client = model.live_client(trajectory_for(slug))
+        # Recording is opt-in in `model`; a --record session must ask for it or
+        # the replay it promises would have no trajectories to replay.
+        client = model.live_client(trajectory_for(slug), record=bool(record))
         row = analyse_survivor(slug, cached, client, profile.days, as_of)
         row.notes = contribution_notes(
             landing_mod.compute(build_threads(records)), profile.contributions)
         rows.append(row)
-        progress(f"analysed {slug}: {row.verdict} (${client.usage.cost_usd:.4f})")
+        progress(f"analysed {slug}: {headline(row.verdict)} (${client.usage.cost_usd:.4f})")
 
     if record:
         manifest_path(record).parent.mkdir(parents=True, exist_ok=True)
