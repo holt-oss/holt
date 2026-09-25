@@ -19,8 +19,8 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select, update
 
-from holt_server import starter
-from holt_server.db import BADGE_PRIORITY, Job, Report, User, now
+from holt_server import quota, starter
+from holt_server.db import BADGE_PRIORITY, Job, Report, now
 from holt_server.errors import ApiError
 
 if TYPE_CHECKING:
@@ -246,13 +246,9 @@ class JobRunner:
             if failed.rowcount != 1:
                 await s.rollback()
                 return
-            if job.charged and job.user_id:
-                # A report that never arrived is not charged for. Atomic, and
-                # only against the month it was charged to.
-                await s.execute(update(User).where(
-                    User.id == job.user_id, User.ai_used > 0,
-                    User.ai_period == (job.params or {}).get("ai_period", ""),
-                ).values(ai_used=User.ai_used - 1))
+            # A report that never arrived is not charged for: back to the
+            # pool that paid, atomically (see quota.refund).
+            await quota.refund(s, job)
             await s.commit()
         self.hub.publish(job.id, "error", {"error": err.body()})
 

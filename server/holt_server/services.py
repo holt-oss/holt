@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
 
-from holt_server import crypto, engine, llm
+from holt_server import crypto, engine, llm, plans
 from holt_server.db import Database, Job, User
 from holt_server.errors import ApiError
 from holt_server.github import GitHubLookup, TokenPool
@@ -33,6 +33,16 @@ class Services:
         self.badge_limiter = RateLimiter()
         self.runner = JobRunner(self, settings.job_concurrency, settings.badge_concurrency)
         self._canonical: OrderedDict[str, str] = OrderedDict()
+        self.catalog = plans.load(settings.plans_file or None)
+        self.grace = timedelta(hours=settings.billing_grace_hours)
+        # None until the Razorpay keys are set; billing endpoints then say so.
+        self.payments = None
+        if settings.razorpay_key_id and settings.razorpay_key_secret:
+            from holt_server.billing.razorpay import Razorpay
+
+            self.payments = Razorpay(settings.razorpay_key_id,
+                                     settings.razorpay_key_secret,
+                                     settings.razorpay_webhook_secret)
         # Swappable seams. Tests replace these; production uses the defaults.
         self.provider_factory: Callable[[str, datetime], Any] = self._live_provider
         self.model_factory: Callable[[llm.ModelSpec], Any] = llm.build

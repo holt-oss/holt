@@ -63,6 +63,41 @@ class FakeEngine:
         return canned_report(repo, mode, days, self.verdict)
 
 
+# Small numbers so tests can run a pool dry. Razorpay plan ids are set for
+# student (INR) and pro (INR) only; pro in USD has none, to test that path.
+TEST_PLANS = """
+[plans.free]
+name = "Free"
+ai_reports_per_month = 2
+
+[plans.student]
+name = "Student"
+ai_reports_per_month = 3
+priority = true
+prices = [{ currency = "INR", amount = 9900, interval = "month", razorpay_plan_id = "plan_student_inr" }]
+
+[plans.pro]
+name = "Pro"
+ai_reports_per_month = 5
+priority = true
+prices = [
+  { currency = "INR", amount = 29900, interval = "month", razorpay_plan_id = "plan_pro_inr" },
+  { currency = "USD", amount = 500, interval = "month" },
+]
+
+[packs.pack10]
+name = "10 AI reports"
+reports = 10
+prices = [{ currency = "INR", amount = 4900 }]
+"""
+
+
+def write_plans(tmp_path: Path, text: str = TEST_PLANS) -> Path:
+    path = tmp_path / "plans.toml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
 def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
     values = {
         # Set HOLT_TEST_DATABASE_URL to run against a real Postgres (e.g. the
@@ -75,7 +110,7 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "OPENROUTER_API_KEY": "",
         "HOLT_ANON_RATE_PER_HOUR": 100,
         "HOLT_USER_RATE_PER_HOUR": 100,
-        "HOLT_FREE_AI_LIMIT": 3,
+        "HOLT_PLANS_FILE": str(write_plans(tmp_path)),
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)

@@ -34,9 +34,16 @@ class Settings(BaseSettings):
 
     job_concurrency: int = Field(2, alias="HOLT_JOB_CONCURRENCY")
     cache_hours: float = Field(24, alias="HOLT_CACHE_HOURS")
-    # How many AI reports a user may run on the server's key per calendar month.
-    free_ai_limit: int = Field(3, alias="HOLT_FREE_AI_LIMIT")
-    plan_ai_limit: int = Field(100, alias="HOLT_PLAN_AI_LIMIT")
+    # Plans, allowances and prices: plans.toml next to this file, or this path.
+    plans_file: str = Field("", alias="HOLT_PLANS_FILE")
+    # A paid plan stays on this long past its period end while the renewal
+    # webhook is on its way (or Razorpay is retrying a failed charge).
+    billing_grace_hours: float = Field(24, alias="HOLT_BILLING_GRACE_HOURS")
+    # Billing cycles a Razorpay subscription is created for (it needs a number).
+    subscription_cycles: int = Field(120, alias="HOLT_SUBSCRIPTION_CYCLES")
+    razorpay_key_id: str = Field("", alias="RAZORPAY_KEY_ID")
+    razorpay_key_secret: str = Field("", alias="RAZORPAY_KEY_SECRET")
+    razorpay_webhook_secret: str = Field("", alias="RAZORPAY_WEBHOOK_SECRET")
     # New work (jobs, starter-issue lookups) per hour.
     anon_rate_per_hour: int = Field(10, alias="HOLT_ANON_RATE_PER_HOUR")
     user_rate_per_hour: int = Field(60, alias="HOLT_USER_RATE_PER_HOUR")
