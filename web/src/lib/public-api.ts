@@ -2,6 +2,7 @@
 // browser extension. They never start work and never expose the internal key.
 import "server-only";
 import { NextResponse } from "next/server";
+import { clientIpFrom } from "./client-ip";
 import { rateLimit } from "./rate-limit";
 import type { Result } from "./types";
 
@@ -30,18 +31,9 @@ export function preflight(req: Request) {
   return res;
 }
 
-export function clientIp(req: Request): string {
-  return (
-    req.headers.get("cf-connecting-ip") ||
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    "127.0.0.1"
-  );
-}
-
-export async function publicGet<T>(req: Request, bucket: string, load: (ip: string) => Promise<Result<T>>) {
-  const ip = clientIp(req);
-  const limited = rateLimit(`${bucket}:${ip}`, PER_MINUTE);
+export async function publicGet<T>(req: Request, bucket: string, load: (ip: string | null) => Promise<Result<T>>) {
+  const ip = clientIpFrom(req.headers);
+  const limited = rateLimit(`${bucket}:${ip ?? "unknown"}`, PER_MINUTE);
   let res: NextResponse;
   if (!limited.ok) {
     res = NextResponse.json(

@@ -1,7 +1,7 @@
 import { friendlyStage, STAGE_ORDER } from "@/lib/stages";
 import { CatFace } from "./cat-face";
 
-export function AnalysisProgress({ repo, stage, progress, mode }: { repo: string; stage?: string; progress: number; mode: "rules" | "ai" }) {
+export function AnalysisProgress({ repo, stage, progress, mode, kicker, note }: { repo: string; stage?: string; progress: number; mode: "rules" | "ai"; kicker?: string; note?: string }) {
   const f = friendlyStage(stage);
   const idx = Math.max(0, STAGE_ORDER.indexOf(f.title));
   const pct = Math.round(Math.min(1, Math.max(0.03, progress)) * 100);
@@ -9,7 +9,7 @@ export function AnalysisProgress({ repo, stage, progress, mode }: { repo: string
     <div className="scan border border-line-strong bg-panel p-6 shadow-card sm:p-10" aria-live="polite" aria-busy="true">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[0.72rem] uppercase tracking-[0.08em] text-faint">{mode === "ai" ? "writing your AI report" : "checking"} · {repo}</p>
+          <p className="text-[0.72rem] uppercase tracking-[0.08em] text-faint">{kicker ?? `${mode === "ai" ? "writing your AI report" : "checking"} · ${repo}`}</p>
           <h1 className="mt-3 text-[1.8rem] font-semibold leading-tight tracking-tight sm:text-[2.4rem]">{f.title}…</h1>
           <p className="mt-2 max-w-lg font-sans text-muted">{f.detail}</p>
         </div>
@@ -36,7 +36,7 @@ export function AnalysisProgress({ repo, stage, progress, mode }: { repo: string
         })}
       </ol>
       <p className="mt-8 border-t border-dashed border-line pt-4 font-sans text-[0.85rem] text-faint">
-        The first check of a repo takes about a minute. After that it&apos;s instant for everyone for a day.
+        {note ?? "The first check of a repo takes about a minute. After that it's instant for everyone for a day."}
       </p>
     </div>
   );

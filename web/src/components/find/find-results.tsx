@@ -42,8 +42,9 @@ export function FindResults({ results, days }: { results: FindResult[]; days: nu
                   {s.first_time_merged_authors != null && <span className="text-green">{s.first_time_merged_authors} first-timers merged</span>}
                   {s.median_first_response_hours != null && <span>replies in {humanHours(s.median_first_response_hours)}</span>}
                 </p>
+                <div className="mt-3 sm:hidden"><VerdictPill verdict={r.verdict} /></div>
               </div>
-              <VerdictPill verdict={r.verdict} />
+              <div className="hidden sm:block"><VerdictPill verdict={r.verdict} /></div>
             </div>
             <div className="p-5 sm:p-6">
               <p className="mb-3 text-[0.72rem] uppercase tracking-[0.08em] text-faint">Pick one of these</p>

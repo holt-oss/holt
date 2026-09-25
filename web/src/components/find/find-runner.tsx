@@ -30,5 +30,5 @@ export function FindRunner({ jobId, days }: { jobId: string; days: number }) {
 
   if (error) return <ErrorPanel error={error} retryHref="/find" />;
   if (results) return <FindResults results={results} days={days} />;
-  return <AnalysisProgress repo="welcoming projects" mode="rules" stage={stage.stage} progress={stage.progress} />;
+  return <AnalysisProgress repo="" kicker="searching · welcoming projects" note="Holt is checking which projects reply to newcomers and have issues you could take. This can take a minute." mode="rules" stage={stage.stage} progress={stage.progress} />;
 }
