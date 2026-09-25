@@ -1,300 +1,365 @@
-# Holt business strategy: the break-even plan
+# Holt business strategy, v2: credits, Pro first, foreign payers
 
-*Written 25 Sep 2026 for the Hacktoberfest launch (1 Oct 2026). Prices were checked that day; sources are at the end. **A** marks an assumption, not a measurement.*
+*25 Sep 2026, for the Hacktoberfest launch (1 Oct 2026). Prices were checked that day; sources are at the end. **A** marks an assumption.*
+
+### What changed from v1
+- **Real hosting instead of the home server** (commercial use). I recommend a Hetzner CX23 at **₹775 a month** ($8.07).
+- **Credits instead of report counts**, like v0. Different models cost different numbers of credits: the free tier uses cheap models only, and paid users get every model.
+- **Pro is the main plan and foreign payers the main target.** It costs **$6** through Dodo, or **₹299** in India through Razorpay.
+- **"Student" is now a verified 50% discount on Pro**, not a separate, weaker plan.
+- **The goal is at least ₹50,000 in revenue** (assumed: in the first 6 months, by 31 Mar 2027), not just breaking even.
+- **The domain is $15 a year.** Fixed costs are now **₹895 a month**.
+
+---
 
 ## The short version
-
-- **Breaking even is easy if the free AI reports have a hard monthly budget.** Hosting, domain and email cost about **₹100 a month** while Holt runs on the home server. Nearly all the money goes on free AI reports. Everything else is small.
-- **One AI report costs ₹1.45** (₹1.86 for a long one) on today's model, `openai/gpt-5-mini`, including OpenRouter's 5.5% top-up fee. Rules reports cost nothing except GitHub API points.
-- **Fix one plan before launch:** Pro at ₹299 for 250 AI reports **loses money** for a heavy user (−₹71 a month, down to −₹173 for long reports). Cut it to **100 reports**, or keep 250 only once a cheaper model passes the evaluation.
-- **Free AI quota:** make it **1 a month** at launch, not 3, and put a **₹1,000 monthly cap** on server-paid free AI. Rules reports stay free and unlimited, and BYOK (bring your own key) stays free. That caps the worst possible month at about **₹1,100**, while keeping the "wow" moment for every new user.
-- **To break even**, about **1 in 140 signed-in users** has to pay (0.7%) with a free quota of 1, or 1 in 70 (1.4%) with a quota of 3. A student product might see 0.5–3% of users pay (**A**).
-- **Adoption is the goal.** In the first 90 days, campus workshops and GitHub Sponsors are the realistic money outside the plans. Sell the maintainer and API products later.
+- **The price sheet:**
+  - **Free:** unlimited rules reports, plus 10 credits a month on cheap models (≈ 5 AI reports).
+  - **Pro:** $6/mo for 600 credits, or ₹299 for 400 credits in India.
+  - **Verified student Pro:** $3 for 300 credits, or ₹149 for 200.
+  - **Top-ups:** $5 for 500 credits, or ₹199 for 250.
+- **1 credit = $0.01 at list price** (₹0.75 in India). Each model's credit cost per report is set so that **the model costs at most 33% of what the user pays for those credits, even on a long report.**
+- **Every paid item keeps at least 48% of its price** as contribution even if the user spends every credit. At typical use it keeps **70–85%**.
+- **Fixed costs: ₹895 a month.** On top of that, free AI spend is capped at **₹1,000 a month**, so the worst month with no revenue costs **₹1,895**.
+- **Break-even month:** realistic **Oct**, optimistic **Oct**, pessimistic **Jan**.
+- **When revenue passes ₹50k:** realistic in **month 5 (Feb)**, optimistic in **month 3–4**, pessimistic in **month 12**.
+- **Runway:** set aside **₹10,000**. That covers about 5 months with zero revenue, or the pessimistic dip (−₹2,300) plus one-time costs with room to spare.
 
 ---
 
-## 1. What things cost
+## 1. The price sheet
 
-### 1.1 One AI report
-I measured token use in the 71 committed trajectories in `fixtures/trajectories/`, all on gpt-5-mini. I counted only the four calls a real report makes (`classify`, `outcomes`, `opportunity`, `narrate`), and left out the evaluation-only `baseline` calls.
-
-| per report | input tokens | output tokens (includes reasoning) |
-|---|---|---|
-| median | 9,033 | 6,039 |
-| p90 (a long report) | 13,406 | 7,513 |
-| max | 18,516 | 8,890 |
-
-Cost per report on OpenRouter. Prices come from the OpenRouter models API. The cost includes the 5.5% fee on credit top-ups, and uses $1 = ₹96.02.
-
-| model | $ per 1M in / out | median report | long report (p90) | per 1,000 reports |
+| | Free | **Pro** | **Pro, verified student** | Top-up pack |
 |---|---|---|---|---|
-| **openai/gpt-5-mini** (today) | 0.25 / 2.00 | **₹1.45** | ₹1.86 | ₹1,452 |
-| openai/gpt-5-nano | 0.05 / 0.40 | ₹0.29 | ₹0.37 | ₹290 |
-| google/gemini-2.5-flash | 0.30 / 2.50 | ₹1.80 | ₹2.31 | ₹1,804 |
-| google/gemini-3.1-flash-lite | 0.25 / 1.50 | ₹1.15 | ₹1.48 | ₹1,146 |
-| deepseek/deepseek-v4.1-flash | 0.099 / 0.60 | ₹0.46 | ₹0.59 | ₹458 |
-| qwen/qwen3.8-flash | 0.15 / 0.47 | ₹0.42 | ₹0.56 | ₹425 |
+| USD (Dodo, merchant of record) | $0 | **$6/mo** | **$3/mo** | **$5** one-time |
+| India (Razorpay, INR) | ₹0 | **₹299/mo** | **₹149/mo** | **₹199** one-time |
+| credits (USD / India) | 10 a month | 600 / 400 a month | 300 / 200 a month | 500 / 250 |
+| rules reports, find, starter issues, badge | unlimited | unlimited | unlimited | — |
+| models | free models only | all models | all models | all models |
+| priority queue | — | yes | yes | — |
+| credits expire | monthly, no rollover | monthly, no rollover | monthly, no rollover | **12 months** |
 
-**A:** The token counts are from gpt-5-mini. Other models write more or less (especially reasoning tokens), so these costs are estimates. **Don't switch models on price alone.** Run the evaluation in `docs/EVALUATION.md` first. A cheaper model that explains verdicts badly would hurt the brand more than it saves.
+- **Anonymous visitors** get rules reports only, as today.
+- **BYOK stays free and unlimited.** It's a good answer for students who have credits somewhere else.
+- **A top-up unlocks all models** while its credits last, like v0's paid credits. The margin holds on every model (§2).
+- **Top-ups are $5 or more.** Dodo's fixed 40¢ makes smaller USD packs a poor deal.
+- **Annual plans** ($60 a year, two months free) can come later. They help cash flow once churn is known.
 
-**The cache matters.** A finished AI report for the same repo, mode and days is served to *anyone* for 24 hours, and it costs nothing and uses no quota (`server/holt_server/api.py`). During Hacktoberfest many students will open the same popular repos.
+**Positioning:** GitHub Copilot Pro is $10, Raycast Pro $10, Cursor Pro $20, Perplexity Pro $20 and v0 Plus $30. Holt at **$6** is a narrow tool at a coffee price. Cursor is the only one of these with a published India price (₹649 for a limited "Start" plan). Holt's ₹299 is about half its USD price.
 
-| share of AI report views served from cache | cost per AI report *viewed* (gpt-5-mini) |
-|---|---|
-| 0% | ₹1.45 |
-| 30% | ₹1.02 |
-| 60% | ₹0.58 |
-
-Quota is only charged on uncached reports. So caching lowers the *average* cost, but not the worst case: someone who uses their whole quota on uncached repos.
-
-### 1.2 Rules reports and GitHub
-- **Cost:** a rules report is free apart from GitHub API points. I measured **about 11 GraphQL points** per fresh rules report (two runs on staging, 25 Sep).
-- **Limit per token:** a personal token gets **5,000 points an hour**, so about **450 uncached rules reports an hour**, less when starter issues and find are also running.
-- **A GitHub App** gets up to **12,500 an hour** per installation.
-- **Cache hits cost 0 points.**
-
-### 1.3 Payment fees
-
-| route | fee | on ₹99 | on ₹299 | notes |
-|---|---|---|---|---|
-| Razorpay, domestic cards / UPI (standard) | 2% + 18% GST on the fee = **2.36%** | ₹2.34 | ₹7.06 | No setup or yearly fee. Razorpay's pricing data lists UPI as "0% MDR for most transactions", so UPI may cost less. I use 2.36% for everything to be safe. |
-| Razorpay, new-merchant offer | **0%** platform fee for 90 days or until ₹5 lakh | ₹0 | ₹0 | For accounts activated from 1 Jul 2026, so it covers the launch quarter. Amex, Diners and corporate cards are excluded. GST still applies. A one-time ₹199 KYC fee may apply. |
-| Razorpay card subscriptions | +0.9% on top | ₹3.2 | ₹9.8 | UPI Autopay pricing is "on request". |
-| Razorpay international cards | up to 3% + GST | — | — | Holt would need to handle tax and compliance itself. Use a merchant of record (MoR) instead. |
-| Dodo Payments (MoR), international | 4% + 40¢, +1.5% outside the US, +0.5% for subscriptions → **about 6% + 40¢** | — | $5 → **$0.70 (14%)** | Dodo handles VAT and sales tax. Payouts are in USD, EUR or GBP only (INR payouts were discontinued); $5 per payout under $1,000, and $25 per USD SWIFT payout to non-US businesses. |
-
-**Payout fees dominate at small volumes.** A $25 SWIFT fee on a $100 monthly payout is 25%. Hold international payouts until each one is a few hundred dollars.
-
-### 1.4 GST (an individual seller in Punjab, domestic sales)
-- **Registration threshold:** GST registration for services is required above **₹20 lakh a year** of turnover. Punjab is a normal-category state, not a ₹10-lakh one. ₹20 lakh a year is about 1,680 Student subscriptions every month, far beyond anything in this plan.
-- **Selling on your own site with Razorpay:** as far as I can tell, this is **not** selling "through an e-commerce operator", which is the rule that forces registration at any turnover. Razorpay is a payment processor.
-- **Inter-state sales:** service suppliers under ₹20 lakh are exempt from compulsory registration (Notification 10/2017-IT).
-- **The OIDAR rule** (online services, register regardless of turnover) targets suppliers *outside* India.
-- **If registered,** SaaS is taxed at 18%. Decide now whether displayed prices include GST: `tax_note` in `plans.toml` is empty.
-- **International sales via Dodo:** Dodo is the seller to the customer; Holt supplies Dodo. Treating that as a zero-rated export needs GST registration plus a Letter of Undertaking (LUT), and proof of foreign remittance. Below ₹20 lakh you don't need to register just for this.
-- **Get a CA to confirm all of the above in writing before the first paid sale** (about ₹1–3k for a consultation, **A**). Income tax on profits is separate, and a CA can advise on that too.
-
-### 1.5 Hosting, domain, email
-
-| item | option | per month |
-|---|---|---|
-| hosting | **today:** home server + Cloudflare Tunnel (the tunnel is free) | ~₹0 extra (**A**: electricity not measured; the box is already on) |
-| | Hetzner CX23 (2 vCPU, 4 GB), Germany/Finland, €5.49 + VAT | ≈ ₹600 (+ IPv4, price unconfirmed). No India region; CX23 is sometimes sold out. |
-| | Hostinger KVM 2 (2 vCPU, 8 GB), ₹799 on a 2-year term, renews at ₹1,199 | ₹799–1,199 |
-| | DigitalOcean Bangalore, 2 vCPU / 4 GB, $24 | ≈ ₹2,300 |
-| domain | .dev at Cloudflare Registrar, about $12.20 a year (Porkbun: $8.75 first year, then $12.87) | ≈ ₹100 |
-| | .in at Porkbun, $7.83 a year | ≈ ₹63 |
-| email | Resend free (3,000 a month, 100 a day) or Brevo free (300 a day) | ₹0. Sign-in is OAuth and Razorpay sends receipts, so Holt barely needs email yet. |
-| GitHub API | free (personal token or GitHub App) | ₹0 |
-
-**Fixed costs: about ₹100 a month on the home server, or about ₹700 on Hetzner.**
-
-**Variable costs:** free AI reports (§4), and AI plus payment fees for paying users (§2).
+**Why India gets fewer credits for its lower price:** models bill Holt in dollars, so a true PPP discount on credits eats the margin. The India price is about 50% of the USD price. India gets 400 credits for ₹299 (**₹0.75 a credit**), and the USD plan gets 600 credits for $6 (₹0.96 a credit). That's still a real regional discount per credit (22%) with a healthy margin. For other lower-income countries, Dodo supports per-country prices and PPP. Use them later with a regional product that has fewer credits, because Dodo's PPP discounts only the price, never the credit grant.
 
 ---
 
-## 2. Margin per plan
-Plans come from `server/holt_server/plans.toml` on `billing-server`. **Note:** that file has Pro at **$5**, not $6, and has **no USD pack**. The task brief said Pro was ₹299 or $6 and packs were ₹49 or $2. I show both.
+## 2. Credits and models
 
-Contribution is what's left per month after payment fees and AI cost (gpt-5-mini, median report; the p90 figure is in brackets), with no cache help. Each column is the share of the quota actually used.
+### How credits work (modelled on v0)
+- **v0:**
+  - Free includes "$5 of included monthly credits". Paid plans include credits equal to the price.
+  - Each model burns credits at its own per-token rate (v0 Mini $0.20/$1.20 per 1M tokens, v0 Max $5/$25).
+  - Paid-plan monthly credits roll over for one month.
+  - Bought credits expire after a year, and only paid plans can buy them.
+- **Lovable:** credits, top-ups at $0.30 a credit that last 12 months, and plan credits that expire after 2 months.
+- **Perplexity:** "100 credits = $1"; monthly credits don't roll over, and bought ones last a year.
+- **Cursor:** charges other models "at the model's API price" from a monthly pool, with pay-as-you-go overage.
 
-| plan | price | quota | 100% used | 50% | 25% |
-|---|---|---|---|---|---|
-| Student | ₹99 | 40 | ₹39 (₹22) | ₹68 (₹59) | ₹82 (₹78) |
-| **Pro** | ₹299 | 250 | **−₹71 (−₹173)** | ₹110 (₹59) | ₹201 (₹176) |
-| Pro, capped at **100** | ₹299 | 100 | ₹147 (₹106) | — | — |
-| Pack | ₹49 | 10 | ₹33 (₹29) | ₹41 | ₹44 |
-| Pro (Dodo) | $5 | 250 | ₹50 (−₹53) | — | — |
-| Pro (Dodo) | $6 | 250 | ₹140 (₹38) | — | — |
-| Pack (Dodo), not in the file | $2 | 10 | ₹129 | — | — |
+**Holt's version: 1 credit = $0.01 at list price.**
+- **A fixed credit price per report for each model**, not per token, so users know the cost before they click. Each price is set from the p90 (long-report) cost.
+- **Target:** model cost ≤ 33% of the credits' list price on a long report, so a gross margin of at least 67% before payment fees.
+- **Formula:** `credits = ceil(p90 cost × 3 / $0.01)`.
+- **Recalibrate every month** from the actual cost per job, which the server should log.
 
-- **Student and packs are healthy** even at full use. Most students won't use all 40.
-- **Pro at 250 is the one leak.** At full use with a cheaper model it would be fine:
+### Per-model unit economics
+Tokens per report were measured from 71 committed trajectories: 4 calls, median 9.0k in / 6.0k out, p90 13.4k in / 7.5k out. Prices come from the OpenRouter API and include its 5.5% top-up fee.
 
-  | model (Pro, 250 reports) | AI cost | contribution |
-  |---|---|---|
-  | gpt-5-nano | ₹73 | ₹219 |
-  | deepseek-v4.1-flash | ₹114 | ₹178 |
-  | qwen3.8-flash | ₹106 | ₹186 |
+| model | tier | $/1M tokens in / out | median cost | long-report (p90) cost | **credits per report** | worst cost ÷ credit value |
+|---|---|---|---|---|---|---|
+| openai/gpt-5-nano | free | 0.05 / 0.40 | $0.0030 | $0.0039 | **2** | 19% |
+| deepseek/deepseek-v4.1-flash | free | 0.099 / 0.60 | $0.0048 | $0.0062 | **2** | 31% |
+| **openai/gpt-5-mini** (paid default) | paid | 0.25 / 2.00 | $0.0151 | $0.0194 | **6** | 32% |
+| google/gemini-3.8-flash | paid | 0.75 / 3.75 | $0.0310 | $0.0403 | **13** | 31% |
+| anthropic/claude-sonnet-5 (premium) | paid | 2.00 / 10.00 | $0.0828 | $0.1075 | **33** | 33% |
 
-  All of these need to pass the evaluation first.
-- **Priority queue** costs nothing to provide.
-- **BYOK is free for Holt.** The user pays their provider, and OpenRouter charges Holt nothing for it.
+- **Evaluation first (A):** all token counts come from gpt-5-mini. Every model except gpt-5-mini must pass `docs/EVALUATION.md` before it's offered. Its real tokens then replace the estimate, and its credit price is recalculated.
+- **What that means for the free tier:** 10 free credits is 5 reports on nano or deepseek.
+- **What that means for Pro (600 credits):** 100 reports on gpt-5-mini, or 18 on Sonnet 5.
+
+### Margin per item
+Worst case: every credit spent on the model with the highest cost per credit, all on long reports. Typical: 40% of credits used, median reports. Fees: Razorpay 2% + GST = 2.36%; Dodo about 6% + 40¢ on subscriptions and 5.5% + 40¢ one-time.
+
+| item | price | credits | fee | worst AI cost | **worst contribution** | typical contribution |
+|---|---|---|---|---|---|---|
+| Pro (USD) | $6 (₹576) | 600 | ₹73 | ₹188 | **₹315 (55%)** | ₹445 (77%) |
+| Student (USD) | $3 (₹288) | 300 | ₹56 | ₹94 | **₹138 (48%)** | ₹203 (70%) |
+| Top-up (USD) | $5 (₹480) | 500 | ₹65 | ₹156 | **₹259 (54%)** | ₹366 (76%) |
+| Pro (India) | ₹299 | 400 | ₹7 | ₹125 | **₹167 (56%)** | ₹253 (85%) |
+| Student (India) | ₹149 | 200 | ₹4 | ₹63 | **₹83 (56%)** | ₹126 (85%) |
+| Top-up (India) | ₹199 | 250 | ₹5 | ₹78 | **₹116 (58%)** | ₹170 (85%) |
+
+- **The v1 problem is fixed.** v1's Pro could lose money; with credits no item can, whatever model the user picks.
+- **GST: not charged at launch (to confirm with a CA).**
+  - Below ₹20 lakh a year, an individual in Punjab selling on their own site doesn't need GST registration.
+  - Dodo is the merchant of record for USD sales and handles VAT and sales tax.
+  - Show "prices include all taxes".
 
 ---
 
-## 3. Break-even
-**Contribution per average paying user: ₹80 a month (A).**
-- Plan mix: 80% Student, 5% Pro, 15% packs.
-- Students use 30% of their quota, Pro users 15%, and packs are fully used.
+## 3. Hosting: the recommendation
 
-**Cost per free signed-in user:**
+Real memory use on staging, 25 Sep:
 
-| free AI quota | who uses it (A) | cost per free user a month |
-|---|---|---|
-| 3 | 40% use AI, 2 reports on average | ₹1.16 |
-| 1 | 40% use AI, 1 report | ₹0.58 |
-
-**Break-even conversion:** the share of signed-in users who must pay just to cover free AI.
-
-| free AI quota | break-even conversion |
+| service | memory |
 |---|---|
-| 3 | **1.4%** |
-| 1 | **0.7%** |
+| web | 72 MB |
+| API | 83 MB |
+| Postgres | 32 MB (8 MB database) |
+| edge | 7 MB |
+| warm/job process | ~85 MB |
+| **total** | **≈ 280 MB steady** |
 
-**Fixed costs** take a few more paying users on top: **1–2** on the home server, **9** on Hetzner, **30** on DigitalOcean Bangalore.
+- **Build images in GitHub Actions** and pull them to the server, so the server never needs the RAM a Next.js build takes.
 
-### Scenarios
-One month at steady state, free AI quota 3, home server.
-
-| | pessimistic | realistic | optimistic |
+| option | what | per month | notes |
 |---|---|---|---|
-| signed-in users a month (**A**) | 300 | 1,500 | 5,000 |
-| paid conversion (**A**) | 0.5% | 1.5% | 3% |
-| paying users | 1–2 | ~22 | 150 |
-| revenue | ₹152 | ₹2,284 | ₹15,225 |
-| contribution from payers | ₹120 | ₹1,806 | ₹12,039 |
-| free AI cost | ₹347 | ₹1,717 | ₹5,635 |
-| fixed | ₹98 | ₹98 | ₹98 |
-| **net** | **−₹324** | **−₹8** | **+₹6,307** |
-| net with free quota **1** | −₹150 | **+₹850** | **+₹9,100** |
-| net on Hetzner instead | −₹924 | −₹608 | +₹5,707 |
+| **A. Hetzner CX23 (pick)** | 2 vCPU / 4 GB / 40 GB, EU. Web, API, Postgres and jobs in Docker; Hetzner backups (20%); nightly `pg_dump` to Cloudflare R2 (free up to 10 GB) | **€7.09 = $8.07 = ₹775** | Cheapest. 4 GB is 10× today's use. EU→India adds about 130–150 ms, but foreign payers are the target and Cloudflare sits in front anyway. CX23 is sometimes sold out; resize to **CX33** (4 vCPU / 8 GB, €8.49) if so: **₹1,170** all-in. |
+| B. DigitalOcean Bangalore | 2 vCPU / 4 GB droplet $24 + weekly backups $4.80; self-run Postgres. Or add Managed Postgres (+$15.15) | $28.80 = **₹2,765** (managed: **₹4,220**) | Best latency in India, 3.5–5× the price. |
+| C. Vercel Pro + small VPS | Vercel Pro $20 (Hobby is non-commercial by its terms) + Hetzner CX23 for API and Postgres | $28 = **₹2,700** | Adds nothing Holt needs, and brings a second bill and function limits. |
+| Managed Postgres alone | Neon free (0.5 GB), Supabase free (pauses after a week idle), DO $15.15, Vultr $18, Linode $16 | $0–18 | Not needed at 8 MB. Revisit at 5 GB or when uptime matters. |
 
-About these assumptions:
-- **Paid conversion.** Published freemium conversion for B2B software is 3–5% ("good") and 8–12% ("great"). That's the ChartMogul 2026 report, which surveyed B2B products. Students have less money and a free BYOK route, so I assume lower: 0.5–3%.
-- **Pessimistic loses about ₹300 a month.** Paid for out of pocket, that's the cost of a Hacktoberfest-sized marketing experiment.
-- **Realistic breaks even. With a free quota of 1, it earns a little.**
-- **"Break even for sure"** comes from the budget cap in §4, not from the forecast.
+**Pick: A, Hetzner CX23 with self-run Postgres, Hetzner backups, and nightly dumps to R2.**
+
+| fixed item | ₹ per month |
+|---|---|
+| hosting (CX23 + backups + IPv4) | 775 |
+| domain ($15 a year) | 120 |
+| email (Resend free tier) | 0 |
+| **total** | **₹895 = $9.30** |
+
+- **Keep staging on the home server.** Staging isn't commercial use.
+- **Cloudflare stays in front** (free), for caching and to hide the origin.
 
 ---
 
-## 4. Is the free tier sustainable?
-Monthly cost of free AI reports on gpt-5-mini:
+## 4. Break-even, runway, and the path to ₹50k
 
-| signed-in users | quota 3, typical | quota 3, worst case (everyone uses all 3, long reports) | quota 1, typical | quota 1, worst |
+### Assumptions (A)
+- Subscribers grow linearly and are counted **net of churn**.
+- Each free signed-in user costs ₹0.90 a month in AI (3 of their 10 credits on cheap models), and total free AI spend is **capped at ₹1,000 a month**.
+- Fixed costs: ₹895 a month.
+- Contribution per payer at typical use:
+
+  | payer | contribution a month |
+  |---|---|
+  | USD Pro | ₹445 |
+  | India Pro | ₹253 |
+  | India student | ₹126 |
+  | USD student | ₹203 |
+  | USD top-up | ₹318 |
+  | India top-up | ₹145 |
+
+### Scenarios: revenue, break-even and ₹50k
+
+| scenario | new subscribers per month (USD Pro / India Pro / students) | break-even month | revenue by month 3 (Dec) | **revenue by month 6 (Mar)** | revenue by month 12 (Sep) | subscribers in March |
+|---|---|---|---|---|---|---|
+| pessimistic | +0.5 / +0.5 / +1 | **Jan** | ₹1,968 | ₹11,690 | **₹50,722** | 10 |
+| **realistic** | +3 / +2 / +5 | **Oct** | ₹21,789 | **₹78,583** (₹50k passed in Feb) | ₹2.97 lakh | 59 |
+| optimistic | +7 / +4 / +10 | **Oct** | ₹47,898 | ₹1.71 lakh | ₹6.43 lakh | 125 |
+
+The months (realistic case):
+
+| month | subscribers | revenue | net after all costs | cumulative revenue |
 |---|---|---|---|---|
-| 500 | ₹581 | ₹2,792 | ₹290 | ₹931 |
-| 2,000 | ₹2,324 | ₹11,170 | ₹1,162 | ₹3,723 |
-| 10,000 | ₹11,618 | ₹55,850 | ₹5,809 | ₹18,617 |
+| Oct | 9 | ₹3,373 | ₹1,019 | ₹3,373 |
+| Nov | 19 | ₹7,263 | ₹3,748 | ₹10,636 |
+| Dec | 29 | ₹11,152 | ₹6,757 | ₹21,789 |
+| Jan | 39 | ₹15,042 | ₹9,767 | ₹36,830 |
+| Feb | 49 | ₹18,931 | ₹12,776 | **₹55,762** |
+| Mar | 59 | ₹22,821 | ₹15,785 | ₹78,583 |
 
-**Recommendation: a free AI quota of 1 a month at launch**, plus two safeguards:
-1. **A hard monthly budget for free AI (e.g. ₹1,000).** When it's spent, free AI shows "this month's free AI reports are used up". The rules report is still free, and so are BYOK and paid plans. OpenRouter is prepaid, so topping up only a fixed amount is already a hard stop. But paying users share the same key, so Holt needs its own counter (**to build**: a global monthly free-AI budget in the server).
-2. **Popular repos get cached.** AI reports on the Hacktoberfest favourites will mostly come from the cache.
+### What ₹50k in 6 months takes
+₹50k over 6 months is **₹8,300 a month on average**. With subscribers growing steadily, that means about **50 subscribers by month 5–6**. The realistic mix above hits it with, in March:
 
-Why 1 rather than 0: the AI report is the thing people screenshot and share. One free report per person is ₹1.45 of marketing per activated user, the cheapest acquisition Holt will ever buy. Why not 3: it doubles the free cost without doubling sharing. Raise it to 2–3 later if conversion is strong.
+| payer type | count in March |
+|---|---|
+| USD Pro | 17 |
+| India Pro | 12 |
+| India students | 25 |
+| USD students | 5 |
+| top-ups | ~13 a month |
 
-### Abuse, and what to do about it
+**Foreign Pro is the lever:** one USD Pro is worth two India Pros or four Indian students. Other ways to average ₹8,300 a month:
 
-| vector | cost to Holt | mitigation |
+| mix (average paying subscribers over the 6 months) | revenue a month |
+|---|---|
+| 10 USD Pro + 5 India Pro + 7 students | ₹8,300 |
+| 14 USD Pro | ₹8,064 |
+| 6 USD Pro + 10 India Pro + 6 students + 4 India top-ups | ₹8,136 |
+
+### Runway
+**Cash needed before revenue:**
+
+| cost | when | amount |
 |---|---|---|
-| Many Google or GitHub accounts farming free AI | ₹1.45–1.86 per report | Free AI only for GitHub sign-ins (to build) with an account older than 30 days (**A**). The global budget caps the damage. |
-| Scripted AI jobs from many IPs | as above | The existing per-user and per-IP limits (`HOLT_USER_RATE_PER_HOUR`), plus the global budget. |
-| Prompt injection making long outputs | up to max tokens per call | Cap `max_tokens` per stage (check that it's set). Alert when a job costs over ₹5. |
-| Rules-report floods burning GitHub points | points only | Already mitigated: anonymous rate limits, the cache, and badge-lane caps. |
-| Reselling a paid account | small | Ignore at this scale. |
+| hosting + domain | monthly | ₹895 |
+| free AI (cap) | monthly | ₹1,000 |
+| CA consultation | one-time | ~₹2,000 |
+| Razorpay KYC | one-time | ₹199 |
+| first OpenRouter top-up (float, not spent) | one-time | $15 = ₹1,440 |
+| domain, paid upfront | one-time | ₹1,440 |
+
+- **Zero-revenue burn:** at most **₹1,895 a month**.
+- **With ₹10,000 set aside,** you last **about 5 months with no revenue at all**. The pessimistic case's worst dip is **−₹2,300** (Dec).
+- **Lean mode:** launch on the home server while nothing is paid (free and BYOK only). Move to Hetzner the day paid plans go live, which cuts the first weeks' burn to about ₹1,000.
 
 ---
 
-## 5. Revenue beyond plans
-Ranked by expected money in the next 90 days for the effort, for a solo student founder.
+## 5. Free tier: abuse controls and the global budget
 
-| # | option | effort | money in 90 days (**A**) | honest take |
-|---|---|---|---|---|
-| 1 | **Campus workshops and club partnerships** (Thapar first, through the senior; then other Punjab/NCR colleges) | medium: a 90-minute "your first open-source PR" session using Holt | ₹0–15k (2–5 sessions at ₹0–5k, often paid from club or department budgets) | **Most realistic.** It's also the best adoption channel. Charge when there's a budget and do it free when there isn't; the users are worth more than the fee. |
-| 2 | **GitHub Sponsors** | low (a profile plus a README badge) | ₹0–3k | 0% fee on personal sponsorships. Set it up at launch; it costs nothing. |
-| 3 | **A labelled sponsor on the /hacktoberfest page** (devrel budgets) | medium: outreach plus a media kit | ₹0–25k, uncertain | Budgets for Oct 2026 are mostly spent, so aim at GSoC (Feb–Mar) and Hacktoberfest 2027. Label it clearly, and never let a sponsor touch verdicts. |
-| 4 | **A paid API** (Pro "API access, coming later") | medium–high: keys, docs, billing | ₹0–2k | Very little demand yet. Build it after a user asks twice. |
-| 5 | **A maintainer or organisation tier** (dashboard, alerts, "how welcoming is my repo") | high | ~₹0 in 90 days | A good long-term product, but it takes longer than 90 days to sell to maintainers. Keep the badge free, because it spreads Holt. |
-| 6 | **Open Collective** | low | ₹0–2k | 10% host fee. Only useful if a company wants an invoice for a donation. |
-| 7 | **Affiliate links or a job board** | medium | small | **Avoid for now.** It conflicts with "the verdict can't be bought" and would cost trust, which is the product. |
+**The global cap:**
+- A **monthly free-AI budget (₹1,000)**, enforced in the server.
+- When it's spent, free AI says "free AI is used up this month". Rules reports stay free, and so do BYOK, paid plans and top-ups.
+- Alert the founder at 50%, 80% and 100%.
+- OpenRouter is prepaid, which is a second backstop, but paying users share the same key, so the server needs its own counter.
 
----
+**Controls:**
 
-## 6. Recommendations
-
-### Pricing changes
-1. **Pro: 250 → 100 AI reports a month** at ₹299, until a cheaper model passes the evaluation. Pro users rarely need 250 reports in a month anyway (**A**).
-2. **Free AI: 3 → 1 a month**, with a ₹1,000 monthly budget cap (to build) and GitHub-login age checks.
-3. **International: keep Pro at $5 or raise it to $6.** $5 leaves a thin margin (−₹53 at worst). $6 is safer. Don't add a $2 pack: Dodo's fixed 40¢ takes 26% of it. Make any USD pack at least $4.
-4. **Decide the GST wording now:** "prices include all taxes", while below the threshold.
-5. **Cache AI reports for 72 hours instead of 24.** Verdict data moves slowly, and cache hits are free. `HOLT_CACHE_HOURS` currently covers both modes, so this needs a separate AI setting.
-
-### Launch on 1 Oct vs later
-
-| launch on 1 Oct | by mid-Oct | later (Q1 2027) |
-|---|---|---|
-| unlimited free rules reports, find, starter issues, badge | Razorpay live (on the 0% offer): Student ₹99 and packs ₹49 | Dodo for international Pro |
-| free AI 1 a month (GitHub sign-in) + BYOK | Pro ₹299/100 | maintainer tier, API |
-| GitHub Sponsors | first campus workshop | sponsor deck for GSoC and Hacktoberfest 2027 |
-
-Billing isn't on staging yet: #28 is waiting for the #12 migrations. Paid plans should follow the launch by about two weeks. Don't delay the free launch for billing.
-
-### Metrics to track every week
-
-| metric | definition | healthy early target (**A**) |
-|---|---|---|
-| activation | visitors who complete their first report in one session | > 30% |
-| signed-in rate | report users who sign in | > 15% |
-| AI reports per signed-in user | charged plus cached | 1–2 |
-| **cache hit rate** | report views served from cache ÷ all report views | > 40% by week 3 |
-| **cost per charged AI report** | OpenRouter spend ÷ charged jobs | ≤ ₹1.60 |
-| free AI spend | per day and per month, against the cap | under budget |
-| paid conversion | payers ÷ signed-in users | ≥ 0.7% (break-even) |
-| GitHub points per report | points used ÷ uncached reports | ≈ 11 (alert at 25) |
-| shares and badges | share clicks, badge embeds | rising |
-| Thapar share | signups with a college email or UTM tag | tells whether the campus channel works |
-
-### The 90-day plan
-- **Weeks 0–2 (1–14 Oct):**
-  - launch free;
-  - Thapar session through the senior (UTM-tagged links);
-  - daily cost and cache dashboard;
-  - CA consultation on GST;
-  - Razorpay KYC (needs terms, privacy and refund pages).
-- **Weeks 3–4:**
-  - paid Student plan and packs live (0% fee window);
-  - Pro at 100;
-  - read activation and conversion, and adjust the free quota (1 → 2 if conversion is ≥ 1.5%).
-- **Weeks 5–8 (Nov):**
-  - model evaluation of nano, deepseek and qwen against gpt-5-mini;
-  - if one passes, move free AI to it first (the cheapest risk);
-  - 2 more college workshops;
-  - write up the Hacktoberfest numbers as a public post (publicity).
-- **Weeks 9–13 (Dec):**
-  - decide on international (Dodo) based on non-Indian traffic;
-  - sponsor deck for the GSoC season;
-  - decide whether the maintainer tier is worth building, from badge-embed numbers.
+| vector | control |
+|---|---|
+| farming with many accounts | Free credits only after GitHub sign-in, for accounts **≥ 30 days old** (**A**). One free grant per GitHub account; Google-only accounts get rules reports only. |
+| scripted jobs | The existing per-user and per-IP limits on "work", plus the global cap. |
+| long outputs and prompt injection | `max_tokens` per stage, and an alert when any job costs over $0.05. |
+| repeated repos | The cache: a fresh AI report is free for everyone and uses no credits. Consider 72-hour caching for AI reports. |
+| student-discount abuse | Verification (§6); one verified email per account; re-verify every 12 months. |
+| payment fraud and chargebacks | Low value per sale. Razorpay and Dodo do the risk checks; cancel on chargeback. |
 
 ---
 
-## 7. Risks
+## 6. Student verification (cheap to build)
 
-| risk | how it happens | mitigation |
+| method | cost | verdict |
 |---|---|---|
-| **AI cost spike** | model price changes, long outputs, farming, a viral day | the global free-AI budget; per-stage `max_tokens`; a prepaid OpenRouter balance; the cache; a cheaper evaluated model on standby |
-| **GitHub rate limits at scale** | 5,000 points an hour per token, about 450 fresh rules reports an hour | the cache (24h reports, starter issues), the warm pass for popular repos, a **GitHub App** (up to 12,500 an hour per installation). Pooling many personal tokens may break GitHub's terms, so prefer an App. |
-| **Payment compliance** | Razorpay KYC and website policy pages; recurring-mandate rules; GST at ₹20 lakh; USD payouts need proof of foreign remittance | publish terms, privacy and refund pages before KYC; a CA consultation; start INR-only |
-| **Brand risk from verdicts on popular repos** | "Not worth your time" on a famous project goes viral; maintainers push back | verdicts are fixed rules with cited evidence; say "for a first-time contributor, right now", not "bad project"; show "Not enough evidence" when unsure; a clear "maintainer? tell us" path; never publish "worst repos" lists; the badge only shows positive or neutral states (check this) |
-| **Single point of failure** | the home server, power or ISP | the Cloudflare tunnel survives an IP change; keep a Hetzner image ready (~₹700 a month) for when uptime matters more than cost |
-| **Founder time** | a student schedule | automate the numbers (the dashboard), do workshops in batches, say no to the maintainer tier until the data asks for it |
+| **University email + one-time code**, domains from the Hipo `university-domains-list` (MIT licence, updated 22 Sep 2026; 10,268 domains, 477 in India) plus Holt's own allowlist | ₹0 (email through Resend's free tier) | **Use this.** Match on suffix (`cs.x.edu` counts as `x.edu`). The list **lacks thapar.edu**, so the allowlist starts with Thapar. It's the same method Lovable uses (university email). |
+| GitHub Student Developer Pack | — | **Not possible.** There's no public API or OAuth scope. The partner programme takes 5–10 partners a year, and partner offers must be free. **Worth applying anyway with a free offer** (e.g. 3 months of student Pro): that's distribution, not a check. |
+| SheerID | custom quote, sales-led | Too heavy now. Perplexity uses it for Education Pro. |
+| ISIC, UNiDAYS | contact sales | No. |
+
+---
+
+## 7. What to change in the billing code
+To turn into tasks. Branches: `billing-server`, `billing-web`.
+
+1. **Credits ledger instead of report counts.**
+   - Table `credit_ledger (id, user_id, delta, kind: grant_monthly|topup|spend|refund|adjust, source_id, expires_at, created_at)`.
+   - The balance is the sum of unexpired rows.
+   - Spend the credits that expire soonest first: monthly credits, then top-ups.
+   - Replace the monthly counter and pack credits.
+2. **A model-to-credits table** in `plans.toml`: `[models.<id>] credits = 6, tier = "free"|"paid", enabled = true`. Plus the OpenRouter id and a max-tokens setting per stage. Recalculate from logged cost monthly.
+3. **Charge on job insert, refund on failure.** Keep the "atomic `UPDATE` in the same transaction" pattern from today's quota code, and **log the real cost** (tokens × price) on every job.
+4. **Choosing a model:** add `model` to `POST /v1/analyses` (default: the tier default). Reject a paid-tier model without paid credits, returning `needs_credits` (a new error code, documented in `API.md`).
+5. **Plans:**
+   - Pro and verified-student Pro, in USD and INR;
+   - a monthly grant on each successful renewal (webhook);
+   - no rollover;
+   - top-ups as one-time products that grant credits with a 12-month expiry (Dodo credit-based billing supports one-time credit grants; for Razorpay, grant on the payment webhook).
+6. **Currency and region:** INR through Razorpay for India (detected from `CF-IPCountry`, and the user can switch); USD through Dodo for everyone else. Store the currency on the subscription.
+7. **Student verification:** an email one-time code, the Hipo list plus an allowlist, a `verified_student_until` date, and a price only verified students can buy. Re-verify yearly.
+8. **Free-tier controls:** the global monthly free-AI budget with alerts; the GitHub account-age check; free credits only on free-tier models.
+9. **`GET /v1/me`:**
+   - balance by bucket (monthly, top-up) and expiry dates;
+   - the model list with credit costs and which are unlocked;
+   - the student status.
+
+   Update `API.md` in the same PR.
+10. **Web:**
+    - a pricing page showing the credit table;
+    - a model picker showing each model's credit cost;
+    - "credits left" in the header menu;
+    - a top-up flow and a student verification page.
+11. **An admin cost dashboard** (can start as SQL): cost per job by model, cache hit rate, free spend against the cap, conversion.
+12. **Tests:** ledger math (expiry order, refunds, parallel spends), webhook idempotency, a model not allowed for a tier.
+
+---
+
+## 8. Launch plan and metrics
+
+| when | what |
+|---|---|
+| **1 Oct** | Free launch: unlimited rules reports and free AI (10 credits, cheap models), BYOK, GitHub Sponsors. Stays on the home server while nothing is sold. |
+| by mid-Oct | Hetzner CX23 live; Razorpay (the 0% fee offer for new accounts covers the launch quarter) with India Pro and top-ups; the student email check; a Thapar workshop through the senior. |
+| by end of Oct | Dodo live (USD Pro, student, top-ups); gpt-5-nano and deepseek pass the evaluation, or free models are limited to whichever passes. |
+| Nov–Dec | Gemini and Sonnet after evaluation; apply to GitHub Education with a free student offer; post the Hacktoberfest numbers publicly. |
+| Jan–Mar | Annual plans; regional USD prices through Dodo for other lower-income countries; decide on the maintainer tier. |
+
+**Weekly metrics:**
+- activation (a first report in the same session);
+- signed-in rate;
+- AI reports per signed-in user;
+- **cache hit rate**;
+- **cost per job by model** against its credit price;
+- free spend against the cap;
+- free → paid conversion;
+- **the USD share of revenue**;
+- churn;
+- GitHub points per report (about 11 today).
+
+**Other income (v1 ranking still stands):** campus workshops (the most realistic, and also adoption), GitHub Sponsors (low effort), and a labelled sponsor on the Hacktoberfest page later. Leave the API and maintainer tier for after March, and skip affiliate links.
+
+---
+
+## 9. Risks
+
+| risk | mitigation |
+|---|---|
+| model price changes or token blow-ups | per-model credit prices recalculated monthly; the 33% cost ceiling; `max_tokens`; the free-AI cap |
+| a cheap model gives bad explanations | evaluation before listing; verdicts are rules-based anyway, so a weak model only hurts the explanation, not the verdict |
+| GitHub rate limits (5,000 points an hour per token, ~11 per report) | the cache and warm pass; a GitHub App (up to 12,500 an hour); don't pool personal tokens |
+| payment and tax | Razorpay KYC needs terms, privacy and refund pages; a CA on GST and on treating Dodo payouts as exports; Dodo payouts are USD-only (a $5 fee under $1,000, $25 SWIFT), so batch them |
+| hosting outage on one small VPS | Hetzner backups plus a nightly R2 dump, with a written restore script; a resize takes minutes |
+| brand risk from verdicts | cited evidence, "for a first-time contributor, right now" wording, a "maintainer? tell us" path, no "worst repos" lists |
 
 ---
 
 ## Sources (read 25 Sep 2026)
-- OpenRouter model prices: `https://openrouter.ai/api/v1/models`. Credit fee (5.5%, $0.80 minimum): https://openrouter.ai/docs/faq and https://openrouter.ai/pricing
-- Razorpay fees: https://razorpay.com/pricing/ ("Last updated: May 2026"). 90-day offer: https://razorpay.com/terms/90-day-free-pg-offer/. UPI mandates: https://razorpay.com/docs/payments/payment-gateway/s2s-integration/recurring-payments/upi/
-- Dodo Payments: https://dodopayments.com/pricing, https://docs.dodopayments.com/features/payouts, https://docs.dodopayments.com/miscellaneous/faq
-- GST: CGST Act s.24 (compulsory registration), https://taxinformation.cbic.gov.in/content/html/tax_repository/gst/acts/2017_CGST_act/active/chapter6/section24_v1.00.html. Thresholds: https://cleartax.in/s/gst-registration-limits-increased. LUT: https://cleartax.in/s/gst-export-bond-and-lut
-- Hetzner: https://docs.hetzner.com/general/infrastructure-and-availability/price-adjustment/. DigitalOcean: https://www.digitalocean.com/pricing/droplets. Hostinger: https://www.hostinger.com/in/vps-hosting
-- Domains: Porkbun pricing API (`https://api.porkbun.com/api/json/v3/pricing/get`); Cloudflare at-cost prices via https://cfdomainpricing.com (secondary)
-- Email: https://resend.com/pricing, https://www.brevo.com/pricing/
-- GitHub limits: https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api
-- GitHub Sponsors fees: https://docs.github.com/en/sponsors/sponsoring-open-source-contributors/about-sponsorships-fees-and-taxes. Open Source Collective fees: https://docs.oscollective.org/welcome-and-introduction-to-osc/fees
-- Conversion benchmarks: https://chartmogul.com/reports/saas-conversion-report/ (Feb 2026, B2B sample)
-- Exchange rate $1 = ₹96.02: https://open.er-api.com (25 Sep 2026)
-- Measured in this repo: tokens per report from `fixtures/trajectories/*.jsonl` (71 runs); GitHub points per rules report on staging (2 runs, 11 points each)
+- **Measured in this repo:**
+  - tokens: `fixtures/trajectories/*.jsonl` (71 runs, product calls only);
+  - GitHub points: staging, 2 runs, 11 each;
+  - memory: `docker stats` on staging.
+- **OpenRouter:**
+  - model prices: `https://openrouter.ai/api/v1/models`;
+  - fees: https://openrouter.ai/docs/faq, https://openrouter.ai/pricing
+- **Pricing mechanics:**
+  - v0: https://v0.app/pricing, https://v0.app/docs/pricing, https://v0.app/students
+  - Cursor: https://cursor.com/pricing, https://cursor.com/docs/account/pricing
+  - Lovable: https://lovable.dev/pricing, https://docs.lovable.dev/introduction/plans-and-credits, https://lovable.dev/students
+  - Perplexity: https://www.perplexity.ai/hub/pricing, and its credits and Education Pro help articles (Sep 2026)
+  - GitHub Copilot: https://github.com/features/copilot/plans
+  - Raycast: https://www.raycast.com/pricing
+- **Payments:**
+  - Razorpay: https://razorpay.com/pricing/ and https://razorpay.com/terms/90-day-free-pg-offer/
+  - Dodo fees: https://dodopayments.com/pricing
+  - Dodo features: https://docs.dodopayments.com/features/credit-based-billing, https://docs.dodopayments.com/features/purchasing-power-parity, https://docs.dodopayments.com/features/payouts
+- **GST:**
+  - CGST Act s.24: https://taxinformation.cbic.gov.in/content/html/tax_repository/gst/acts/2017_CGST_act/active/chapter6/section24_v1.00.html
+  - https://cleartax.in/s/gst-registration-limits-increased
+- **Hosting:**
+  - Hetzner: https://docs.hetzner.com/general/infrastructure-and-availability/price-adjustment/ and the price API the site calls
+  - DigitalOcean: https://www.digitalocean.com/pricing/droplets, https://www.digitalocean.com/pricing/managed-databases
+  - Vultr: https://www.vultr.com/pricing/
+  - Vercel: https://vercel.com/docs/plans/hobby, https://vercel.com/docs/plans/pro-plan
+  - Neon: https://neon.com/pricing
+  - Supabase: https://supabase.com/pricing
+  - Cloudflare R2: https://developers.cloudflare.com/r2/pricing/
+- **Student verification:**
+  - Hipo list: https://github.com/Hipo/university-domains-list
+  - GitHub Education partners: https://github.com/education/partners
+  - SheerID: https://www.sheerid.com/pricing/
+- **Other:**
+  - Resend: https://resend.com/pricing
+  - GitHub limits: https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api
+  - exchange rate $1 = ₹96.02: https://open.er-api.com (25 Sep 2026)
 
 ### Unconfirmed
-- Razorpay: whether UPI pays the 2% platform fee (its page says both "0% MDR" and "2% platform fee"), and the UPI Autopay price. Ask at onboarding.
-- Whether Dodo collects Indian GST on sales to Indian customers, and whether a payout from Dodo counts as a zero-rated export (ask a CA).
-- Hetzner's IPv4 price. Electricity cost of the home server. Everything marked **A**.
+- Razorpay: whether UPI pays the 2% platform fee (its page says both "0% MDR" and "2% platform fee"). I assumed 2.36% everywhere.
+- Whether Hetzner prices include VAT (they're normally shown without it). Whether CX23 is in stock.
+- Whether Neon and Supabase free tiers allow commercial use (their terms don't say they don't).
+- Every **A**, especially the growth ramps and conversion. Measure from week 2 and replace them.
