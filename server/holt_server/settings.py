@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     database_url: str = Field(
         "postgresql+asyncpg://holt:holt@127.0.0.1:20131/holt", alias="DATABASE_URL"
     )
+    # Run database migrations when the server starts (under a lock, so
+    # replicas take turns). Turn off when a separate migrate step runs them.
+    migrate_on_startup: bool = Field(True, alias="HOLT_MIGRATE_ON_STARTUP")
     internal_key: str = Field("", alias="HOLT_INTERNAL_KEY")
     secret_key: str = Field("", alias="HOLT_SECRET_KEY")
     # Where the badge links to: `{web_url}/{owner}/{repo}`.

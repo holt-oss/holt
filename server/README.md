@@ -22,7 +22,7 @@ curl localhost:20130/health
 ```
 
 `holt-server` reads `server/.env` when started from `server/`, plus the process
-environment (which wins). The schema is created on startup (`create_all`).
+environment (which wins). Database migrations run on startup.
 Stop Postgres with `docker compose -f server/compose.yml down` (add `-v` to
 drop the data).
 
@@ -39,6 +39,7 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 
 | Variable | Default | What it does |
 |---|---|---|
+| `HOLT_MIGRATE_ON_STARTUP` | `true` | Apply database migrations when the server starts. |
 | `HOLT_ENV` | `production` | `dev` serves the interactive docs at `/docs` and `/openapi.json`; otherwise they are off. |
 | `DATABASE_URL` | `postgresql+asyncpg://holt:holt@127.0.0.1:20131/holt` | SQLAlchemy async URL. `sqlite+aiosqlite:///path.db` works for quick experiments. |
 | `HOLT_INTERNAL_KEY` | *(empty)* | Shared secret with `web/`. Every `/v1` request must send it as `X-Holt-Internal-Key`. Empty means every `/v1` request is refused. |
@@ -94,9 +95,7 @@ Per process (fine for one server; revisit with more): rate-limit counters,
 the badge lane's concurrency count and the repo-name cache are in memory. SSE
 fan-out is in memory but falls back to re-reading the jobs table every 15s.
 
-The schema is made with `create_all`, which adds missing tables but never
-alters existing ones. Pre-launch, after a schema change, recreate the dev
-database (`docker compose -f server/compose.yml down -v`).
+The schema is managed by migrations; see [Database migrations](#database-migrations).
 
 ## Billing
 
@@ -128,6 +127,46 @@ Setting up Razorpay (once the account exists):
    `/v1/billing/verify` credits a pack as soon as the payment signature checks
    out, which Razorpay issues on *authorization*; with manual capture a payment
    could be credited and then never captured. Auto-capture closes that gap.
+
+## Database migrations
+
+The schema is managed by Alembic (`holt_server/migrations/versions/`):
+
+| Revision | What |
+|---|---|
+| `0001` | Baseline: main as of PR #6 (`users`, `jobs`, `reports`) |
+| `0002` | `starter_cache` (PR #30) |
+| `0003` | Billing: new `users`/`jobs` columns; `subscriptions`, `payments`, `refunds`, `webhook_events` |
+
+```sh
+uv run holt-server-migrate            # upgrade to the latest revision
+uv run holt-server-migrate --check    # exit 1 if the database is behind
+```
+
+`holt-server` also migrates on startup (`HOLT_MIGRATE_ON_STARTUP`, default on),
+holding a Postgres advisory lock so replicas take turns. A database created by
+`create_all` before migrations existed (no `alembic_version` table) is stamped
+at `0001` and upgraded in place; later revisions only add what is missing, so
+a preview that ran newer code under `create_all` upgrades cleanly too.
+
+For a deploy, run it as a one-shot step before the API starts, e.g. in Compose:
+
+```yaml
+  migrate:
+    image: <the API image>
+    command: ["holt-server-migrate"]      # or: python -m holt_server.migrate
+    environment: { DATABASE_URL: "postgresql+asyncpg://…" }
+    depends_on: { db: { condition: service_healthy } }
+    restart: "no"
+  api:
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    environment: { HOLT_MIGRATE_ON_STARTUP: "false" }   # optional; the lock makes both safe
+```
+
+New schema change: edit the models in `db.py`, then add a revision in
+`migrations/versions/` (next number, `down_revision` = the current head).
+`test_server_migrations.py` fails until the models and the latest revision
+match.
 
 ## Tests
 

@@ -1,9 +1,9 @@
 """Tables and sessions.
 
 Postgres in production (asyncpg); the tests use SQLite (aiosqlite), so column
-types stay portable: JSON, strings, integers, timestamps. The schema is made
-with `create_all` at startup. It is small and pre-launch; when it first needs
-to change in place, that is the moment to add Alembic.
+types stay portable: JSON, strings, integers, timestamps. The schema comes
+from Alembic migrations in `holt_server/migrations`, applied at startup and by
+`holt-server-migrate` (see holt_server.migrate).
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.pool import NullPool
 
 
 def now() -> datetime:
@@ -152,16 +153,22 @@ class Report(Base):
 
 
 class Database:
-    def __init__(self, url: str) -> None:
-        kwargs = {}
+    def __init__(self, url: str, pooled: bool = True) -> None:
+        kwargs: dict = {}
         if url.startswith("sqlite"):
             kwargs["connect_args"] = {"check_same_thread": False}
-        else:
+        elif pooled:
             kwargs.update(pool_size=5, max_overflow=5, pool_pre_ping=True)
+        if not pooled:
+            # A connection per use: for one-shot commands that open and close
+            # their own event loop (a pooled asyncpg connection is loop-bound).
+            kwargs["poolclass"] = NullPool
         self.engine: AsyncEngine = create_async_engine(url, **kwargs)
         self.session = async_sessionmaker(self.engine, expire_on_commit=False)
 
     async def create_all(self) -> None:
+        """Tables straight from the models. Only for throwaway databases; the
+        real schema comes from migrations (holt_server.migrate)."""
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 

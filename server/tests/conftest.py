@@ -166,10 +166,12 @@ def make_harness(tmp_path):
             import asyncio
 
             from holt_server.db import Base
+            from sqlalchemy import text
 
             async def reset():
                 async with services.db.engine.begin() as conn:
                     await conn.run_sync(Base.metadata.drop_all)
+                    await conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
                 await services.db.engine.dispose()
 
             asyncio.run(reset())

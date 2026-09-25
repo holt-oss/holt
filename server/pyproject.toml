@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 holt-server = "holt_server.main:run"
+holt-server-migrate = "holt_server.migrate:main"
 
 [tool.uv.sources]
 holt-cli = { workspace = true }
