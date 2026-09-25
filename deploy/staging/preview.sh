@@ -251,7 +251,7 @@ log "live: ${preview_sha:0:7} on 127.0.0.1:$port"
 # on /__build as "smoke": {"status": "failed", "failures": [...]}.
 write_smoke() {   # status message [playwright-json-report]
     STATUS="$1" MESSAGE="$2" REPORT="${3:-}" PREVIEW="$preview_sha" OUT="$STATE/smoke.json" python3 - <<'PY'
-import json, os, datetime
+import json, os, re, datetime
 env = os.environ
 doc = {"status": env["STATUS"], "message": env["MESSAGE"], "preview_sha": env["PREVIEW"],
        "at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
@@ -265,7 +265,7 @@ if env["REPORT"] and os.path.exists(env["REPORT"]):
                 if t.get("status") == "unexpected":
                     err = next((r.get("error", {}).get("message", "") for r in t.get("results", []) if r.get("error")), "")
                     failures.append({"test": " > ".join(trail + [spec["title"]]), "project": t.get("projectName"),
-                                     "error": " ".join(err.split())[:300]})
+                                     "error": " ".join(re.sub(r"\x1b\[[0-9;]*m", "", err).split())[:300]})
         for sub in suite.get("suites", []):
             walk(sub, trail)
     for s in rep.get("suites", []):
