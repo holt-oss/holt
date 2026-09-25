@@ -44,6 +44,19 @@ npm run dev -- -p $PORT
 | `/badge/{owner}/{repo}.svg` | README badge (proxied from the API) |
 | `/api/*` | BFF route handlers: start analysis, SSE proxy, starter issues, find events |
 
+## Production
+
+Required env: `AUTH_URL` (public URL, for OAuth callbacks), `AUTH_SECRET`,
+`DATABASE_URL`, `HOLT_API_URL`, `HOLT_INTERNAL_KEY`, OAuth app ids/secrets,
+and `NEXT_PUBLIC_SITE_HOST` at build time. Run `npm run db:migrate` on deploy.
+
+- `TRUST_PROXY_HEADERS=1` only when the app is reachable solely through our
+  proxy (Cloudflare tunnel). The standalone server should listen on
+  `HOSTNAME=127.0.0.1` or only on the compose network, never on a public
+  interface, or visitors could forge their rate-limit IP.
+- The server refuses to start with `MOCK_API=1` in production unless
+  `ALLOW_MOCK_IN_PROD=1` (demo deployments only).
+
 ## Checks
 
 ```sh

@@ -5,8 +5,8 @@ import { getReport } from "@/lib/api";
 import { preflight, publicGet } from "@/lib/public-api";
 import { isValidRepo } from "@/lib/repo";
 
-export function OPTIONS(req: Request) {
-  return preflight(req);
+export function OPTIONS() {
+  return preflight();
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ owner: string; repo: string }> }) {
@@ -14,5 +14,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ owner: s
   if (!isValidRepo(owner, repo)) {
     return NextResponse.json({ error: { code: "invalid_repo", message: "That isn't a GitHub repository." } }, { status: 400 });
   }
-  return publicGet(req, "report", () => getReport(`${owner}/${repo}`, "rules", 7));
+  // The extension reads only the verdict and counts, so drop the evidence list.
+  return publicGet(req, "report", async () => {
+    const r = await getReport(`${owner}/${repo}`, "rules", 7);
+    return r.ok ? { ok: true as const, data: { ...r.data, evidence: [] } } : r;
+  });
 }

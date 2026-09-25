@@ -5,14 +5,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { devSignInEnabled } from "@/auth";
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
+import { safeCallback } from "@/lib/safe-url";
 
 export async function POST(req: NextRequest) {
   if (!devSignInEnabled) return new NextResponse("Not found", { status: 404 });
   const form = await req.formData();
   const name = String(form.get("name") || "Dev Student").slice(0, 60);
   const email = `${name.toLowerCase().replace(/[^a-z0-9]+/g, ".")}@dev.holt.local`;
-  const back = String(form.get("callbackUrl") || "/");
-  const safeBack = back.startsWith("/") && !back.startsWith("//") ? back : "/";
+  const safeBack = safeCallback(String(form.get("callbackUrl") || "/"));
 
   let [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (!user) [user] = await db.insert(users).values({ name, email }).returning();

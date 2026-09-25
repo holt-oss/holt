@@ -1,17 +1,24 @@
 /**
- * The visitor's IP from proxy headers (Cloudflare first), for the API
- * server's per-IP rate limits. Outside production a missing header falls
- * back to 127.0.0.1; in production we send nothing rather than put every
- * visitor in one bucket (the server then answers 400 invalid_request).
+ * The visitor's IP, for the API server's per-IP rate limits.
+ *
+ * Proxy headers are client-controlled unless our own proxy set them, so they
+ * are trusted only with TRUST_PROXY_HEADERS=1 (staging/production, where the
+ * app is reachable only through Cloudflare). Then: cf-connecting-ip (set by
+ * Cloudflare), else the last X-Forwarded-For hop (added by our proxy; earlier
+ * entries can be forged), else X-Real-IP.
+ *
+ * Without a trusted IP: 127.0.0.1 outside production; in production nothing
+ * (the server answers 400 rather than lumping every visitor into one bucket).
  */
 export function clientIpFrom(h: Headers): string | null {
-  const ip =
-    h.get("cf-connecting-ip")?.trim() ||
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    h.get("x-real-ip")?.trim() ||
-    null;
-  if (ip) return ip;
+  if (process.env.TRUST_PROXY_HEADERS === "1") {
+    const ip =
+      h.get("cf-connecting-ip")?.trim() ||
+      h.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean).pop() ||
+      h.get("x-real-ip")?.trim();
+    if (ip) return ip;
+  }
   if (process.env.NODE_ENV !== "production") return "127.0.0.1";
-  console.warn("[holt] no client IP header (cf-connecting-ip / x-forwarded-for / x-real-ip) on a request");
+  console.warn("[holt] no trusted client IP (set TRUST_PROXY_HEADERS=1 behind the proxy)");
   return null;
 }
