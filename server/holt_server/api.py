@@ -11,7 +11,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from holt_server import __version__, badge, crypto, llm, repos, starter
@@ -302,6 +302,30 @@ def job_copy(job: Job) -> Job:
                days=job.days, params=dict(job.params or {}), user_id=job.user_id,
                key_source=job.key_source, charged=job.charged, priority=job.priority,
                dedupe_key=job.dedupe_key)
+
+
+@router.get("/reports", dependencies=[Depends(internal)])
+async def list_reports(request: Request,
+                       limit: int = Query(500, ge=1, le=5000)) -> dict[str, Any]:
+    """The latest 7-day rules report per repository, newest first (sitemaps)."""
+    svc = services(request)
+    latest = (select(func.max(Report.id).label("id"))
+              .where(Report.mode == "rules", Report.days == 7)
+              .group_by(Report.repo_key).subquery())
+    async with svc.db.session() as s:
+        # Two fields out of each report in SQL, not 500 whole report bodies.
+        rows = (await s.execute(
+            select(Report.repo, Report.mode, Report.created_at,
+                   Report.report["generated_at"].as_string(),
+                   Report.report["verdict"].as_string())
+            .join(latest, Report.id == latest.c.id)
+            .order_by(Report.created_at.desc(), Report.id.desc()).limit(limit)
+        )).all()
+    return {"reports": [
+        {"repo": repo, "mode": mode, "generated_at": generated or iso(created),
+         "verdict": verdict}
+        for repo, mode, created, generated, verdict in rows
+    ]}
 
 
 @router.get("/reports/{owner}/{repo}", dependencies=[Depends(internal)])

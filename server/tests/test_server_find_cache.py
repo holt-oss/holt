@@ -8,9 +8,8 @@ import types
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import update
-
 from holt_server.db import FindCache, now
+from sqlalchemy import update
 
 LANGS = ["python", "javascript", "typescript", "go", "rust"]
 

@@ -527,3 +527,18 @@ def test_docs_only_in_dev(make_harness):
     dev = make_harness(HOLT_ENV="dev")
     assert dev.client.get("/openapi.json").status_code == 200
     assert dev.client.get("/docs").status_code == 200
+
+
+def test_report_list_for_sitemaps(h):
+    assert h.client.get("/v1/reports").status_code == 401  # internal key, like other reads
+    assert h.get("/v1/reports").json() == {"reports": []}
+    for repo in ("octo/one", "octo/two", "pallets/flask"):
+        h.wait(h.post("/v1/analyses", {"repo": repo}).json()["job_id"])
+    # A newer report for octo/one, and a non-default question that is not listed.
+    h.wait(h.post("/v1/analyses", {"repo": "octo/one", "refresh": True}).json()["job_id"])
+    h.wait(h.post("/v1/analyses", {"repo": "octo/two", "days": 30}).json()["job_id"])
+    body = h.get("/v1/reports?limit=500").json()["reports"]
+    assert [r["repo"] for r in body] == ["octo/one", "pallets/flask", "octo/two"]
+    assert body[0] == {"repo": "octo/one", "mode": "rules",
+                       "generated_at": "2026-09-25T00:00:00Z", "verdict": "viable"}
+    assert len(h.get("/v1/reports?limit=2").json()["reports"]) == 2
