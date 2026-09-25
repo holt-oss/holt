@@ -132,7 +132,7 @@ def test_the_suggested_repository_really_is_free():
     the one path offered to someone with nothing on screen was a paid one, or a
     dead end without a key.
     """
-    from holt.tui.screens.home import SUGGESTION
+    from holt.tui.screens.home import REPLAY_SUGGESTION as SUGGESTION
     from holt.tui.session import has_recording
 
     assert has_recording(SUGGESTION), (
@@ -718,8 +718,13 @@ def test_discover_says_a_live_search_needs_a_token(tmp_path, monkeypatch):
         app.screen.query_one("#choices").index = 0
         await pilot.press("enter")
         await pilot.pause(0.3)
-        assert "GITHUB_TOKEN" in screen_text(app)
-        # The choice is still there; a missing token is not a dead end.
+        # Asked for, on the spot: the first-run token prompt.
+        assert app.screen.__class__.__name__ == "TokenScreen"
+        assert "github.com/settings/tokens/new" in screen_text(app)
+        await pilot.press("escape")
+        await pilot.pause(0.3)
+        # Skipped: the choice is still there; a missing token is not a dead end.
+        assert "GitHub token" in screen_text(app)
         assert "Search GitHub for repositories" in screen_text(app)
         assert app.screen.search is None
 
@@ -825,7 +830,7 @@ def test_a_live_find_is_assessed_live_even_where_a_recording_exists(
     choice, and the contents of `fixtures/` do not get to make it.
     """
     from holt.tui import discovery, session as session_module
-    from holt.tui.screens.home import SUGGESTION
+    from holt.tui.screens.home import REPLAY_SUGGESTION as SUGGESTION
 
     monkeypatch.setenv("GITHUB_TOKEN", "t")
     monkeypatch.setenv("OPENAI_API_KEY", "k")
@@ -1112,20 +1117,79 @@ def test_what_next_asks_for_a_github_username_in_those_words(tmp_path):
     drive(body, tmp_path, size=(120, 44))
 
 
-def test_home_says_why_it_opened_on_recordings(tmp_path, monkeypatch):
-    """Opening onto committed recordings is a decision. When the environment
-    made it for you, the chrome says so rather than showing the bare word
-    `replay` and leaving you to work out that it was not your choice."""
+def test_home_opens_live_and_says_when_it_is_rules_only(tmp_path, monkeypatch):
+    """No model set up is not a dead end: runs are rules-only, and the chrome
+    says so next to the mode, with the key that adds a model."""
+    from holt import model
+
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    model.enable_user_models_config(model.ModelsConfig())
 
     async def body(app, pilot):
+        assert app.screen.mode == "live"
         flat = " ".join(screen_text(app).split())
-        assert "replay no OPENAI_API_KEY" in flat, flat[:300]
+        assert "live rules only" in flat, flat[:300]
+        assert "OPENAI_API_KEY" not in flat
 
-        # Once you have chosen, it stops explaining itself.
-        await pilot.press("ctrl+t")
+    drive(body, tmp_path, size=(120, 44))
+
+
+def test_first_live_run_asks_for_a_token_then_runs(tmp_path, monkeypatch):
+    """The first-run prompt: paste a token, it is saved privately, the run starts."""
+    import os
+    import stat
+
+    from holt import credentials
+
+    monkeypatch.setenv("HOLT_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    started = []
+
+    async def body(app, pilot):
+        app.start_run = lambda options: started.append(options)
+        app.screen.run_repo("some/repo")
         await pilot.pause(0.3)
-        assert "no OPENAI_API_KEY" not in screen_text(app)
+        assert app.screen.__class__.__name__ == "TokenScreen"
+        app.screen.query_one("#token-input").value = "ghp_test"
+        await pilot.press("enter")
+        await pilot.pause(0.3)
+        assert [o.repo for o in started] == ["some/repo"]
+
+    drive(body, tmp_path / "store", size=(120, 44))
+    path = credentials.token_path()
+    assert credentials.saved_token() == "ghp_test"
+    if os.name != "nt":
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+
+
+def test_question_mark_opens_help_and_q_on_a_report_goes_back(tmp_path):
+    from holt.tui import store
+
+    keep = store.Store(root=tmp_path)
+    keep.save(fake_run.stored_entry(repo="astral-sh/uv", age=120))
+
+    async def body(app, pilot):
+        await pilot.press("question_mark")
+        await pilot.pause(0.3)
+        assert app.screen.__class__.__name__ == "HelpScreen"
+        assert "Worth your time" in screen_text(app)
+        await pilot.press("escape")
+        await pilot.pause(0.2)
+        assert app.screen.__class__.__name__ == "HomeScreen"
+
+        await pilot.press("down")
+        await pilot.press("enter")
+        await pilot.pause(0.4)
+        assert app.screen.__class__.__name__ == "AssessmentScreen"
+        await pilot.press("question_mark")
+        await pilot.pause(0.3)
+        assert "open on GitHub" in screen_text(app)
+        await pilot.press("escape")
+        await pilot.pause(0.2)
+        await pilot.press("q")
+        await pilot.pause(0.3)
+        assert app.screen.__class__.__name__ == "HomeScreen"
+        assert app.is_running
 
     drive(body, tmp_path, size=(120, 44))
 
@@ -1520,7 +1584,7 @@ def test_a_pasted_url_finds_the_repository_you_already_have(tmp_path):
     from holt.tui import store
 
     keep = store.Store(root=tmp_path)
-    keep.save(fake_run.stored_entry(repo="astral-sh/uv", age=120))
+    keep.save(fake_run.stored_entry(repo="astral-sh/uv", mode="live", age=120))
 
     async def body(app, pilot):
         app.screen.query_one("#repo-input", __import__(

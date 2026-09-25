@@ -68,7 +68,33 @@ def test_a_long_note_is_clipped_before_it_reaches_the_reader():
 
 def test_a_claim_keeps_its_evidence_id_next_to_it():
     out = build(claims=[Claim("merged after review", "pr:a/b#1:opened")])
-    assert "- merged after review — `pr:a/b#1:opened`" in out
+    assert "- merged after review — [pull request #1](https://github.com/a/b/pull/1)" in out
+
+
+@pytest.mark.parametrize(
+    "evidence_id,url",
+    [("pr:NixOS/nixpkgs#526518:opened", "https://github.com/NixOS/nixpkgs/pull/526518"),
+     ("issue:a/b#45:closed", "https://github.com/a/b/issues/45"),
+     ("pr:a/b#7:comment:3", "https://github.com/a/b/pull/7"),
+     ("repo:a/b:meta", "https://github.com/a/b"),
+     ("nonsense", "")],
+)
+def test_evidence_ids_become_github_links(evidence_id, url):
+    from holt.report import evidence_url
+
+    assert evidence_url(evidence_id) == url
+
+
+def test_json_carries_the_headline_and_clickable_evidence():
+    from holt.report import Assessment
+
+    data = Assessment(
+        repo="a/b", verdict=Verdict.NOT_VIABLE, summary="",
+        claims=[Claim("ignored", "pr:a/b#2:opened")],
+    ).to_dict()
+    assert data["headline"] == "Not worth your time"
+    assert data["mode"] == "rules"
+    assert data["evidence"][0]["url"] == "https://github.com/a/b/pull/2"
 
 
 def test_a_report_whose_every_claim_was_dropped_says_so_before_the_prose():

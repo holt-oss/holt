@@ -16,7 +16,6 @@ morning's result and running a new one are the same object to every screen.
 
 from __future__ import annotations
 
-import os
 import queue
 import threading
 import time
@@ -25,11 +24,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from holt import credentials, paths
 from holt import model as model_module
 from holt.agent import entry, pipeline
 from holt.evidence.fixtures import FixtureProvider, redact_records
 from holt.evidence.provider import EvidenceProvider
-from holt.report import EntryPoint
+from holt.report import VERDICT_HEADLINES, EntryPoint
 from holt.tui import events, store
 from holt.tui.observe import ObservingModel, ObservingProvider, RunCancelled
 from holt.types import Window
@@ -55,16 +55,24 @@ class RunOptions:
     #: measured decision.
     entry_points: bool = False
     contributor_days: int = 7
-    #: Where a live run records its trajectory.
-    #:
-    #: Deliberately **not** `fixtures/trajectories/`. `OpenAIModel` appends every
-    #: call to the path it is given, so pointing it at the committed fixtures
-    #: would have the interface rewrite the evidence the eval harness replays.
-    run_root: Path = Path("runs")
+    #: Where a live model run records its calls, *if* recording is on
+    #: (`HOLT_RECORD_TRAJECTORIES=1`; off by default). The user data directory
+    #: (`~/.local/share/holt/runs` on Linux): never the current directory and
+    #: never the committed recordings the eval harness replays.
+    run_root: Path = field(default_factory=paths.runs_dir)
     #: Stamped once so every call in a run lands in the same file.
     started: str = field(
         default_factory=lambda: datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     )
+
+    @property
+    def rules_only(self) -> bool:
+        """No model will be called: none is set up, and this is not a replay.
+
+        Decided when asked rather than stored, so setting up a model in the
+        models screen takes effect on the very next run.
+        """
+        return not self.replay and not model_module.model_ready()
 
     @property
     def mode(self) -> str:
@@ -378,8 +386,13 @@ class Session:
                 _provider(opts.live), self._emit, self._cancel.is_set
             )
             self.provider = provider
-            client = ObservingModel(
-                _client(repo, opts, "verdict"), self._emit, repo, self._cancel.is_set
+            inner = _client(repo, opts, "verdict")
+            # None is the rules-only run: the verdict and the counts, no model
+            # call anywhere. Nothing to observe, so nothing is wrapped.
+            client = (
+                None
+                if inner is None
+                else ObservingModel(inner, self._emit, repo, self._cancel.is_set)
             )
             self._emit(events.RunStarted(repo=repo, replayed=opts.replay))
 
@@ -421,7 +434,11 @@ class Session:
             )
             self._emit(
                 events.StageFinished(
-                    stage="verdict", seconds=0.0, summary=assessment.verdict.value
+                    stage="verdict",
+                    seconds=0.0,
+                    summary=VERDICT_HEADLINES.get(
+                        assessment.verdict, assessment.verdict.value
+                    ),
                 )
             )
 
@@ -434,7 +451,7 @@ class Session:
             # be reported as a defect, and nothing partial is stored.
             self._emit(events.RunCancelled(completed_stages=tuple(self._completed)))
         except Exception as exc:  # noqa: BLE001 - surfaced in the UI, not swallowed
-            self._emit(events.RunFailed(error=readable(exc)))
+            self._emit(events.RunFailed(error=readable(exc, repo)))
 
     def _rank(self, assessment, repo: str, provider, opts: RunOptions) -> None:
         """Attach a reading order, or say nothing.
@@ -453,6 +470,9 @@ class Session:
         self.issue_provider = issue_provider
         try:
             client = _client(repo, opts, PATHFINDER_TRAJECTORIES)
+            if client is None:
+                # The ranking is model-written; rules-only has nothing to rank with.
+                return
             self._emit(
                 events.StageStarted(
                     stage="pathfinder", model=model_module.model_for("pathfinder")
@@ -627,34 +647,25 @@ def _original_source(stored: Any) -> ReopenedEvidence | None:
     return source
 
 
-def readable(exc: BaseException) -> str:
+def readable(exc: BaseException, repo: str | None = None) -> str:
     """Turn an exception into something a person can act on.
 
-    The failures that actually happen get a sentence saying what to do next.
-    Everything else is reported as itself rather than dressed up, because a
-    confident wrong guess about a cause is worse than the raw error.
+    The same wording the command line uses — `holt.cli.friendly_error` — so a
+    failure reads the same sentence whichever way Holt was opened.
     """
-    text = str(exc)
-    if isinstance(exc, FileNotFoundError):
-        return (
-            "No recording for this repository, so it cannot be replayed. "
-            "Run it live instead."
-        )
-    if "not found or not public" in text:
-        return f"{text}. Check the owner and name, and that the repository is public."
-    if "GITHUB_TOKEN" in text or "OPENAI_API_KEY" in text:
-        return text
-    if "rate limit" in text.lower():
-        return f"{text}. GitHub is rate limiting; wait a few minutes."
-    return f"{type(exc).__name__}: {text}"
+    from holt.cli import friendly_error
+
+    return friendly_error(exc, repo)
 
 
 def _client(repo: str, opts: RunOptions, kind: str):
-    """The model client for one part of a run.
+    """The model client for one part of a run, or None for rules-only.
 
     Replay reads the committed trajectory, exactly as the CLI does. A live run
-    records to `runs/` instead, so the interface never appends to the fixtures
-    the eval harness replays.
+    uses whichever provider `holt models` chose (`model.live_client`), and when
+    no model is set up at all the run is rules-only rather than a failure.
+    Nothing is recorded unless `HOLT_RECORD_TRAJECTORIES=1`, and then only
+    under the user data directory, never over the committed recordings.
     """
     if opts.replay:
         directory = (
@@ -663,26 +674,34 @@ def _client(repo: str, opts: RunOptions, kind: str):
             else model_module.TRAJECTORY_DIR / kind
         )
         return model_module.ReplayModel(directory / (repo.replace("/", "__") + ".jsonl"))
-    return model_module.OpenAIModel(opts.recording(repo, kind))
+    if opts.rules_only:
+        return None
+    return model_module.live_client(opts.recording(repo, kind))
 
 
 def missing_credentials(opts: RunOptions) -> list[str]:
     """What a run needs before it is worth starting.
 
-    Checked up front so the answer arrives as a sentence rather than a traceback
-    part-way through a full-screen interface.
+    Only a GitHub token, for a run that reads GitHub. A model is never
+    required: without one the run is rules-only. Looked for the same way the
+    command line looks (environment, saved token, `gh auth token`).
     """
-    missing = []
-    if not opts.replay and not os.environ.get("OPENAI_API_KEY"):
-        missing.append(
-            "OPENAI_API_KEY — the stages call a model. Without it, use replay."
-        )
-    if opts.live and not os.environ.get("GITHUB_TOKEN"):
-        missing.append(
-            "GITHUB_TOKEN — live mode reads GitHub directly. Without it, only "
-            "repositories with committed fixtures can be assessed."
-        )
-    return missing
+    if opts.live and not credentials.ensure_token():
+        return [credentials.missing_token_message()]
+    return []
+
+
+def token_missing(opts: RunOptions) -> bool:
+    """A live run with no GitHub token anywhere: the interface should ask."""
+    return bool(missing_credentials(opts))
+
+
+def recordings_available() -> bool:
+    """Whether this is a clone of Holt, with recorded runs to replay."""
+    try:
+        return model_module.TRAJECTORY_DIR.is_dir()
+    except OSError:
+        return False
 
 
 def has_recording(repo: str) -> bool:

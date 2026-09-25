@@ -220,8 +220,14 @@ class DiscoverScreen(Screen):
     def _start_live(self) -> None:
         missing = discovery.missing_token()
         if missing:
-            # Said on the screen that asked for it, and the choice stays put.
+            # Ask for one, and start the search as soon as it is saved. The
+            # choice stays put either way, with the reason under it.
             self.query_one("#start-hint", Line).update(Text(missing, style=theme.DROP))
+            from holt.tui.screens.token import TokenScreen
+
+            self.app.push_screen(
+                TokenScreen(), lambda saved: self._start_live() if saved else None
+            )
             return
 
         self.search = discovery.Search(profile=self._profile())
@@ -417,11 +423,7 @@ class DiscoverScreen(Screen):
         if cached is not None:
             self.app.open_stored(cached)
             return
-        missing = session_module.missing_credentials(options)
-        if missing:
-            self._hint(missing[0])
-            return
-        self.app.start_run(options)
+        self.app.with_token(options, lambda: self.app.start_run(options))
 
     def _hint(self, message: str) -> None:
         self.query_one("#discover-hint", Line).update(Text(message, style=theme.DROP))
