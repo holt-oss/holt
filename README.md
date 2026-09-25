@@ -126,6 +126,7 @@ making a significant commitment.
 |---|---|
 | `holt analyze <owner/repo>` | Assess one repository using current GitHub data. Add `--json` for machine-readable output. |
 | `holt compare <repo>…` | Compare repositories side by side. |
+| `holt start --lang python` | Find open starter issues in repositories that merge newcomers' work. |
 | `holt profile` | Save the languages, topics, contribution type, and time budget you want. |
 | `holt discover --live` | Find and screen repositories for that profile. |
 | `holt next <repo> --as <login>` | Rank open issues after you have contributed to a project. |

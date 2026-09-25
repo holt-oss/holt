@@ -177,8 +177,9 @@ Holt searches GitHub for issues labelled for beginners (`good first issue`,
 `help wanted`, `easy`, `hacktoberfest` and their variants), checks each
 repository's recent pull requests with the free rules, and lists only the ones
 worth your time, each with its best open, unassigned issues and the reasons
-they were picked. Several topics mean "any of these". It needs a
-`GITHUB_TOKEN` (no scopes) and takes about 20 seconds. Add `--json` for the
+they were picked. Several topics mean "any of these". It uses the same GitHub
+token as everything else (`holt token`, or `gh auth token`) and takes about 20
+seconds. Add `--json` for the
 same data as the web API returns.
 
 ## After you have landed something

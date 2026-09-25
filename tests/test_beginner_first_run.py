@@ -186,6 +186,32 @@ def test_typed_github_errors_are_reworded():
     assert "holt analyze a/b" in cli.friendly_error(errors.UpstreamError(), "a/b")
 
 
+def test_retry_hints_name_the_command_that_failed():
+    from holt.evidence import errors
+
+    assert "holt start a/b" in cli.friendly_error(errors.RateLimited(60), "a/b", "start")
+    assert "holt start --lang python" in cli.friendly_error(errors.UpstreamError(), None, "start")
+    assert "holt analyze a/b" in cli.friendly_error(errors.UpstreamError(), "a/b", "models")
+
+
+def test_start_uses_a_saved_token(home, monkeypatch, capsys):
+    from holt import starter
+
+    credentials.save_token("saved-token")
+    monkeypatch.delenv("GITHUB_TOKEN")
+    seen = {}
+
+    def fake_find(languages, topics, hacktoberfest, token, **kw):
+        seen["token"] = token
+        raise starter.RateLimited(60)
+
+    monkeypatch.setattr(starter, "find", fake_find)
+    assert cli.main(["start", "--lang", "python"]) == 1
+    assert seen["token"] == "saved-token"
+    err = capsys.readouterr().err
+    assert "holt start --lang python" in err and "Traceback" not in err
+
+
 def test_a_bad_repository_name_says_what_to_type(capsys):
     assert cli.main(["analyze", "gitlab.com/a/b"]) == 1
     err = capsys.readouterr().err

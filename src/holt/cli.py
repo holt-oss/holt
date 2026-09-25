@@ -468,56 +468,42 @@ def cmd_discover(args: argparse.Namespace) -> int:
 
 def cmd_start(args: argparse.Namespace) -> int:
     """Where to start: starter issues in repositories that merge newcomers' work."""
-    import json
-    import os
-
     from holt import starter
 
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        print("`holt start` searches GitHub live and needs a GITHUB_TOKEN. "
-              "Create one at https://github.com/settings/tokens (no scopes needed) "
-              "and export it.", file=sys.stderr)
-        return 2
+    # Same lookup and same message as every other command: environment, saved
+    # token, then `gh auth token`. Errors below go to `friendly_error` in main().
+    require_github_token()
+    token = os.environ[credentials.ENV]
     progress = (lambda s: None) if args.json else (lambda s: print(s, file=sys.stderr))
-    try:
-        if args.repo:
-            from holt import reponame
-
-            repo = reponame.normalise(args.repo)
-            transport = starter.GitHub(token=token)
-            as_of = datetime.now(UTC)
-            landing = []
-            try:
-                # Where outsider work landed boosts issues that name it. Only a
-                # bonus: if the screen fails, the issues still list.
-                landing = starter.rules_screen(transport, as_of, args.days)(repo).landing
-            except starter.RateLimited:
-                raise
-            except Exception as err:
-                progress(f"Could not read pull-request history ({err}); listing issues only")
-            issues = starter.starter_issues(repo, token, limit=args.limit, as_of=as_of,
-                                            landing=landing,
-                                            hacktoberfest=args.hacktoberfest,
-                                            transport=transport)
-            print(json.dumps({"repo": repo, "issues": [i.as_dict() for i in issues]},
-                             indent=1) if args.json else starter.render_repo(repo, issues))
-            return 0
-        languages = [x for x in (args.lang or "").split(",") if x.strip()]
-        topics = [x for x in (args.topic or "").split(",") if x.strip()]
-        if not (languages or topics or args.hacktoberfest):
-            print("Say what you want to work on: --lang python, --topic cli, "
-                  "or --hacktoberfest. Or name a repository: holt start owner/repo.",
-                  file=sys.stderr)
-            return 2
-        results = starter.find(languages, topics, args.hacktoberfest, token,
-                               limit=args.limit, progress=progress, days=args.days)
-    except starter.RateLimited as err:
-        print(f"holt: {err}", file=sys.stderr)
-        return 1
-    except (starter.RepoNotFound, ValueError) as err:
-        print(f"holt: {err}", file=sys.stderr)
+    if args.repo:
+        repo = reponame.normalise(args.repo)
+        transport = starter.GitHub(token=token)
+        as_of = datetime.now(UTC)
+        landing = []
+        try:
+            # Where outsider work landed boosts issues that name it. Only a
+            # bonus: if the screen fails, the issues still list.
+            landing = starter.rules_screen(transport, as_of, args.days)(repo).landing
+        except starter.RateLimited:
+            raise
+        except Exception as err:
+            progress(f"Could not read pull-request history ({err}); listing issues only")
+        issues = starter.starter_issues(repo, token, limit=args.limit, as_of=as_of,
+                                        landing=landing,
+                                        hacktoberfest=args.hacktoberfest,
+                                        transport=transport)
+        print(json.dumps({"repo": repo, "issues": [i.as_dict() for i in issues]},
+                         indent=1) if args.json else starter.render_repo(repo, issues))
+        return 0
+    languages = [x for x in (args.lang or "").split(",") if x.strip()]
+    topics = [x for x in (args.topic or "").split(",") if x.strip()]
+    if not (languages or topics or args.hacktoberfest):
+        print("Say what you want to work on: --lang python, --topic cli, "
+              "or --hacktoberfest. Or name a repository: holt start owner/repo.",
+              file=sys.stderr)
         return 2
+    results = starter.find(languages, topics, args.hacktoberfest, token,
+                           limit=args.limit, progress=progress, days=args.days)
     if args.json:
         print(json.dumps({"results": [r.as_dict() for r in results]}, indent=1))
     else:
@@ -620,7 +606,12 @@ def cmd_token(args: argparse.Namespace) -> int:
     return 0
 
 
-def friendly_error(exc: BaseException, repo: str | None = None) -> str:
+#: Commands whose retry hint can repeat them with the same repository.
+_RETRYABLE = {"analyze", "compare", "next", "start"}
+
+
+def friendly_error(exc: BaseException, repo: str | None = None,
+                   command: str = "analyze") -> str:
     """What went wrong, in a sentence, with the command that fixes it.
 
     Matched on type where the type says enough and on the message where only
@@ -631,10 +622,12 @@ def friendly_error(exc: BaseException, repo: str | None = None) -> str:
     import httpx
 
     target = normalise(repo) if isinstance(repo, str) and repo else "owner/name"
+    if command == "start" and not repo:
+        target = "--lang python"
     text = str(exc)
     name = type(exc).__name__
     lowered = text.lower()
-    retry = f"holt analyze {target}"
+    retry = f"holt {command if command in _RETRYABLE else 'analyze'} {target}"
 
     from holt.evidence import errors as gh
 
@@ -945,7 +938,8 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:  # noqa: BLE001 - reworded, never swallowed silently
         if os.environ.get("HOLT_DEBUG"):
             raise
-        print(friendly_error(exc, getattr(args, "repo", None)), file=sys.stderr)
+        print(friendly_error(exc, getattr(args, "repo", None),
+                             getattr(args, "command", None) or "analyze"), file=sys.stderr)
         return 2 if isinstance(exc, UserError) else 1
 
 
