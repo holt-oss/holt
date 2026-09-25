@@ -17,6 +17,7 @@ from __future__ import annotations
 import statistics
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 from holt.types import EvidenceRecord
 
@@ -32,6 +33,13 @@ def pr_key(evidence_id: str) -> str:
 # at read time so fixtures stay as captured.
 _BOT_HINTS = ("dependabot", "renovate", "greenkeeper", "imgbot", "allcontributors",
               "codecov", "sonarcloud", "netlify", "vercel", "mergify", "stale")
+
+
+# A pull request opened an hour ago has not been ignored; nobody has had the
+# chance to read it. Without this, a busy repository read at any moment looked
+# hostile, because its newest pull requests -- often most of the sample -- had
+# no reply *yet*. Two days covers a weekend's silence without excusing a week.
+MIN_AGE_HOURS = 48.0
 
 
 def looks_like_bot(login: str, flagged: bool = False) -> bool:
@@ -71,6 +79,14 @@ class Thread:
     @property
     def engaged(self) -> bool:
         return any(who != self.author for _, who, _ in self.responses)
+
+    def awaiting_reply(self, as_of: datetime | None, min_age_hours: float) -> bool:
+        """Still open, unanswered, and too new for that silence to mean anything."""
+        if as_of is None or min_age_hours <= 0:
+            return False
+        if self.engaged or self.merged or self.closed_unmerged:
+            return False
+        return as_of - self.opened_at < timedelta(hours=min_age_hours)
 
 
 def build_threads(records: Iterable[EvidenceRecord]) -> dict[str, Thread]:
@@ -163,6 +179,19 @@ class Signals:
     merged_files_median: float | None = None
     merged_dirs_median: float | None = None
     merged_with_files: int = 0
+    # Outsider attempts too new to judge: unanswered, but opened less than
+    # MIN_AGE_HOURS before the reading. Counted in `outsider_threads` (they are
+    # attempts) and never in `outsider_ignored`.
+    outsider_awaiting_reply: int = 0
+    # How many outsider attempts got any reply. `median_first_response_hours`
+    # is the median over exactly these; the rest never got one, which a median
+    # over replies alone cannot show. Report the two together.
+    outsider_answered: int = 0
+
+    @property
+    def outsider_judgeable(self) -> int:
+        """Attempts old enough that silence on them means something."""
+        return self.outsider_threads - self.outsider_awaiting_reply
 
     def as_dict(self) -> dict:
         return {
@@ -179,11 +208,26 @@ class Signals:
             "merged_files_median": self.merged_files_median,
             "merged_dirs_median": self.merged_dirs_median,
             "merged_with_files": self.merged_with_files,
+            "outsider_awaiting_reply": self.outsider_awaiting_reply,
+            "outsider_answered": self.outsider_answered,
         }
 
 
-def compute(threads: dict[str, Thread]) -> Signals:
+def compute(
+    threads: dict[str, Thread],
+    as_of: datetime | None = None,
+    min_age_hours: float = MIN_AGE_HOURS,
+) -> Signals:
+    """Count what the threads show.
+
+    `as_of` is the moment the evidence is read at. Given one, attempts younger
+    than `min_age_hours` with no reply are "awaiting a reply", not ignored.
+    Without one (or with `min_age_hours=0`) every silent attempt counts, which
+    is how the committed benchmark was computed.
+    """
     outsiders = newcomer_threads(threads)
+    waiting = [t for t in outsiders if t.awaiting_reply(as_of, min_age_hours)]
+    waiting_keys = {t.key for t in waiting}
     merged_threads = [t for t in threads.values() if t.merged]
     # Every merge with a file list, not only the outsiders': what a merged
     # contribution *is* here is a property of the repository, and narrowing it
@@ -199,7 +243,10 @@ def compute(threads: dict[str, Thread]) -> Signals:
         total_threads=len(threads),
         outsider_threads=len(outsiders),
         outsider_merged=sum(1 for t in outsiders if t.merged),
-        outsider_ignored=sum(1 for t in outsiders if not t.engaged and not t.merged),
+        outsider_ignored=sum(
+            1 for t in outsiders
+            if not t.engaged and not t.merged and t.key not in waiting_keys
+        ),
         median_first_response_hours=round(statistics.median(latencies), 1) if latencies else None,
         bot_share=(bots / len(threads)) if threads else 0.0,
         distinct_outsider_authors=len({t.author for t in outsiders}),
@@ -217,4 +264,6 @@ def compute(threads: dict[str, Thread]) -> Signals:
         merged_files_median=statistics.median(file_counts) if file_counts else None,
         merged_dirs_median=statistics.median(dir_counts) if dir_counts else None,
         merged_with_files=len(shaped),
+        outsider_awaiting_reply=len(waiting),
+        outsider_answered=len(latencies),
     )
