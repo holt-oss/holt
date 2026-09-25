@@ -181,6 +181,14 @@ export function jobEvents(kind: "analyses" | "find", id: string, signal: AbortSi
   return new Response(stream, { headers: { "Content-Type": "text/event-stream" } });
 }
 
+export async function listReports(limit: number): Promise<Result<{ reports: { repo: string; mode: Mode; generated_at: string; verdict: string }[] }>> {
+  const rows = [...state().cache.values()]
+    .filter((r) => r.mode === "rules" && r.days === 7)
+    .map((r) => ({ repo: r.repo, mode: r.mode, generated_at: r.generated_at, verdict: r.verdict }))
+    .sort((a, b) => b.generated_at.localeCompare(a.generated_at));
+  return { ok: true, data: { reports: rows.slice(0, limit) } };
+}
+
 export async function getReport(repoIn: string, mode: Mode, days: number): Promise<Result<Report>> {
   const v = validate(repoIn);
   if (!v.ok) return v;

@@ -110,6 +110,21 @@ export async function getReport(repo: string, mode: Mode = "rules", days = 7): P
   return call(`/v1/reports/${repoPath(repo)}?mode=${mode}&days=${days}`);
 }
 
+/**
+ * Latest rules report per repo, newest first, for the sitemap:
+ * GET /v1/reports?limit=500 -> {"reports": [{repo, mode, generated_at, verdict}]}.
+ * Never throws; any failure (404/501 before the server ships it) is [].
+ */
+export async function listReports(limit = 500): Promise<{ repo: string; generated_at: string }[]> {
+  const n = Math.min(500, Math.max(1, Math.floor(limit)));
+  const r = MOCK ? await mock.listReports(n) : await call<unknown>(`/v1/reports?limit=${n}`);
+  const rows = r.ok ? (r.data as { reports?: unknown } | null)?.reports : null;
+  if (!Array.isArray(rows)) return [];
+  return (rows as { repo?: unknown; generated_at?: unknown }[])
+    .filter((x): x is { repo: string; generated_at: string } => typeof x?.repo === "string" && repoOk(x.repo) && typeof x.generated_at === "string")
+    .slice(0, n);
+}
+
 export async function starterIssues(repo: string, limit: number, caller: Caller): Promise<Result<{ repo: string; issues: StarterIssue[] }>> {
   if (!repoOk(repo)) return BAD_REPO;
   if (MOCK) return mock.starterIssues(repo, limit);
