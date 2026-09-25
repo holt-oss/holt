@@ -12,7 +12,7 @@ export function UpgradeCard({ repo, signedIn }: { repo: string; signedIn: boolea
         It can&apos;t change the verdict.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Link href={href} className="btn-primary bg-blue">
+        <Link href={href} prefetch={false} className="btn-primary bg-blue">
           upgrade to AI report <span aria-hidden="true">→</span>
         </Link>
         <span className="text-[0.75rem] text-faint">
