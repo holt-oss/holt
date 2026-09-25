@@ -2,9 +2,10 @@
 # Build context: the repository root.
 #   docker build -f deploy/server/Dockerfile .
 FROM python:3.12-slim AS build
+# The venv must sit at the same path in both stages: its scripts' shebangs are absolute.
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
-WORKDIR /src
+WORKDIR /app
 
 # Dependencies first, so source edits don't reinstall them.
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
@@ -18,7 +19,7 @@ RUN uv sync --frozen --no-dev --package holt-server --no-editable
 FROM python:3.12-slim
 LABEL holt.stage="holt-new"
 RUN useradd --create-home --uid 10001 holt
-COPY --from=build /src/.venv /app/.venv
+COPY --from=build /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 HOST=0.0.0.0 PORT=8000
 USER holt
 WORKDIR /home/holt
