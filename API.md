@@ -39,7 +39,8 @@ Two separate hourly buckets, per IP for anonymous callers and per user when
 signed in:
 
 - **work** — new analyses (`POST /v1/analyses` that queues a job) and
-  `POST /v1/find`. Small (anonymous: 10/h). Cached answers are free.
+  `POST /v1/find` searches that are not cached or already running. Small
+  (anonymous: 10/h). Cached answers, and joining a running job, are free.
 - **read** — cache misses on reads (`/starter-issues`). Generous (anonymous:
   120/h). Viewing, reloading and sharing report pages can never use up work.
 
@@ -111,6 +112,11 @@ Events: `stage` `{"stage": "…", "progress": 0.0–1.0}`, then exactly one of
 plain English ("Fetching pull requests", "Reading threads", "Checking evidence",
 "Writing the report").
 
+### `GET /v1/reports?limit=500` (internal key, like other reads)
+The latest 7-day rules report per repository, newest first, for sitemaps:
+`{"reports": [{"repo": "owner/repo", "mode": "rules", "generated_at": "…",
+"verdict": "viable"}]}`. `limit` 1–5000, default 500.
+
 ### `GET /v1/reports/{owner}/{repo}?mode=rules|ai&days=7`
 Latest cached report or 404 `not_found`. Public via the BFF: no user needed
 (used for shareable pages and OG images), but it still requires the internal
@@ -128,11 +134,19 @@ Returns `{"results": [ { "repo": "owner/repo", "headline": "…", "verdict": "�
 "description": "string | null", "language": "string | null", "stars": 123 | null,
 "stats": {…subset}, "issues": [StarterIssue] } ]}` (`description`, `language`
 and `stars` are null when the finder did not supply them), only repos whose rules
-verdict is `viable`, ordered by starter-issue quality. May return `202` with a
-`job_id` like analyses if it takes long; same polling/SSE endpoints under
-`/v1/find/{job_id}`. (The server always answers `202`. Polling a find job
-returns `results` instead of `report`; the SSE `done` event carries
-`{"results": [...]}`.)
+verdict is `viable`, ordered by starter-issue quality.
+
+- **Cached** (same search, finished within 6 hours): `200
+  {"status": "done", "results": [...]}` at once, with no rate limit. "Same
+  search" means the same languages and topics (order, case and duplicates
+  ignored), `hacktoberfest` and `days`; `limit` is a slice of one cached
+  answer (searches are computed for at least 20).
+- **Already running** for someone else: `202` with that search's `job_id`, also
+  free.
+- Otherwise `202 {"status": "queued", "job_id": "…"}`, which costs one unit of
+  the work bucket; poll or stream under `/v1/find/{job_id}` like analyses.
+  Polling a find job returns `results` instead of `report`; the SSE `done`
+  event carries `{"results": [...]}`.
 
 StarterIssue:
 ```jsonc

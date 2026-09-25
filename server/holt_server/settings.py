@@ -62,6 +62,15 @@ class Settings(BaseSettings):
     badge_rate_total: int = Field(60, alias="HOLT_BADGE_RATE_TOTAL")
     # Badge refreshes running at once, at most. They also queue behind user jobs.
     badge_concurrency: int = Field(1, alias="HOLT_BADGE_CONCURRENCY")
+    # Warm cache (see warm.py). 0 hours = no in-process schedule.
+    warm_interval_hours: float = Field(0, alias="HOLT_WARM_INTERVAL_HOURS")
+    warm_seeds_file: str = Field("", alias="HOLT_WARM_SEEDS")
+    # Reports younger than this are not re-run by a warm pass.
+    warm_max_age_hours: float = Field(20, alias="HOLT_WARM_MAX_AGE_HOURS")
+    # Stop a warm pass when any GitHub token has fewer GraphQL points left.
+    warm_min_points: int = Field(1500, alias="HOLT_WARM_MIN_POINTS")
+    # How long a finished /v1/find result is served for the same search.
+    find_cache_hours: float = Field(6, alias="HOLT_FIND_CACHE_HOURS")
     # Pull-request pages crawled per analysis (25 PRs a page).
     max_pages: int = Field(8, alias="HOLT_MAX_PAGES")
 

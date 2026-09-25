@@ -21,6 +21,8 @@ query($owner:String!, $name:String!) {
 }
 """
 
+RATE_LIMIT = "query { rateLimit { remaining resetAt } }"
+
 LOOKUP_TIMEOUT_S = 15.0
 
 
@@ -43,6 +45,9 @@ class TokenPool:
             )
         with self._lock:
             return next(self._cycle)
+
+    def all(self) -> list[str]:
+        return list(self._tokens)
 
 
 @dataclass
@@ -82,3 +87,17 @@ class GitHubLookup:
 
             raise not_found_repo(repo)
         return RepoInfo(name_with_owner=found["nameWithOwner"])
+
+    async def remaining(self) -> int:
+        """The fewest GraphQL points left on any token (checking is free)."""
+        return await asyncio.to_thread(self._remaining)
+
+    def _remaining(self) -> int:
+        from holt.evidence.github_graphql import GitHubGraphQL
+
+        counts = []
+        for token in self.pool.all():
+            data = GitHubGraphQL(token=token, client=self.http).query(
+                RATE_LIMIT, timeout=LOOKUP_TIMEOUT_S)
+            counts.append(int((data.get("rateLimit") or {}).get("remaining") or 0))
+        return min(counts) if counts else 0

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -26,9 +27,17 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             await migrate(svc.db.engine)
         if run_jobs:
             await svc.runner.start()
+        warming = None
+        if run_jobs and svc.settings.warm_interval_hours > 0:
+            from holt_server import warm
+
+            warming = asyncio.create_task(warm.schedule(svc), name="holt-warm")
         try:
             yield
         finally:
+            if warming is not None:
+                warming.cancel()
+                await asyncio.gather(warming, return_exceptions=True)
             if run_jobs:
                 await svc.runner.stop()
             await svc.db.dispose()

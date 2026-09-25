@@ -146,3 +146,15 @@ def test_check_command(db, monkeypatch, capsys):
     finally:
         settings.get_settings.cache_clear()
     assert "up to date" in capsys.readouterr().out
+
+
+def test_staging_as_it_is_now_upgrades(db):
+    """main with #30 and #35 under create_all: starter_cache and find_cache
+    exist, alembic_version does not."""
+    main_schema_without_alembic(db)  # users, jobs, reports, starter_cache
+    run(db, lambda conn: Base.metadata.tables["find_cache"].create(conn))
+    run(db, sql("INSERT INTO find_cache (key, params, results, created_at) "
+                "VALUES ('k', '{}', '[]', :now)", {"now": datetime.now(UTC)}))
+    asyncio.run(mig.migrate(db.engine))
+    assert asyncio.run(mig.is_current(db.engine))
+    assert run(db, sql("SELECT count(*) FROM find_cache")).scalar() == 1
