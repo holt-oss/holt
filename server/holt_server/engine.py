@@ -47,6 +47,9 @@ class Progress:
         self._emit = emit
         self.value = 0.0
         self.stage = ""
+        # Once the engine reports progress itself, its stages win and the
+        # coarse ones from the wrappers are dropped, so the two cannot alternate.
+        self.engine_driven = False
 
     def __call__(self, stage: str | None, value: float | None = None) -> None:
         value = self.value if value is None else max(self.value, min(float(value), 0.99))
@@ -56,8 +59,13 @@ class Progress:
         self.stage, self.value = stage, value
         self._emit(stage, round(value, 3))
 
+    def auto(self, stage: str, value: float) -> None:
+        if not self.engine_driven:
+            self(stage, value)
+
     def from_engine(self, *args: Any, **kwargs: Any) -> None:
         """Adapter for the engine's own callback, whatever its exact shape."""
+        self.engine_driven = True
         values = list(args) + list(kwargs.values())
         stage = next((v for v in values if isinstance(v, str)), None)
         frac = next((float(v) for v in values
@@ -81,16 +89,16 @@ class WatchedProvider:
         self._resolving = False
 
     def fetch(self, request: str, /, **params: object) -> list[EvidenceRecord]:
-        self.progress(FETCHING, 0.05)
+        self.progress.auto(FETCHING, 0.05)
         records = self.inner.fetch(request, **params)
         self.records.extend(records)
-        self.progress(READING, 0.3)
+        self.progress.auto(READING, 0.3)
         return records
 
     def resolve(self, evidence_id: str):
         if not self._resolving:
             self._resolving = True
-            self.progress(CHECKING, 0.75)
+            self.progress.auto(CHECKING, 0.75)
         return self.inner.resolve(evidence_id)
 
     def __getattr__(self, name: str):
@@ -112,7 +120,7 @@ class WatchedModel:
 
     def complete(self, *, label: str, system: str, prompt: str, schema: dict) -> dict:
         if label in MODEL_STAGES:
-            self.progress(*MODEL_STAGES[label])
+            self.progress.auto(*MODEL_STAGES[label])
         return self.inner.complete(label=label, system=system, prompt=prompt, schema=schema)
 
 
