@@ -22,7 +22,7 @@ curl localhost:20130/health
 ```
 
 `holt-server` reads `server/.env` when started from `server/`, plus the process
-environment (which wins). The schema is created on startup (`create_all`).
+environment (which wins). Database migrations run on startup.
 Stop Postgres with `docker compose -f server/compose.yml down` (add `-v` to
 drop the data).
 
@@ -39,6 +39,7 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 
 | Variable | Default | What it does |
 |---|---|---|
+| `HOLT_MIGRATE_ON_STARTUP` | `true` | Apply database migrations when the server starts. |
 | `HOLT_ENV` | `production` | `dev` serves the interactive docs at `/docs` and `/openapi.json`; otherwise they are off. |
 | `DATABASE_URL` | `postgresql+asyncpg://holt:holt@127.0.0.1:20131/holt` | SQLAlchemy async URL. `sqlite+aiosqlite:///path.db` works for quick experiments. |
 | `HOLT_INTERNAL_KEY` | *(empty)* | Shared secret with `web/`. Every `/v1` request must send it as `X-Holt-Internal-Key`. Empty means every `/v1` request is refused. |
@@ -50,8 +51,12 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenAI-compatible endpoint. |
 | `HOLT_JOB_CONCURRENCY` | `2` | Analyses running at once in this process. Each holds a thread and some memory. |
 | `HOLT_CACHE_HOURS` | `24` | How long a finished report is served instead of re-running. |
-| `HOLT_FREE_AI_LIMIT` | `3` | AI reports per user per calendar month on the server's key (plan `free`). `0` turns free AI reports off. |
-| `HOLT_PLAN_AI_LIMIT` | `100` | The same, for any other plan (set by hand in the `users` table for now). |
+| `HOLT_PLANS_FILE` | *(bundled `holt_server/plans.toml`)* | Plans, allowances, packs and prices. See [Billing](#billing). |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | *(empty)* | Razorpay API keys (test or live). Empty turns payments off: `/v1/billing/*` answer 501 and `/v1/plans` reports `"provider": null`. |
+| `RAZORPAY_WEBHOOK_SECRET` | *(empty)* | The secret set on the Razorpay webhook. Empty means every webhook is rejected. |
+| `RAZORPAY_PLAN_<PLAN>_<CURRENCY>` | *(empty)* | Razorpay plan id per plan and currency, e.g. `RAZORPAY_PLAN_STUDENT_INR=plan_…`. Overrides `razorpay_plan_id` in the plans file. |
+| `HOLT_BILLING_GRACE_HOURS` | `24` | How long a paid plan stays on past its period end while the renewal webhook arrives. |
+| `HOLT_SUBSCRIPTION_CYCLES` | `120` | Billing cycles a Razorpay subscription is created for (Razorpay requires a count). |
 | `HOLT_ANON_RATE_PER_HOUR` | `10` | Work bucket: new analyses and find per hour per IP for anonymous callers (`X-Holt-Client-Ip`). Cached answers are free. |
 | `HOLT_USER_RATE_PER_HOUR` | `60` | The same, per signed-in user. |
 | `HOLT_ANON_READ_RATE_PER_HOUR` | `120` | Read bucket, per IP: starter-issue lookups that miss the cache. Separate from the work bucket above, so page views never block analyses. |
@@ -85,19 +90,89 @@ Identical requests share one job. That is enforced by a partial unique index
 on `jobs.dedupe_key` (only over queued/running jobs), so two requests racing
 each other still get one job and one quota charge.
 
-Who pays for an AI report: a saved BYOK key if the user has one (it does not
-use up free reports); otherwise the server's OpenRouter key, counted against the
-monthly quota (an atomic `UPDATE`, in the same transaction as the job insert).
-A report that fails is refunded, again atomically and only against the month
-it was charged to.
+Who pays for an AI report: a saved BYOK key if the user has one (free and
+unlimited); otherwise the server's OpenRouter key, charged to the plan's
+allowance first and then to pack credits (`holt_server/quota.py`), each an
+atomic `UPDATE` in the same transaction as the job insert. The job records
+which pool paid; a report that fails goes back to that pool.
 
 Per process (fine for one server; revisit with more): rate-limit counters,
 the badge lane's concurrency count and the repo-name cache are in memory. SSE
 fan-out is in memory but falls back to re-reading the jobs table every 15s.
 
-The schema is made with `create_all`, which adds missing tables but never
-alters existing ones. Pre-launch, after a schema change, recreate the dev
-database (`docker compose -f server/compose.yml down -v`).
+The schema is managed by migrations; see [Database migrations](#database-migrations).
+
+## Billing
+
+Plans and packs live in `holt_server/plans.toml` (or `HOLT_PLANS_FILE`):
+allowances, whether a plan gets the priority queue, and prices in minor units
+(paise/cents). Changing a price is a config change, not a code change.
+
+The payment provider sits behind `billing/provider.py` (`PaymentProvider`);
+`billing/razorpay.py` implements it with the Orders API (packs) and the
+Subscriptions API (plans). Adding Stripe or Lemon Squeezy means another class
+with the same methods, plus its webhook route; `billing/service.py` (what a
+payment grants) stays as it is.
+
+Entitlements change only in `billing/service.py`, called from the
+signature-checked `/v1/billing/verify` and the HMAC-checked webhook. Payments
+and subscriptions are stored with provider ids, minor-unit amounts, currency
+and status; no card data is ever seen.
+
+Setting up Razorpay (once the account exists):
+
+1. Create a Plan in the dashboard for each paid plan and currency (monthly,
+   same amount as `plans.toml`), and put the ids in `RAZORPAY_PLAN_<PLAN>_<CURRENCY>`.
+2. Add a webhook to `https://<api host>/webhooks/razorpay` with a secret
+   (`RAZORPAY_WEBHOOK_SECRET`) and these events: `payment.captured`,
+   `payment.failed`, `order.paid`, all `subscription.*`, `refund.processed`
+   and all `payment.dispute.*`.
+3. Set `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`. Use test-mode keys first.
+4. **Turn on automatic capture** (Settings → Payment capture → automatic).
+   `/v1/billing/verify` credits a pack as soon as the payment signature checks
+   out, which Razorpay issues on *authorization*; with manual capture a payment
+   could be credited and then never captured. Auto-capture closes that gap.
+
+## Database migrations
+
+The schema is managed by Alembic (`holt_server/migrations/versions/`):
+
+| Revision | What |
+|---|---|
+| `0001` | Baseline: main as of PR #6 (`users`, `jobs`, `reports`) |
+| `0002` | `starter_cache` (PR #30) |
+| `0003` | Billing: new `users`/`jobs` columns; `subscriptions`, `payments`, `refunds`, `webhook_events` |
+| `0004` | `find_cache` (PR #35) |
+
+```sh
+uv run holt-server-migrate            # upgrade to the latest revision
+uv run holt-server-migrate --check    # exit 1 if the database is behind
+```
+
+`holt-server` also migrates on startup (`HOLT_MIGRATE_ON_STARTUP`, default on),
+holding a Postgres advisory lock so replicas take turns. A database created by
+`create_all` before migrations existed (no `alembic_version` table) is stamped
+at `0001` and upgraded in place; later revisions only add what is missing, so
+a preview that ran newer code under `create_all` upgrades cleanly too.
+
+For a deploy, run it as a one-shot step before the API starts, e.g. in Compose:
+
+```yaml
+  migrate:
+    image: <the API image>
+    command: ["holt-server-migrate"]      # or: python -m holt_server.migrate
+    environment: { DATABASE_URL: "postgresql+asyncpg://…" }
+    depends_on: { db: { condition: service_healthy } }
+    restart: "no"
+  api:
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    environment: { HOLT_MIGRATE_ON_STARTUP: "false" }   # optional; the lock makes both safe
+```
+
+New schema change: edit the models in `db.py`, then add a revision in
+`migrations/versions/` (next number, `down_revision` = the current head).
+`test_server_migrations.py` fails until the models and the latest revision
+match.
 
 ## Warm cache
 

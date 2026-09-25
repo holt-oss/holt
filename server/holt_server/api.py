@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
@@ -14,14 +14,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from holt_server import __version__, badge, crypto, llm, repos, starter
+from holt_server import __version__, badge, crypto, llm, quota, repos, starter
 from holt_server.db import (
     ACTIVE,
     BADGE_PRIORITY,
+    USER_PRIORITY,
     FindCache,
     Job,
     Report,
     StarterCache,
+    Subscription,
     User,
     dedupe_key,
     find_key,
@@ -103,7 +105,7 @@ async def get_user(svc: Services, user_id: str) -> User:
     async with svc.db.session() as s:
         user = await s.get(User, user_id)
         if user is None:
-            user = User(id=user_id, plan="free", ai_used=0, ai_period=period())
+            user = User(id=user_id, plan="free", ai_used=0, ai_period="")
             s.add(user)
             try:
                 await s.commit()
@@ -119,33 +121,36 @@ def signed_in(who: Caller) -> str:
     return who.user_id
 
 
-# --- quota --------------------------------------------------------------------
+# --- account body -------------------------------------------------------------
 
 
-def period(when: datetime | None = None) -> str:
-    return (when or now()).strftime("%Y-%m")
+async def active_subscription(svc: Services, user_id: str) -> Subscription | None:
+    """The user's most recent subscription, whatever its status."""
+    async with svc.db.session() as s:
+        return (await s.execute(
+            select(Subscription).where(Subscription.user_id == user_id)
+            .order_by(Subscription.created_at.desc(), Subscription.id.desc()).limit(1)
+        )).scalar_one_or_none()
 
 
-def resets_at(when: datetime | None = None) -> datetime:
-    when = when or now()
-    year, month = (when.year + 1, 1) if when.month == 12 else (when.year, when.month + 1)
-    return datetime(year, month, 1, tzinfo=UTC)
-
-
-def ai_limit(svc: Services, user: User) -> int:
-    s = svc.settings
-    return s.free_ai_limit if user.plan in ("", "free") else s.plan_ai_limit
-
-
-def ai_used(user: User) -> int:
-    return user.ai_used if user.ai_period == period() else 0
-
-
-def me_body(svc: Services, user: User) -> dict[str, Any]:
+async def me_body(svc: Services, user: User) -> dict[str, Any]:
+    plan = quota.effective_plan(user, svc.catalog, svc.grace)
+    paid = quota.is_paid(plan)
+    sub = await active_subscription(svc, user.id) if paid else None
+    renewing = sub is not None and sub.status in ("active", "pending") \
+        and not sub.cancel_at_period_end
+    until = iso(user.plan_until) if paid else None
     return {
-        "plan": user.plan or "free",
-        "quota": {"ai_used": ai_used(user), "ai_limit": ai_limit(svc, user),
-                  "resets_at": iso(resets_at())},
+        "plan": plan.id,
+        "plan_name": plan.name,
+        # Next charge date while the subscription renews; else null.
+        "renews_at": until if renewing else None,
+        # When paid access stops, if it is going to (cancelled, halted); else null.
+        "ends_at": until if (paid and not renewing and until) else None,
+        "pack_credits": user.pack_credits or 0,
+        "quota": {"ai_used": quota.used(user, plan),
+                  "ai_limit": plan.ai_reports_per_month,
+                  "resets_at": iso(quota.resets_at(user, plan))},
         "byok": {"provider": user.byok_provider, "model": user.byok_model or
                  llm.DEFAULT_MODELS.get(user.byok_provider or "", ""), "set": True}
         if user.byok_cipher else None,
@@ -261,13 +266,15 @@ async def active_job(svc: Services, key: str, mode: str, days: int) -> Job | Non
         )).scalar_one_or_none()
 
 
-async def join_active(svc: Services, key: str, mode: str, days: int) -> Job | None:
-    """The in-flight job for this question, promoted to user priority: someone
-    is waiting on it now, even if a badge queued it."""
+async def join_active(svc: Services, key: str, mode: str, days: int,
+                      priority: int = USER_PRIORITY) -> Job | None:
+    """The in-flight job for this question, promoted to the joiner's priority:
+    someone is waiting on it now, even if a badge queued it."""
     job = await active_job(svc, key, mode, days)
-    if job is not None and job.priority:
+    if job is not None and job.priority > priority:
         async with svc.db.session() as s:
-            await s.execute(update(Job).where(Job.id == job.id).values(priority=0))
+            await s.execute(update(Job).where(Job.id == job.id, Job.priority > priority)
+                            .values(priority=priority))
             await s.commit()
     return job
 
@@ -291,7 +298,7 @@ async def insert_or_join(svc: Services, job: Job, before_insert=None) -> tuple[J
         else:
             svc.runner.wake()
             return job, True
-    existing = await join_active(svc, job.repo_key, job.mode, job.days)
+    existing = await join_active(svc, job.repo_key, job.mode, job.days, job.priority)
     if existing is None:  # finished in between; retry once without the race
         return await insert_or_join(svc, job_copy(job), before_insert)
     return existing, False
@@ -301,6 +308,7 @@ def job_copy(job: Job) -> Job:
     return Job(kind=job.kind, repo=job.repo, repo_key=job.repo_key, mode=job.mode,
                days=job.days, params=dict(job.params or {}), user_id=job.user_id,
                key_source=job.key_source, charged=job.charged, priority=job.priority,
+               quota_pool=job.quota_pool,
                dedupe_key=job.dedupe_key)
 
 
@@ -361,53 +369,42 @@ async def create_analysis(body: AnalysisIn, request: Request,
 
     rate_limit(svc, who)
 
-    if existing := await join_active(svc, key, body.mode, body.days):
+    user = await get_user(svc, who.user_id) if who.user_id else None
+    plan = quota.effective_plan(user, svc.catalog, svc.grace)
+    priority = quota.job_priority(plan)
+
+    if existing := await join_active(svc, key, body.mode, body.days, priority):
         return queued(existing.id)
 
     canonical = await svc.canonical(repo)
     job = Job(kind="analysis", repo=canonical, repo_key=key, mode=body.mode,
               days=body.days, params={"refresh": body.refresh}, user_id=who.user_id,
-              dedupe_key=dedupe_key(key, body.mode, body.days))
+              dedupe_key=dedupe_key(key, body.mode, body.days), priority=priority)
     charge = None
     if body.mode == "ai":
-        user = await get_user(svc, who.user_id)
         if user.byok_cipher:
             # A saved key is used when there is one: the person chose to set
-            # it, and it leaves their free reports for later.
+            # it, it is free and unlimited, and it leaves their reports for later.
             job.key_source = "byok"
         else:
+            if not svc.server_model_available():
+                raise ApiError("needs_key", "AI reports need an API key. Add your own "
+                               "key in settings to run one.")
             job.key_source, job.charged = "server", True
-            job.params["ai_period"] = period()
-            charge = charge_ai(svc, user)
+            charge = charge_ai(user, plan, job)
     job, _created = await insert_or_join(svc, job, charge)
     return queued(job.id)
 
 
-def charge_ai(svc: Services, user: User):
+def charge_ai(user: User, plan, job: Job):
     """One AI report against the server's key, counted atomically in the same
     transaction as the job insert: a lost dedupe race refunds itself."""
-    limit = ai_limit(svc, user)
-    if limit <= 0 or not svc.server_model_available():
-        raise ApiError("needs_key", "AI reports need an API key. Add your own key "
-                       "in settings to run one.")
-    month = period()
 
     async def charge(s) -> None:
-        # New month: start the count again. Guarded so it happens once.
-        await s.execute(update(User).where(User.id == user.id, User.ai_period != month)
-                        .values(ai_period=month, ai_used=0))
-        took = await s.execute(
-            update(User).where(User.id == user.id, User.ai_period == month,
-                               User.ai_used < limit)
-            .values(ai_used=User.ai_used + 1))
-        if took.rowcount != 1:
-            await s.rollback()
-            raise ApiError(
-                "quota_exceeded",
-                f"You've used all {limit} free AI reports this month. They reset on "
-                f"{resets_at().strftime('%-d %B')}. You can add your own API key in "
-                "settings to keep going.",
-            )
+        pool, window, pack_payment = await quota.charge(s, user, plan)
+        job.quota_pool = pool
+        job.params = {**(job.params or {}), "ai_period": window,
+                      "pack_payment_id": pack_payment}
 
     return charge
 
@@ -647,7 +644,7 @@ async def find_events(job_id: str, request: Request) -> StreamingResponse:
 @router.get("/me")
 async def me(request: Request, who: Caller = Depends(caller)) -> dict[str, Any]:
     svc = services(request)
-    return me_body(svc, await get_user(svc, signed_in(who)))
+    return await me_body(svc, await get_user(svc, signed_in(who)))
 
 
 @router.put("/me/byok")
@@ -666,7 +663,7 @@ async def put_byok(body: ByokIn, request: Request,
         user.byok_model = (body.model or "").strip() or None
         user.byok_cipher = cipher
         await s.commit()
-        return me_body(svc, user)
+    return await me_body(svc, user)
 
 
 @router.delete("/me/byok")
@@ -678,7 +675,7 @@ async def delete_byok(request: Request, who: Caller = Depends(caller)) -> dict[s
         user = await s.get(User, user_id)
         user.byok_provider = user.byok_model = user.byok_cipher = None
         await s.commit()
-        return me_body(svc, user)
+    return await me_body(svc, user)
 
 
 @router.get("/me/history")

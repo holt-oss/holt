@@ -8,7 +8,7 @@ import sys
 import types
 
 import pytest
-from holt_server.db import Job, User
+from holt_server.db import USER_PRIORITY, Job, User
 from holt_server.errors import ApiError
 from sqlalchemy import select
 
@@ -226,8 +226,7 @@ def test_ai_without_server_key_or_byok_needs_key(h):
 
 
 def test_ai_quota(make_harness):
-    h = make_harness(OPENROUTER_API_KEY="sk-or-server", HOLT_FREE_AI_LIMIT=2,
-                     OPENROUTER_MODEL="some/model")
+    h = make_harness(OPENROUTER_API_KEY="sk-or-server", OPENROUTER_MODEL="some/model")
     for repo in ("octo/one", "octo/two"):
         job = h.post("/v1/analyses", {"repo": repo, "mode": "ai"}, user="u1").json()["job_id"]
         assert h.wait(job)["status"] == "done"
@@ -471,7 +470,7 @@ def test_joining_a_badge_job_promotes_it(make_harness):
     job = db_rows(h, Job)[0]
     assert job.priority == 10
     assert h.post("/v1/analyses", {"repo": "octo/one"}).json()["job_id"] == job.id
-    assert db_rows(h, Job)[0].priority == 0
+    assert db_rows(h, Job)[0].priority == USER_PRIORITY
 
 
 def test_only_stale_running_jobs_are_requeued(make_harness):

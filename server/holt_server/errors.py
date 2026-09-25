@@ -25,6 +25,8 @@ STATUS = {
     "upstream": 502,
     "internal": 500,
     "not_implemented": 501,
+    "invalid_signature": 400,
+    "already_subscribed": 409,
 }
 
 

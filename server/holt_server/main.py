@@ -11,6 +11,8 @@ from fastapi import FastAPI
 
 from holt_server import __version__, errors
 from holt_server.api import public, router
+from holt_server.billing import routes as billing_routes
+from holt_server.migrate import migrate
 from holt_server.services import Services
 from holt_server.settings import Settings, get_settings
 
@@ -21,7 +23,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        await svc.db.create_all()
+        if svc.settings.migrate_on_startup:
+            await migrate(svc.db.engine)
         if run_jobs:
             await svc.runner.start()
         warming = None
@@ -48,6 +51,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     errors.install(app)
     app.include_router(public)
     app.include_router(router)
+    app.include_router(billing_routes.router)
+    app.include_router(billing_routes.webhooks)
     return app
 
 

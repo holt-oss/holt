@@ -14,10 +14,12 @@ dependencies = [
     "pydantic-settings>=2.4",
     "cryptography>=43",
     "httpx>=0.27",
+    "alembic>=1.13",
 ]
 
 [project.scripts]
 holt-server = "holt_server.main:run"
+holt-server-migrate = "holt_server.migrate:main"
 
 [tool.uv.sources]
 holt-cli = { workspace = true }

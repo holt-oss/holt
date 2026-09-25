@@ -1,0 +1,50 @@
+# Plans and report packs. Prices are in minor units: paise for INR, cents
+# for USD. Override the whole file with HOLT_PLANS_FILE.
+#
+# Razorpay subscriptions need a plan created in the Razorpay dashboard (one per
+# plan and currency). Its id goes in `razorpay_plan_id`, or in the environment
+# as RAZORPAY_PLAN_<PLAN>_<CURRENCY> (e.g. RAZORPAY_PLAN_STUDENT_INR), which
+# wins. Ids are per Razorpay account and mode (test/live), so env is usual.
+#
+# BYOK (a user's own model key) is always free and unlimited; it is not a plan.
+
+# Shown next to prices by the web app (e.g. whether GST is included). The
+# wording is a business decision; empty means nothing is shown. A per-currency
+# note, when set, is used for that currency instead of the general one.
+tax_note = ""
+
+[tax_notes]
+# INR = ""
+# USD = ""
+
+[plans.free]
+name = "Free"
+ai_reports_per_month = 3
+priority = false
+
+[plans.student]
+name = "Student"
+ai_reports_per_month = 40
+priority = true
+features = ["Priority queue"]
+prices = [
+  { currency = "INR", amount = 9900, interval = "month" },
+]
+
+[plans.pro]
+name = "Pro"
+ai_reports_per_month = 250
+priority = true
+features = ["Priority queue", "API access (coming later)"]
+prices = [
+  { currency = "INR", amount = 29900, interval = "month" },
+  { currency = "USD", amount = 500, interval = "month" },
+]
+
+# One-time packs. Credits never expire and are used after the monthly allowance.
+[packs.pack10]
+name = "10 AI reports"
+reports = 10
+prices = [
+  { currency = "INR", amount = 4900 },
+]

@@ -34,6 +34,23 @@ jobs:
 
   tests:
     runs-on: ubuntu-latest
+    # The API server's tests also run against real Postgres: row locks, partial
+    # indexes and migrations behave differently from SQLite, and the billing
+    # concurrency tests only mean something there.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: holt
+          POSTGRES_PASSWORD: holt
+          POSTGRES_DB: holt
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U holt -d holt"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
     steps:
       - uses: actions/checkout@v7.0.1
 
@@ -47,6 +64,11 @@ jobs:
 
       - name: Tests
         run: uv run pytest -rs
+
+      - name: Server tests on Postgres
+        env:
+          HOLT_TEST_DATABASE_URL: postgresql+asyncpg://holt:holt@127.0.0.1:5432/holt
+        run: uv run pytest server/tests -rs
 
       # The no-key paths remain part of the product contract even though PyPI
       # installs are aimed at live use.

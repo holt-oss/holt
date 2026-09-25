@@ -28,8 +28,10 @@ HTTP statuses: `unauthorized` 401, `not_found` 404, `invalid_repo` and
 `invalid_request` (malformed body or query) 400, `rate_limited` 429 (also sent
 as a `Retry-After` header), `quota_exceeded` 402, `needs_key` 403 (also for an
 anonymous AI request, and when a saved BYOK key is rejected by its provider),
-`upstream` 502, `internal` 500, `not_implemented` 501 (starter issues and find,
-until the engine side ships).
+`upstream` 502, `internal` 500, `not_implemented` 501 (a feature not set up on
+this server, e.g. payments before the Razorpay keys exist),
+`invalid_signature` 400 (a payment or webhook signature did not verify),
+`already_subscribed` 409.
 
 ## Rate limits
 
@@ -163,7 +165,18 @@ limits (per client IP and in total, separate from user limits), run at most
 one at a time, and wait behind every user request.
 
 ### Account
-- `GET /v1/me` → `{"plan": "free"|"…", "quota": {"ai_used": 1, "ai_limit": 3, "resets_at": "…"}, "byok": {"provider": "openrouter"|"openai"|"anthropic"|"gemini", "model": "…", "set": true} | null}`
+- `GET /v1/me` →
+  ```jsonc
+  {
+    "plan": "free" | "student" | "pro",   // the plan in effect now
+    "plan_name": "Student",
+    "renews_at": "…" | null,              // next charge, while the subscription renews
+    "ends_at": "…" | null,                // when paid access stops (cancelled/halted), else null
+    "pack_credits": 7,                    // one-time report credits; never expire
+    "quota": {"ai_used": 1, "ai_limit": 40, "resets_at": "…"},  // the plan's allowance
+    "byok": {"provider": "openrouter"|"openai"|"anthropic"|"gemini", "model": "…", "set": true} | null
+  }
+  ```
 - `PUT /v1/me/byok` body `{"provider": "…", "api_key": "…", "model": "…"}` → stored
   encrypted (AES-GCM, key from env `HOLT_SECRET_KEY`); the key is never returned.
   Returns the same body as `GET /v1/me`.
@@ -172,12 +185,97 @@ one at a time, and wait behind every user request.
   `{"items": [{"job_id", "repo", "mode", "days", "status", "verdict", "headline", "created_at"}]}`
   (`verdict`/`headline` are null until the job is done).
 
-`/v1/me*` without `X-Holt-User` → 401 `unauthorized`. AI reports use the
-user's BYOK key when one is saved (not counted against quota); otherwise the
-server's key, counted per calendar month (UTC). Failed AI jobs are not counted.
+`/v1/me*` and `/v1/billing/*` without `X-Holt-User` → 401 `unauthorized`.
 
-Plans and payments are not implemented yet; `plan` is set manually in the DB
-for now. Free-tier quota values come from env.
+Who pays for an AI report: the user's BYOK key when one is saved (always free
+and unlimited). Otherwise the server's key, taken first from the plan's
+allowance (per calendar month on free; per billing cycle on a paid plan), then
+from pack credits; when both are empty, `quota_exceeded`. A failed AI job is
+given back to the pool that paid for it. Paid plans' jobs run ahead of
+everyone else's in the queue.
+
+## Billing
+
+Prices are integers in the currency's minor unit (paise for INR, cents for
+USD). The provider today is Razorpay; card, UPI and netbanking details go to
+Razorpay Checkout in the browser and never touch our servers.
+
+**Nothing a browser says grants anything.** Access and credits change only
+after `/v1/billing/verify` checks the provider's payment signature, or after a
+signed webhook arrives. Both are idempotent: calling verify twice, or
+receiving the webhook as well, credits once.
+
+### `GET /v1/plans` (public via the BFF: internal key, no user)
+```jsonc
+{
+  "plans": [ { "id": "student", "name": "Student", "ai_reports_per_month": 40,
+               "priority": true, "features": ["Priority queue"],
+               "prices": [ { "currency": "INR", "amount": 9900, "interval": "month" } ] } ],
+  "packs": [ { "id": "pack10", "name": "10 AI reports", "reports": 10,
+               "prices": [ { "currency": "INR", "amount": 4900 } ] } ],
+  "byok": { "price": 0, "unlimited": true },
+  "tax_note": "",                          // general note to show by prices ("" = none)
+  "tax_notes": { "INR": "…" },             // per-currency notes; use instead of tax_note
+  "provider": "razorpay" | null            // null: payments not set up on this server
+}
+```
+Plans, prices and tax notes come from server config
+(`server/holt_server/plans.toml`).
+
+### `POST /v1/billing/checkout`
+Body: `{"pack": "pack10"}` or `{"plan": "student"}`, plus optional
+`"currency": "INR"` (default) | `"USD"`. Returns what Razorpay Checkout needs:
+```jsonc
+// pack
+{ "provider": "razorpay", "key_id": "rzp_…", "kind": "order", "order_id": "order_…",
+  "amount": 4900, "currency": "INR", "name": "Holt", "description": "10 AI reports" }
+// plan
+{ "provider": "razorpay", "key_id": "rzp_…", "kind": "subscription",
+  "subscription_id": "sub_…", "amount": 9900, "currency": "INR", "name": "Holt",
+  "description": "Student plan", "short_url": "https://rzp.io/…" }
+```
+Grants nothing by itself. A user has at most one live subscription: asking
+again for the same plan returns the same open `subscription_id`; asking for a
+different plan while a checkout is still unpaid cancels the unpaid one first.
+Errors: `invalid_request` (unknown item, not sold in that currency),
+`already_subscribed` (a renewing paid plan, cancel first; or a concurrent
+checkout), `not_implemented` (payments or that plan not set up yet).
+
+### `POST /v1/billing/verify`
+Body: exactly what Razorpay Checkout's success handler returns —
+`{"razorpay_payment_id", "razorpay_signature"}` plus `razorpay_order_id` (pack)
+or `razorpay_subscription_id` (plan). Returns
+`{"status": "paid" | "active" | "authenticated" | …, "me": <GET /v1/me body>}`.
+`invalid_signature` if the signature is wrong; `not_found` if the order or
+subscription is not this user's. For a subscription the paid period is read
+from Razorpay, not from the browser; `authenticated` means the mandate is set
+but the first charge has not landed yet (the webhook will finish it).
+
+### `POST /v1/billing/cancel`
+Cancels the user's subscription at the end of the period already paid for (an
+unpaid checkout is cancelled at once).
+Returns the `GET /v1/me` body (`renews_at` null, `ends_at` set). `not_found`
+if there is nothing to cancel.
+
+### `POST /webhooks/razorpay` (no internal key; Razorpay calls it)
+Verified with HMAC-SHA256 of the raw body using `RAZORPAY_WEBHOOK_SECRET`
+(`X-Razorpay-Signature`); `invalid_signature` 400 otherwise. Bodies over 1 MB
+get 413 without being read. Idempotent on a hash of the signed body (the
+`X-Razorpay-Event-Id` header is not signed, so it is only logged). Handles
+`payment.captured`, `order.paid`, `payment.failed`, `subscription.*`
+(authenticated, activated, charged, pending, halted, cancelled, completed,
+expired, paused, resumed), `refund.processed` and `payment.dispute.*`.
+Always 200 once verified, including for events it ignores.
+
+- A subscription's events only affect the plan that subscription granted; an
+  older or cancelled subscription cannot end or overwrite a newer one, and an
+  event for an older billing period than the one stored is ignored.
+- Refunds (full or partial, each applied once): a pack loses the refunded
+  share of its reports (rounded up, never below zero); a fully refunded
+  subscription payment ends the plan it paid for.
+- Disputes: the payment is flagged and the user's pack credits are frozen
+  (kept, not spendable) until the dispute closes; a lost dispute counts as a
+  refund.
 
 ## Public proxy for the browser extension (implemented by `web/`)
 

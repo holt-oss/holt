@@ -1,9 +1,9 @@
 """Tables and sessions.
 
 Postgres in production (asyncpg); the tests use SQLite (aiosqlite), so column
-types stay portable: JSON, strings, integers, timestamps. The schema is made
-with `create_all` at startup. It is small and pre-launch; when it first needs
-to change in place, that is the moment to add Alembic.
+types stay portable: JSON, strings, integers, timestamps. The schema comes
+from Alembic migrations in `holt_server/migrations`, applied at startup and by
+`holt-server-migrate` (see holt_server.migrate).
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.pool import NullPool
 
 
 def now() -> datetime:
@@ -53,13 +54,33 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(200), primary_key=True)
     plan: Mapped[str] = mapped_column(String(40), default="free")
-    # AI reports run on the server's key in `ai_period` (a "YYYY-MM" month).
+    # When paid access ends unless renewed. Null with a paid plan means a grant
+    # made by hand, which does not lapse. Changed only by verified payment
+    # events (see billing/service.py), never by what a client says.
+    plan_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Start of the current paid billing cycle: the monthly allowance resets on
+    # the subscription's cycle, not the calendar month.
+    cycle_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # AI reports run on the server's key in `ai_period` (see quota.period_key).
     ai_used: Mapped[int] = mapped_column(Integer, default=0)
-    ai_period: Mapped[str] = mapped_column(String(7), default="")
+    ai_period: Mapped[str] = mapped_column(String(20), default="")
+    # One-time pack credits. Never expire; spent after the monthly allowance.
+    pack_credits: Mapped[int] = mapped_column(Integer, default=0)
+    # Set while a pack payment is disputed: credits stay but cannot be spent.
+    packs_frozen: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The provider subscription that granted `plan`. Only that subscription's
+    # events (or a newer one's) may change or end it.
+    plan_subscription_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     byok_provider: Mapped[str | None] = mapped_column(String(40), nullable=True)
     byok_model: Mapped[str | None] = mapped_column(String(200), nullable=True)
     byok_cipher: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+# Lower runs first: paid plans, then everyone else, then badge refreshes.
+PAID_PRIORITY = 0
+USER_PRIORITY = 5
+BADGE_PRIORITY = 10
 
 
 class Job(Base):
@@ -77,11 +98,14 @@ class Job(Base):
     # Where the model key came from: "server" (counts against quota) or "byok".
     key_source: Mapped[str | None] = mapped_column(String(10), nullable=True)
     charged: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Which pool paid for it: "plan" (monthly allowance) or "pack". Refunds go
+    # back to the same pool.
+    quota_pool: Mapped[str | None] = mapped_column(String(8), nullable=True)
     # Identical questions share a job: at most one queued/running job per key,
     # enforced by the partial unique index below, not by a read-then-insert.
     dedupe_key: Mapped[str | None] = mapped_column(String(260), nullable=True)
-    # Lower runs first. User requests are 0; badge refreshes are BADGE_PRIORITY.
-    priority: Mapped[int] = mapped_column(Integer, default=0)
+    # Lower runs first; see PAID_PRIORITY / USER_PRIORITY / BADGE_PRIORITY.
+    priority: Mapped[int] = mapped_column(Integer, default=USER_PRIORITY)
     # The runner that claimed the job, and when it last said it was alive. A
     # `running` job whose heartbeat is stale belonged to a dead process.
     worker_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
@@ -105,7 +129,6 @@ class Job(Base):
     )
 
 
-BADGE_PRIORITY = 10
 ACTIVE = ("queued", "running")
 
 
@@ -130,16 +153,22 @@ class Report(Base):
 
 
 class Database:
-    def __init__(self, url: str) -> None:
-        kwargs = {}
+    def __init__(self, url: str, pooled: bool = True) -> None:
+        kwargs: dict = {}
         if url.startswith("sqlite"):
             kwargs["connect_args"] = {"check_same_thread": False}
-        else:
+        elif pooled:
             kwargs.update(pool_size=5, max_overflow=5, pool_pre_ping=True)
+        if not pooled:
+            # A connection per use: for one-shot commands that open and close
+            # their own event loop (a pooled asyncpg connection is loop-bound).
+            kwargs["poolclass"] = NullPool
         self.engine: AsyncEngine = create_async_engine(url, **kwargs)
         self.session = async_sessionmaker(self.engine, expire_on_commit=False)
 
     async def create_all(self) -> None:
+        """Tables straight from the models. Only for throwaway databases; the
+        real schema comes from migrations (holt_server.migrate)."""
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
@@ -155,6 +184,116 @@ class Database:
         await self.engine.dispose()
 
 
+# --- billing ------------------------------------------------------------------
+#
+# No card data is ever stored or seen: the provider's checkout collects it.
+# Amounts are integers in minor units (paise, cents) with their currency.
+
+LIVE_SUBSCRIPTION = ("status IN ('created', 'authenticated', 'active', 'pending') "
+                     "AND NOT cancel_at_period_end")
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(200), index=True)
+    provider: Mapped[str] = mapped_column(String(20))
+    provider_subscription_id: Mapped[str] = mapped_column(String(100), unique=True)
+    plan: Mapped[str] = mapped_column(String(40))
+    currency: Mapped[str] = mapped_column(String(3))
+    amount: Mapped[int] = mapped_column(Integer)
+    # created | authenticated | active | pending | halted | cancelled | completed | expired
+    status: Mapped[str] = mapped_column(String(20), default="created")
+    current_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    current_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now,
+                                                 onupdate=now)
+
+    # At most one live, renewing subscription per user: a second checkout
+    # reuses or cancels the first (billing/routes.py), and this makes a race
+    # between two checkouts fail instead of billing twice.
+    __table_args__ = (
+        Index("ux_subscriptions_one_live", "user_id", unique=True,
+              postgresql_where=text(LIVE_SUBSCRIPTION),
+              sqlite_where=text(LIVE_SUBSCRIPTION)),
+    )
+
+
+class Payment(Base):
+    """One payment. Pack rows double as a credit ledger.
+
+    Lock order, everywhere a pack row and a user row change together: the
+    user row first, then the payment row (SELECT ... FOR UPDATE). Spending
+    (which updates the user row before touching a pack), refunds, crediting
+    and returning a credit all follow it, so they serialise per user instead
+    of losing each other's updates or deadlocking.
+    """
+
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(200), index=True)
+    provider: Mapped[str] = mapped_column(String(20))
+    kind: Mapped[str] = mapped_column(String(20))  # pack | subscription
+    item: Mapped[str] = mapped_column(String(40))  # pack id or plan id
+    provider_order_id: Mapped[str | None] = mapped_column(String(100), unique=True,
+                                                          nullable=True)
+    provider_payment_id: Mapped[str | None] = mapped_column(String(100), unique=True,
+                                                            nullable=True)
+    provider_subscription_id: Mapped[str | None] = mapped_column(String(100), nullable=True,
+                                                                 index=True)
+    amount: Mapped[int] = mapped_column(Integer)
+    currency: Mapped[str] = mapped_column(String(3))
+    status: Mapped[str] = mapped_column(String(20), default="created")  # created|paid|failed
+    # Pack credits were added for this payment. Set in the same transaction as
+    # the credit, under a conditional UPDATE, so no event credits twice.
+    credited: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Minor units refunded so far (partial refunds add up).
+    refunded_amount: Mapped[int] = mapped_column(Integer, default=0)
+    # Pack ledger. `credits_left`: this pack's unspent reports (packs are spent
+    # oldest first). `credits_taken`: reports actually clawed back (or never
+    # granted) for refunds. The refunded share is ceil(reports * refunded /
+    # amount); whatever of it is not yet taken is owed, and is taken from this
+    # pack's unspent credits as soon as there are any (a later refund, or a
+    # credit coming back from a failed job).
+    credits_left: Mapped[int] = mapped_column(Integer, default=0)
+    credits_taken: Mapped[int] = mapped_column(Integer, default=0)
+    # Reports this pack was sold with, fixed at checkout: later price or pack
+    # changes in plans.toml do not change what was bought.
+    reports: Mapped[int] = mapped_column(Integer, default=0)
+    disputed: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now,
+                                                 onupdate=now)
+
+
+class Refund(Base):
+    """Each provider refund, applied once however many events mention it."""
+
+    __tablename__ = "refunds"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String(20))
+    provider_refund_id: Mapped[str] = mapped_column(String(100), unique=True)
+    payment_id: Mapped[int] = mapped_column(Integer, index=True)
+    amount: Mapped[int] = mapped_column(Integer)
+    currency: Mapped[str] = mapped_column(String(3))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class WebhookEvent(Base):
+    """Every webhook delivery we acted on, keyed by a hash of its signed body
+    (the event-id header is not covered by the signature)."""
+
+    __tablename__ = "webhook_events"
+
+    provider: Mapped[str] = mapped_column(String(20), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    type: Mapped[str] = mapped_column(String(60))
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 class FindCache(Base):
     """Finished `/v1/find` results by profile, so a repeated search is instant."""
 
