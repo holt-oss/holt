@@ -93,6 +93,9 @@ export default async function RepoPage({ params, searchParams }: Props) {
           alt=""
           width={40}
           height={40}
+          // Decorative and small: don't compete with the CSS and fonts the verdict needs.
+          fetchPriority="low"
+          decoding="async"
           className="size-10 rounded-md border border-line-strong bg-panel-2"
         />
         <div className="min-w-0 flex-1">
@@ -105,8 +108,10 @@ export default async function RepoPage({ params, searchParams }: Props) {
           </a>
         </div>
         <nav aria-label="Report type" className="grid w-full grid-cols-2 border border-line-strong text-center text-[0.78rem] sm:flex sm:w-auto">
+          {/* No prefetch: one tab is this page, the other is sign-in for most visitors. */}
           <Link
             href={`/${display}`}
+            prefetch={false}
             aria-current={mode === "rules" ? "page" : undefined}
             className={`px-3 py-2 ${mode === "rules" ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
           >
@@ -114,6 +119,7 @@ export default async function RepoPage({ params, searchParams }: Props) {
           </Link>
           <Link
             href={signedIn ? `/${display}?mode=ai` : `/signin?callbackUrl=${encodeURIComponent(`/${display}?mode=ai`)}`}
+            prefetch={false}
             aria-current={mode === "ai" ? "page" : undefined}
             className={`px-3 py-2 ${mode === "ai" ? "bg-blue text-on-accent" : "text-muted hover:text-ink"}`}
           >
