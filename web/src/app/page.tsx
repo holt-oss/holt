@@ -37,7 +37,7 @@ export default function Home() {
               {hf && <HacktoberfestPill year={hf.year} short={hf.short} />}
               <p className="text-[0.78rem] text-muted">holt / free / for first-time contributors</p>
             </div>
-            <h1 className="display mb-5 text-[clamp(1.95rem,8.2vw,3.5rem)]">
+            <h1 className="display mb-5 text-[clamp(1.95rem,8.2vw,3.15rem)]">
               <span className="headline-line"><span>Find an open-source</span></span>
               <span className="headline-line"><span>project that will</span></span>
               <span className="headline-line"><span className="text-orange"><span className="marker">actually merge</span> your first PR.</span></span>

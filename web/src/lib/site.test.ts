@@ -19,3 +19,9 @@ test("hides after October and long before it", () => {
   assert.equal(at("2026-12-15T00:00:00Z"), null);
   assert.equal(at("2026-07-01T00:00:00Z"), null);
 });
+
+test("the campaign page knows when October is over", async () => {
+  const { hacktoberfestOver } = await import("./site.ts");
+  assert.equal(hacktoberfestOver(2026, new Date("2026-10-31T23:59:59Z")), false);
+  assert.equal(hacktoberfestOver(2026, new Date("2026-11-01T00:00:00Z")), true);
+});

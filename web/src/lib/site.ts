@@ -23,3 +23,8 @@ export function hacktoberfest(now = new Date()): { live: boolean; text: string; 
   }
   return null;
 }
+
+/** True from 1 November (UTC) of `year`. */
+export function hacktoberfestOver(year: number, now = new Date()): boolean {
+  return now.getTime() >= Date.UTC(year, 10, 1);
+}

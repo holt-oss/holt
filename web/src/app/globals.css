@@ -263,6 +263,16 @@
     background: var(--orange);
   }
 
+  .bracket-link--hf {
+    border-color: var(--hf);
+    color: var(--hf);
+  }
+  .bracket-link--hf:hover,
+  .bracket-link--hf:focus-visible {
+    color: var(--bg);
+    background: var(--hf);
+  }
+
   .panel {
     box-shadow: var(--card-shadow);
   }

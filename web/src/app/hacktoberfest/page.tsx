@@ -7,7 +7,7 @@ import { FindRunner } from "@/components/find/find-runner";
 import { ShareBar } from "@/components/report/share-bar";
 import { cachedFind } from "@/lib/find-cached";
 import { caller } from "@/lib/session";
-import { hacktoberfest, SITE_URL } from "@/lib/site";
+import { hacktoberfest, hacktoberfestOver, SITE_URL } from "@/lib/site";
 
 const YEAR = 2026;
 
@@ -53,31 +53,46 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
   const sp = await searchParams;
   const tab = LANGS.find((l) => l.id === sp.lang) ?? LANGS[0];
   const hf = hacktoberfest();
+  const ended = hacktoberfestOver(YEAR);
   const result = await cachedFind({ languages: [...tab.langs], topics: [], days: 7, hacktoberfest: true, limit: 12 }, await caller());
   const here = `/hacktoberfest${tab.id === "all" ? "" : `?lang=${tab.id}`}`;
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-line">
+      {/* Campaign header: a limited-time event page, not part of the core site. */}
+      <section className="relative overflow-hidden border-b border-hf-line bg-hf-bg">
         <div
           aria-hidden="true"
-          className="absolute inset-0 opacity-[0.06]"
-          style={{ backgroundImage: "repeating-linear-gradient(135deg, var(--orange) 0 10px, transparent 10px 22px)" }}
+          className="absolute inset-0 opacity-[0.08]"
+          style={{ backgroundImage: "repeating-linear-gradient(135deg, var(--hf) 0 2px, transparent 2px 14px)" }}
         />
-        <div className="wrap relative py-12 sm:py-16">
-          <p className="rail mb-4 flex gap-2">
-            <strong className="m-0 text-orange">hacktoberfest</strong>
-            <span>{hf ? hf.text : "every October"}</span>
-          </p>
-          <h1 className="display max-w-4xl text-[clamp(2.1rem,7vw,4rem)]">
-            Your first Hacktoberfest PR, <span className="text-orange">in a repo that will actually review it.</span>
+        <div className="wrap relative py-10 sm:py-14">
+          <div className="mb-6 flex flex-wrap items-center gap-2 text-[0.72rem] uppercase tracking-[0.08em]">
+            <span className="rounded-full bg-hf px-3 py-1 font-semibold text-bg">limited-time event</span>
+            <span className="rounded-full border border-hf-line px-3 py-1 text-hf">Hacktoberfest {YEAR} · 1–31 October</span>
+            {hf && (
+              <span className="inline-flex items-center gap-2 rounded-full border border-hf-line px-3 py-1 text-hf">
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-orange motion-safe:animate-pulse" />
+                {hf.short}
+              </span>
+            )}
+          </div>
+          {ended && (
+            <p role="status" className="mb-6 max-w-2xl border border-hf-line bg-panel px-4 py-3 font-sans text-[0.92rem] text-muted">
+              Hacktoberfest {YEAR} has ended. The projects below still welcome newcomers, and{" "}
+              <Link href="/find" className="text-link">/find</Link> works all year.
+            </p>
+          )}
+          <h1 className="display max-w-4xl text-[clamp(2rem,6.5vw,3.6rem)]">
+            Your first Hacktoberfest PR, <span className="text-hf">in a repo that will actually review it.</span>
           </h1>
           <p className="prose-sans mt-5 max-w-2xl text-[1.05rem]">
             Every project below takes part in Hacktoberfest, replies to newcomers and merges their work. Each comes with
             open issues you could pick up today, and what to do next.
           </p>
+          <p className="mt-3 text-[0.78rem] text-faint">This page is for October. Outside Hacktoberfest, use <Link href="/find" className="text-link">find a project</Link>.</p>
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
-            <a href="#tips" className="bracket-link border-orange text-orange hover:bg-orange">[ 5 tips so your PR isn&apos;t ignored ]</a>
+            <a href="#tips" className="bracket-link bracket-link--hf">[ 5 tips so your PR isn&apos;t ignored ]</a>
             <ShareBar url={`${SITE_URL}/hacktoberfest`} text={`Doing Hacktoberfest ${YEAR}? These repos actually review newcomers' pull requests:`} />
           </div>
         </div>
@@ -92,7 +107,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
                   href={l.id === "all" ? "/hacktoberfest" : `/hacktoberfest?lang=${l.id}`}
                   scroll={false}
                   aria-current={l.id === tab.id ? "page" : undefined}
-                  className={`chip min-h-11 whitespace-nowrap px-4 text-[0.85rem] transition-colors ${l.id === tab.id ? "border-orange bg-orange text-on-accent" : "hover:border-orange hover:text-ink"}`}
+                  className={`chip min-h-11 whitespace-nowrap px-4 text-[0.85rem] transition-colors ${l.id === tab.id ? "border-hf bg-hf text-bg" : "hover:border-hf hover:text-ink"}`}
                 >
                   {l.label}
                 </Link>
