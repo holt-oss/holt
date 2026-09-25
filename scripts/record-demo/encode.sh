@@ -7,14 +7,26 @@ raw="${1:-$here/out}"
 assets="$(cd "$here/../.." && pwd)/assets"
 mkdir -p "$assets"
 
+# record.mjs writes <name>.cuts.json: [[from, to], ...] seconds of waiting to drop.
+cutfilter() { # in.webm -> "fps=25,select=...,setpts=..." (or just fps=25)
+  local cuts="${1%.webm}.cuts.json"
+  node -e '
+    const fs = require("fs");
+    const cuts = fs.existsSync(process.argv[1]) ? JSON.parse(fs.readFileSync(process.argv[1], "utf8")) : [];
+    const keep = ["gte(t,0.4)", ...cuts.map(([a, b]) => `not(between(t,${a.toFixed(2)},${b.toFixed(2)}))`)].join("*");
+    const q = "\u0027"; // quote the expression: its commas would split the filtergraph
+    process.stdout.write(`fps=25,select=${q}${keep}${q},setpts=N/25/TB`);
+  ' "$cuts"
+}
+
 mp4() { # in out
-  ffmpeg -hide_banner -loglevel error -y -i "$1" -ss 0.4 -c:v libx264 -preset slow -crf 24 \
+  ffmpeg -hide_banner -loglevel error -y -i "$1" -vf "$(cutfilter "$1")" -c:v libx264 -preset slow -crf 24 \
     -pix_fmt yuv420p -movflags +faststart -an "$2"
 }
 
 gif() { # in out width fps
-  ffmpeg -hide_banner -loglevel error -y -ss 0.4 -i "$1" \
-    -vf "fps=$4,scale=$3:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" \
+  ffmpeg -hide_banner -loglevel error -y -i "$1" \
+    -vf "$(cutfilter "$1"),fps=$4,scale=$3:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" \
     "$2"
 }
 
@@ -32,4 +44,6 @@ if [ -f "$raw/demo-desktop.webm" ]; then
     [ "$size" -lt $((8 * 1024 * 1024)) ] && break
   done
 fi
-ls -la "$assets"
+for f in "$assets"/demo.mp4 "$assets"/demo-phone.mp4 "$assets"/url-trick.mp4; do
+  [ -f "$f" ] && echo "$(basename "$f"): $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f")s, $(( $(stat -c %s "$f") / 1024 )) KB"
+done
