@@ -99,11 +99,11 @@ async function mainFlow(page, mobile) {
 /** A drawn address bar: swap github.com for our host, then land on the real page. */
 async function trickFlow(page) {
   const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
-  await page.setContent(`<!doctype html><html><body style="margin:0;background:#0d0e0e;color:#e7e5dc;font:22px 'JetBrains Mono',ui-monospace,monospace;display:grid;place-items:center;height:100vh">
-    <div style="width:min(1000px,92vw)">
-      <p style="color:#a3a39b;font-size:16px;margin:0 0 18px">Already on GitHub? Change one word.</p>
-      <div style="display:flex;gap:14px;align-items:center;border:1px solid #3b3e3a;border-radius:999px;padding:18px 26px;background:#141615">
-        <span style="color:#8a8a83">🔒</span><span id="u"><span style="color:#8a8a83">https://</span><span id="h" style="color:#e7e5dc">github.com</span><span>/pallets/flask</span></span><span id="c" style="display:inline-block;width:2px;height:26px;background:#83a9ff"></span>
+  await page.setContent(`<!doctype html><html><body style="margin:0;background:#0d0e0e;color:#e7e5dc;font:34px 'JetBrains Mono','DejaVu Sans Mono',ui-monospace,monospace;display:grid;place-items:center;height:100vh">
+    <div style="width:min(1180px,94vw)">
+      <p style="color:#a3a39b;font-size:26px;margin:0 0 26px">Already on GitHub? Change one word.</p>
+      <div style="display:flex;gap:14px;align-items:center;border:1px solid #3b3e3a;border-radius:999px;padding:26px 34px;background:#141615">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#8a8a83" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="u"><span style="color:#8a8a83">https://</span><span id="h" style="color:#e7e5dc">github.com</span><span>/pallets/flask</span></span><span id="c" style="display:inline-block;width:2px;height:40px;background:#83a9ff"></span>
       </div>
     </div></body></html>`);
   await wait(page, 1800);
