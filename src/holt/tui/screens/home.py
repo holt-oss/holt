@@ -16,9 +16,10 @@ Three behaviours worth stating, because they are the ones that make it usable:
   repository assessed four minutes ago opens that assessment rather than
   spending a minute and some money reproducing it. Its age is on screen and
   re-running is one key.
-* **The mode is visible before you commit.** Replay is free and only works where
-  there is a recording; live costs money and reads GitHub. You should never
-  discover which one you were in by watching the bill.
+* **The mode is visible before you commit.** Live reads GitHub; with no model
+  set up it is rules-only and free, and the chrome says so. Replay exists only
+  in a clone of Holt, where recordings ship. You should never discover which
+  one you were in by watching the bill.
 * **Runs still going sit at the top of the same list.** Starting an assessment
   and coming back here does not stop it, so the list has to show it: enter
   rejoins it, ctrl+x stops it after asking. A run you cannot see is one you
@@ -32,8 +33,6 @@ Three behaviours worth stating, because they are the ones that make it usable:
 
 from __future__ import annotations
 
-import os
-
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -41,16 +40,20 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Input
 
+from holt import model as model_module
 from holt.cli import normalise
 from holt.tui import animation, session as session_module, store, theme
 from holt.tui.visual import Line
 from holt.tui.widgets.masthead import Masthead
 from holt.tui.widgets.recent import RecentList, RecentRow, RunningRow
 
-#: Shown in the empty state. Must be a repository with a committed recording,
-#: because the empty state promises the suggestion costs nothing —
-#: `tests/test_tui_screens.py` holds it to that.
-SUGGESTION = "home-assistant/core"
+#: Shown in the empty state. A live rules-only run, which is free and works
+#: from a PyPI install: it needs a GitHub token and nothing else.
+SUGGESTION = "pallets/flask"
+
+#: Suggested instead when in replay mode, which only exists in a clone of Holt.
+#: Must have a committed recording — `tests/test_tui_screens.py` holds it to that.
+REPLAY_SUGGESTION = "home-assistant/core"
 
 #: The standing hint under the input. Present by default rather than only in the
 #: footer, because the question this screen has to answer immediately is "what
@@ -60,8 +63,8 @@ SUGGESTION = "home-assistant/core"
 #: wrong arrow in several terminal fonts, and a hint nobody can read is worse
 #: than one that takes five more columns.
 HINT = (
-    "enter assess    ↑↓ one you already have    ctrl+f find one    "
-    "ctrl+t mode    ctrl+l models    ctrl+q quit"
+    "enter assess    ↑↓ past ones    ctrl+f find one    "
+    "ctrl+l models    ? help    ctrl+q quit"
 )
 
 #: How often the in-flight rows redraw. Slower than the event pump on purpose:
@@ -94,14 +97,10 @@ class HomeScreen(Screen):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        # Live where it is possible, because that is what assessing a new
-        # repository means. Falls back to replay so the interface is still
-        # useful with no credentials at all — but the fallback says *why*, next
-        # to the mode in the chrome. Opening onto committed recordings is a
-        # decision, and one the environment made on your behalf is one you
-        # should be able to see it made, not infer from a word.
-        self.mode = "live" if os.environ.get("OPENAI_API_KEY") else "replay"
-        self._fell_back = self.mode == "replay"
+        # Always live: that is what assessing a new repository means, and with
+        # no model set up it is rules-only and free rather than impossible.
+        # Replay is a ctrl+t away in a clone of Holt, where recordings exist.
+        self.mode = "live"
         self._entries: list = []
         self._notice = ""
         #: True once ↑↓ has moved the highlight, false again as soon as anything
@@ -225,10 +224,16 @@ class HomeScreen(Screen):
         widget.display = True
         if filtered:
             message = "Nothing assessed matches that. Press enter to assess it."
+        elif self.mode == "replay":
+            message = (
+                f"Nothing assessed yet. Type a repository above — "
+                f"{REPLAY_SUGGESTION} has a recording, so it costs nothing — "
+                "and press enter."
+            )
         else:
             message = (
-                f"Nothing assessed yet. Type a repository above — {SUGGESTION} has a "
-                "recording, so it costs nothing — and press enter."
+                f"Nothing assessed yet. Type a repository above and press enter — "
+                f"try {SUGGESTION}. It reads GitHub and needs no AI key."
             )
         widget.update(Text(message, style=theme.FAINT))
         animation.reveal(widget)
@@ -240,12 +245,14 @@ class HomeScreen(Screen):
         if count:
             right.append(f"{count} assessed   ", style=theme.FAINT)
         right.append(self.mode, style=theme.DIM)
-        # Only while it is still the environment's choice rather than yours.
-        # Beside the mode, not in the notice line: the notice is where the keys
-        # are advertised, and a startup message that displaces them costs the
-        # reader the one thing the screen has to tell them immediately.
-        if self._fell_back:
-            right.append("  no OPENAI_API_KEY", style=theme.FAINT)
+        # Whether a model will write the explanation. Beside the mode, not in
+        # the notice line: the notice is where the keys are advertised.
+        if self.mode != "replay":
+            if model_module.model_ready():
+                config = model_module.active_config()
+                right.append(f"  {config.provider} model", style=theme.FAINT)
+            else:
+                right.append("  rules only · ctrl+l to add AI", style=theme.FAINT)
         self.query_one("#chrome-left", Line).update(Text(left, style=theme.DIM))
         self.query_one("#chrome-right", Line).update(right)
 
@@ -263,6 +270,12 @@ class HomeScreen(Screen):
     # ─── input ──────────────────────────────────────────────────────────────
 
     async def on_input_changed(self, event: Input.Changed) -> None:
+        if event.value == "?":
+            # The box always has focus, so `?` arrives here as a character.
+            # Alone it cannot be a repository name, so it means help.
+            event.input.value = ""
+            self.app.action_help()
+            return
         await self.refresh_entries(event.value)
         # Typing puts you back in the box, and clears any complaint about what
         # was typed before it.
@@ -407,11 +420,6 @@ class HomeScreen(Screen):
             repo=repo, replay=self.mode == "replay", live=self.mode == "live"
         )
 
-        missing = session_module.missing_credentials(options)
-        if missing:
-            self.notice(missing[0], theme.DROP)
-            return
-
         if options.replay and not session_module.has_recording(repo):
             self.notice(
                 f"No recording for {repo}. Press ctrl+t to switch to live.", theme.DROP
@@ -432,7 +440,8 @@ class HomeScreen(Screen):
                 self.app.open_stored(cached)
                 return
 
-        self.app.start_run(options)
+        # First live run with no token anywhere: ask for one, then carry on.
+        self.app.with_token(options, lambda: self.app.start_run(options))
 
     def action_rerun(self) -> None:
         """Assess again, ignoring anything stored."""
@@ -467,16 +476,19 @@ class HomeScreen(Screen):
         self.app.push_screen("models")
 
     def action_toggle_mode(self) -> None:
-        # Chosen now, so the chrome stops explaining a fallback that has been
-        # answered — in either direction.
-        self._fell_back = False
+        if self.mode == "live" and not session_module.recordings_available():
+            # An install from PyPI ships no recordings, so there is nothing to
+            # switch to. Saying so beats a mode that fails on every repository.
+            self.notice("Holt reads GitHub live in this install; there is no other mode.")
+            return
         self.mode = "replay" if self.mode == "live" else "live"
         self._paint_chrome()
-        self.notice(
-            "replay reads a committed recording: free, and only where one exists."
-            if self.mode == "replay"
-            else "live reads GitHub and calls a model. Costs a few cents per run."
-        )
+        if self.mode == "replay":
+            self.notice("replay reads a committed recording: free, and only where one exists.")
+        elif model_module.model_ready():
+            self.notice("live reads GitHub and calls your model. Costs a few cents per run.")
+        else:
+            self.notice("live reads GitHub. No model is set up, so it is rules-only and free.")
 
     def action_clear(self) -> None:
         box = self.query_one("#repo-input", Input)

@@ -1,0 +1,13 @@
+# The context is the repo root, which carries large research material.
+# Send only what the server image needs.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!NOTICE
+!src/holt/**
+!server/pyproject.toml
+!server/holt_server/**
+**/__pycache__
+**/*.pyc

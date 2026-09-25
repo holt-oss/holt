@@ -43,9 +43,13 @@ from holt.tui import events as events_module
 #: Entries with a different version are ignored rather than guessed at.
 SCHEMA_VERSION = 1
 
-#: Where history lives. Outside `fixtures/`, outside the reproduction path, and
-#: in `.gitignore` — this is a convenience for one machine, not project content.
-DEFAULT_ROOT = Path(".holt/assessments")
+#: Where history lives: the platform data directory (`~/.local/share/holt` on
+#: Linux), never the current directory — see `holt.paths`. A function rather
+#: than a constant so the location follows the environment it is read in.
+def default_root() -> Path:
+    from holt import paths
+
+    return paths.assessments_dir()
 
 #: How long an assessment is considered fresh enough to reuse without asking.
 #: Ten minutes: long enough to cover re-opening the tool while still working on
@@ -362,7 +366,7 @@ def from_dict(raw: dict[str, Any], path: Path | None = None) -> Entry | None:
 
 @dataclass
 class Store:
-    root: Path = DEFAULT_ROOT
+    root: Path = field(default_factory=default_root)
     #: Set when the directory cannot be written. The interface stays usable and
     #: says so once, rather than failing every time an assessment finishes.
     read_only: bool = False
@@ -396,7 +400,7 @@ class Store:
             paths = []
         for path in paths:
             try:
-                raw = json.loads(path.read_text())
+                raw = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
             entry = from_dict(raw, path)
@@ -444,7 +448,8 @@ def _filename(entry: Entry) -> str:
 def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
     """Temp file then rename, so a kill mid-write cannot truncate history."""
     handle = tempfile.NamedTemporaryFile(
-        "w", dir=path.parent, prefix=".tmp-", suffix=".json", delete=False
+        "w", dir=path.parent, prefix=".tmp-", suffix=".json", delete=False,
+        encoding="utf-8",
     )
     try:
         with handle:

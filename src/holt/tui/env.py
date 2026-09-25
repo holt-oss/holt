@@ -31,7 +31,7 @@ def load(path: str | Path = ".env") -> list[str]:
         return []
 
     filled: list[str] = []
-    for raw in file.read_text().splitlines():
+    for raw in file.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue

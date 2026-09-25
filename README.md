@@ -24,35 +24,68 @@ review, or comment that supports it.
 
 ## Install
 
-Holt is pre-1.0. You need [`uv`](https://docs.astral.sh/uv/) and Python 3.11 or
-newer.
+Holt is pre-1.0 and needs Python 3.11 or newer. Pick whichever installer you
+already have:
 
 ```sh
-uv tool install holt-cli
+pipx install holt-cli          # recommended if you have pipx
+uv tool install holt-cli       # if you use uv
+pip install --user holt-cli    # plain pip
 ```
 
-Create a classic GitHub token with no scopes and expose it to Holt:
+The same commands work in PowerShell on Windows.
+
+## Quickstart
+
+**1. Give Holt a GitHub token.** Holt only reads public data, so the token needs
+no permissions. [Create one here](https://github.com/settings/tokens/new?description=holt)
+(leave every box unticked), then:
 
 ```sh
-export GITHUB_TOKEN=your_token
+holt token
 ```
 
-Start with the rules-only report. It calls no model and needs no model API key:
+It asks for the token and saves it privately on your computer. Already use the
+GitHub CLI? Holt picks up `gh auth token` automatically, so you can skip this.
+
+**2. Ask about a repository.**
 
 ```sh
-holt analyze pallets/flask --live --no-model
+holt analyze pallets/flask
 ```
 
-For a written report with cited findings and quotations, configure a supported
-model provider and run the full analysis:
+That is the whole thing: a verdict and the numbers behind it, free, with no AI
+key. Or run `holt` with no arguments for the interactive interface.
+
+<details>
+<summary>Prefer an environment variable for the token?</summary>
 
 ```sh
-export OPENAI_API_KEY=your_key
-holt analyze pallets/flask --live
+export GITHUB_TOKEN=your_token             # macOS / Linux
 ```
 
-Run `holt models` to inspect or change the provider. OpenAI, Anthropic, Gemini,
-Ollama, and OpenAI-compatible endpoints are supported.
+```powershell
+$env:GITHUB_TOKEN = "your_token"           # Windows PowerShell
+```
+
+</details>
+
+### Optional: add a written explanation
+
+With a model set up, the report also explains itself in plain English and quotes
+the pull request threads it relied on. The model never chooses the verdict.
+Gemini's free tier is the cheapest way to start:
+
+```sh
+holt models --provider gemini --model gemini-2.5-flash
+export GEMINI_API_KEY=your_key             # PowerShell: $env:GEMINI_API_KEY = "your_key"
+holt analyze pallets/flask
+```
+
+Get a Gemini key at <https://aistudio.google.com/apikey>. Holt also supports
+OpenRouter (`--provider openrouter`, key in `OPENROUTER_API_KEY`), Anthropic,
+OpenAI, Ollama (local, no key), and any OpenAI-compatible endpoint. Without a
+model, every command gives the rules-only report.
 
 ## Use the terminal interface
 
@@ -62,8 +95,9 @@ Run Holt without a subcommand to open the interactive terminal interface:
 holt
 ```
 
-From there you can assess a repository, revisit past reports, inspect the
-evidence behind a claim, compare candidates, and configure model providers.
+Type a repository and press enter. The first time, it asks for your GitHub
+token. From there you can revisit past reports, open the evidence behind a claim
+on GitHub (`o`), and set up a model (`ctrl+l`). Press `?` on any screen for help.
 
 ## What you get
 
@@ -90,12 +124,14 @@ making a significant commitment.
 
 | Command | Purpose |
 |---|---|
-| `holt analyze <owner/repo> --live` | Assess one repository using current GitHub data. |
-| `holt compare <repo>… --live` | Compare repositories side by side. |
+| `holt analyze <owner/repo>` | Assess one repository using current GitHub data. Add `--json` for machine-readable output. |
+| `holt compare <repo>…` | Compare repositories side by side. |
+| `holt start --lang python` | Find open starter issues in repositories that merge newcomers' work. |
 | `holt profile` | Save the languages, topics, contribution type, and time budget you want. |
 | `holt discover --live` | Find and screen repositories for that profile. |
-| `holt next <repo> --as <login> --live` | Rank open issues after you have contributed to a project. |
-| `holt models` | Inspect or change the model provider. |
+| `holt next <repo> --as <login>` | Rank open issues after you have contributed to a project. |
+| `holt token` | Save a GitHub token (asked for, never echoed). |
+| `holt models` | Optional: set up a model for the written explanation. |
 | `holt tui` | Open the interactive terminal interface. |
 
 See [USAGE.md](https://github.com/holt-oss/holt/blob/main/USAGE.md) for the
