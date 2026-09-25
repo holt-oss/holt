@@ -6,7 +6,7 @@ import { TONE, VERDICT_MOOD } from "../report/tone";
 
 export function CompareShell({ repo, removeHref, children }: { repo: string; removeHref: string; children: React.ReactNode }) {
   return (
-    <li className="flex min-w-0 flex-col border border-line-strong bg-panel">
+    <li className="flex min-w-0 flex-col border border-line-strong bg-panel shadow-soft">
       <div className="flex items-center gap-3 border-b border-line p-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`https://github.com/${repo.split("/")[0]}.png?size=64`} alt="" width={28} height={28} className="size-7 rounded border border-line-strong bg-panel-2" />

@@ -6,6 +6,7 @@ import { deleteByok, me, putByok } from "@/lib/api";
 import { shortDate } from "@/lib/format";
 import { currentUser } from "@/lib/session";
 import type { ByokProvider } from "@/lib/types";
+import { PageHead } from "@/components/page-head";
 
 export const metadata: Metadata = { title: "Settings", robots: { index: false } };
 
@@ -56,15 +57,18 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     : null;
 
   return (
-    <div className="wrap max-w-3xl py-10 sm:py-14">
+    <>
+    <PageHead narrow>
       <p className="rail mb-4 flex gap-2"><strong className="m-0">settings</strong><span>{user.name || user.email}</span></p>
       <h1 className="display text-[clamp(2rem,6vw,3rem)]">Your AI reports</h1>
+    </PageHead>
+    <div className="wrap max-w-3xl pb-14 pt-2 sm:pb-16">
 
       {notice && <p role="status" className={`mt-6 border px-4 py-3 font-sans text-[0.9rem] ${notice.tone}`}>{notice.text}</p>}
       {!account.ok && <p role="alert" className="mt-6 border border-orange/50 px-4 py-3 font-sans text-[0.9rem] text-orange">{account.error.message}</p>}
 
       {m && (
-        <section aria-labelledby="quota" className="mt-8 grid gap-px border border-line bg-line sm:grid-cols-2">
+        <section aria-labelledby="quota" className="mt-8 grid gap-px border border-line bg-line shadow-soft sm:grid-cols-2">
           <div className="bg-panel p-5">
             <p id="quota" className="text-[0.72rem] uppercase tracking-[0.08em] text-faint">Plan</p>
             <p className="mt-1 text-[1.3rem] font-semibold capitalize">{m.plan}</p>
@@ -83,7 +87,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </section>
       )}
 
-      <section aria-labelledby="byok" className="mt-10 border border-line-strong bg-panel p-5 sm:p-8">
+      <section aria-labelledby="byok" className="mt-10 border border-line-strong bg-panel p-5 shadow-soft sm:p-8">
         <h2 id="byok" className="text-[1.3rem] font-semibold tracking-tight">Bring your own key</h2>
         <p className="prose-sans mt-2 text-[0.95rem]">
           Use your own model provider for unlimited AI reports. Always free on Holt; you pay your provider directly
@@ -157,5 +161,6 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </form>
       </section>
     </div>
+    </>
   );
 }

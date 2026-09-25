@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ErrorPanel } from "@/components/error-panel";
+import { PageHead } from "@/components/page-head";
 import { FindResults } from "@/components/find/find-results";
 import { FindRunner } from "@/components/find/find-runner";
 import { cachedFind } from "@/lib/find-cached";
@@ -34,7 +35,8 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
     : null;
 
   return (
-    <div className="wrap py-10 sm:py-14">
+    <>
+    <PageHead>
       <p className="rail mb-4 flex gap-2"><strong className="m-0">find</strong><span>your first contribution</span></p>
       <h1 className="display max-w-3xl text-[clamp(2rem,6vw,3.4rem)]">
         Tell us what you know. <span className="text-orange">We&apos;ll find where you&apos;re welcome.</span>
@@ -43,7 +45,7 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
         Every project below replies to newcomers and merges their work. Each comes with open issues you could take today.
       </p>
 
-      <form action="/find" method="get" className="mt-10 space-y-8 border border-line-strong bg-panel p-5 sm:p-8">
+      <form action="/find" method="get" className="mt-10 space-y-8 border border-line-strong bg-panel p-5 shadow-soft sm:p-8">
         <input type="hidden" name="go" value="1" />
         <fieldset>
           <legend className="mb-3 text-[0.78rem] uppercase tracking-[0.08em] text-faint">Languages you can read</legend>
@@ -72,9 +74,10 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
 
         <label className="flex cursor-pointer items-center gap-3 text-[0.9rem]">
           <input type="checkbox" name="hacktoberfest" value="1" defaultChecked={hf} className="peer sr-only" />
-          <span aria-hidden="true" className="relative h-6 w-11 shrink-0 rounded-full border border-line-strong bg-panel-2 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-4.5 after:rounded-full after:bg-faint after:transition-transform peer-checked:border-orange peer-checked:bg-orange/20 peer-checked:after:translate-x-5 peer-checked:after:bg-orange peer-focus-visible:outline-2 peer-focus-visible:outline-blue" />
+          <span aria-hidden="true" className="relative h-6 w-11 shrink-0 rounded-full border border-line-strong bg-panel-2 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-4.5 after:rounded-full after:bg-faint after:transition-transform peer-checked:border-hf peer-checked:bg-hf-bg peer-checked:after:translate-x-5 peer-checked:after:bg-hf peer-focus-visible:outline-2 peer-focus-visible:outline-blue" />
           <span>
-            Only Hacktoberfest projects
+            Only Hacktoberfest projects{" "}
+            <span className="ml-1 rounded-full border border-hf-line bg-hf-bg px-2 py-0.5 align-middle text-[0.66rem] uppercase tracking-[0.06em] text-hf">October</span>
             <span className="block font-sans text-[0.8rem] text-faint">Repos taking part, so your pull requests count.</span>
           </span>
         </label>
@@ -83,9 +86,11 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
           find my first contribution <span aria-hidden="true">→</span>
         </button>
       </form>
+    </PageHead>
 
       {result && (
-        <section aria-label="Results" className="mt-12">
+        <div className="wrap py-10 sm:py-12">
+        <section aria-label="Results">
           {!result.ok ? (
             <ErrorPanel error={result.error} retryHref="/find" />
           ) : result.data.status === "queued" ? (
@@ -99,7 +104,8 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
             </>
           )}
         </section>
+        </div>
       )}
-    </div>
+    </>
   );
 }

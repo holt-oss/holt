@@ -18,7 +18,7 @@ const HEAD: Record<string, string> = {
 export function ErrorPanel({ error, repo, onRetry, retryHref }: { error: ApiError; repo?: string; onRetry?: () => void; retryHref?: string }) {
   const account = error.code === "needs_key" || error.code === "quota_exceeded";
   return (
-    <div role="alert" className="border border-line-strong bg-panel p-6 sm:p-8">
+    <div role="alert" className="border border-line-strong bg-panel p-6 shadow-soft sm:p-8">
       <CatFace mood={account ? "determined" : "startled"} className="text-[1.6rem]" />
       <h2 className="mt-4 text-[1.4rem] font-semibold tracking-tight">{HEAD[error.code] ?? "Something went wrong"}</h2>
       <p className="mt-2 max-w-xl font-sans text-muted">

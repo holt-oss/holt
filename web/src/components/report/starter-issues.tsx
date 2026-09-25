@@ -3,7 +3,7 @@ import type { StarterIssue } from "@/lib/types";
 
 export function StarterIssueCard({ issue, compact = false }: { issue: StarterIssue; compact?: boolean }) {
   return (
-    <li className="group relative border border-line bg-panel p-4 transition-colors hover:border-blue sm:p-5">
+    <li className="group relative border border-line bg-panel p-4 shadow-soft transition-colors hover:border-blue sm:p-5">
       <div className="flex flex-wrap items-center gap-2 text-[0.72rem] text-faint">
         <span className="text-blue">#{issue.number}</span>
         {issue.labels.slice(0, 3).map((l) => (

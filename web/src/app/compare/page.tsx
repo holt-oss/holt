@@ -5,6 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getReport } from "@/lib/api";
 import { parseRepoInput } from "@/lib/repo";
+import { PageHead } from "@/components/page-head";
 
 export const metadata: Metadata = {
   title: "Compare repositories",
@@ -35,12 +36,13 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
   const reports = await Promise.all(all.map((r) => getReport(r)));
 
   return (
-    <div className="wrap py-10 sm:py-14">
+    <>
+    <PageHead>
       <p className="rail mb-4 flex gap-2"><strong className="m-0">compare</strong><span>side by side</span></p>
       <h1 className="display max-w-3xl text-[clamp(2rem,6vw,3.4rem)]">Which one will review your PR?</h1>
       <p className="prose-sans mt-5 max-w-2xl text-[1.05rem]">Add up to {MAX} repositories. Same rules, same numbers, side by side.</p>
 
-      <form action="/compare" method="get" className="mt-8 grid max-w-2xl grid-cols-[1fr_auto] border border-line-strong bg-panel focus-within:border-blue">
+      <form action="/compare" method="get" className="mt-8 grid max-w-2xl grid-cols-[1fr_auto] border border-line-strong bg-panel shadow-soft focus-within:border-blue">
         <input type="hidden" name="repos" value={all.join(",")} />
         <label htmlFor="add" className="sr-only">Add a repository</label>
         <input
@@ -55,14 +57,16 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
         />
         <button type="submit" disabled={all.length >= MAX} className="btn-primary m-1.5">add</button>
       </form>
+    </PageHead>
 
+    <div className="wrap py-10 sm:py-12">
       {all.length === 0 ? (
-        <div className="mt-10 border border-dashed border-line-strong p-8 font-sans text-muted">
+        <div className="border border-dashed border-line-strong p-8 font-sans text-muted">
           Nothing to compare yet. Try{" "}
           <Link className="text-link font-mono text-[0.9rem]" href="/compare?repos=pallets/flask,pytorch/pytorch,psf/requests">flask vs pytorch vs requests</Link>.
         </div>
       ) : (
-        <ul className={`mt-10 grid gap-4 sm:grid-cols-2 ${all.length >= 3 ? "lg:grid-cols-3" : ""} ${all.length === 4 ? "xl:grid-cols-4" : ""}`}>
+        <ul className={`grid gap-4 sm:grid-cols-2 ${all.length >= 3 ? "lg:grid-cols-3" : ""} ${all.length === 4 ? "xl:grid-cols-4" : ""}`}>
           {all.map((repo, i) => {
             const r = reports[i];
             const name = r.ok ? r.data.repo : repo;
@@ -77,5 +81,6 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
         </ul>
       )}
     </div>
+    </>
   );
 }

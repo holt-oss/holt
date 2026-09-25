@@ -119,6 +119,7 @@
   --font-mono: var(--font-jetbrains), "SFMono-Regular", "Cascadia Code", "Liberation Mono", Consolas, monospace;
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --shadow-card: var(--shadow);
+  --shadow-soft: var(--card-shadow);
   --color-section-alt: var(--section-alt);
   --color-hf: var(--hf);
   --color-hf-bg: var(--hf-bg);
@@ -275,6 +276,14 @@
 
   .panel {
     box-shadow: var(--card-shadow);
+  }
+
+  /* A full-width tinted band from inside a centred column: section rhythm
+     without restructuring the page. */
+  .band-alt {
+    background: var(--section-alt);
+    box-shadow: 0 0 0 100vmax var(--section-alt);
+    clip-path: inset(0 -100vmax);
   }
 
   /* Highlighter stroke behind a phrase. */

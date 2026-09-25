@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FREE_AI_QUOTA } from "@/lib/site";
+import { PageHead } from "@/components/page-head";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -45,7 +46,8 @@ const SOON = [
 
 export default function PricingPage() {
   return (
-    <div className="wrap py-10 sm:py-14">
+    <>
+    <PageHead>
       <p className="rail mb-4 flex gap-2"><strong className="m-0">pricing</strong><span>free where it matters</span></p>
       <h1 className="display max-w-3xl text-[clamp(2rem,6vw,3.4rem)]">
         Finding a project is free. <span className="text-green">It always will be.</span>
@@ -53,10 +55,12 @@ export default function PricingPage() {
       <p className="prose-sans mt-5 max-w-2xl text-[1.05rem]">
         The verdict never depends on what you pay. AI only adds a written explanation on top of the same rules.
       </p>
+    </PageHead>
 
-      <ul className="mt-12 grid gap-4 lg:grid-cols-3">
+    <div className="wrap py-10 sm:py-14">
+      <ul className="grid gap-4 lg:grid-cols-3">
         {PLANS.map((p) => (
-          <li key={p.name} className={`relative flex flex-col border bg-panel p-6 ${p.accent} ${p.featured ? "shadow-card" : ""}`}>
+          <li key={p.name} className={`relative flex flex-col border bg-panel p-6 ${p.accent} ${p.featured ? "shadow-card" : "shadow-soft"}`}>
             {p.featured && <span className="absolute -top-3 left-6 bg-blue px-2 py-0.5 text-[0.7rem] font-semibold text-on-accent">most students start here</span>}
             <p className="text-[0.78rem] uppercase tracking-[0.08em] text-faint">{p.name}</p>
             <p className="mt-3 text-[2.4rem] font-semibold leading-none tracking-tight">
@@ -73,10 +77,11 @@ export default function PricingPage() {
         ))}
       </ul>
 
-      <h2 className="mt-16 text-[1.2rem] font-semibold tracking-tight">Paid plans</h2>
+      <div className="band-alt mt-14 py-10">
+      <h2 className="text-[1.2rem] font-semibold tracking-tight">Paid plans</h2>
       <ul className="mt-4 grid gap-4 sm:grid-cols-2">
         {SOON.map((s) => (
-          <li key={s.name} className="border border-dashed border-line-strong p-5">
+          <li key={s.name} className="border border-dashed border-line-strong bg-panel/60 p-5">
             <div className="flex items-center justify-between gap-3">
               <p className="font-semibold">{s.name}</p>
               <span className="chip border-amber/60 text-amber">coming soon</span>
@@ -85,6 +90,8 @@ export default function PricingPage() {
           </li>
         ))}
       </ul>
+      </div>
     </div>
+    </>
   );
 }

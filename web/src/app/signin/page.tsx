@@ -30,8 +30,10 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
   const configured = new Set(oauthProviders.map((p) => p.id));
 
   return (
-    <div className="wrap grid min-h-[70dvh] place-items-center py-12">
-      <div className="w-full max-w-md">
+    <div className="relative overflow-hidden">
+    <div aria-hidden="true" className="hero-backdrop" />
+    <div className="wrap relative grid min-h-[70dvh] place-items-center py-12">
+      <div className="w-full max-w-md border border-line-strong bg-panel p-6 shadow-card sm:p-8">
         <CatFace mood="adoring" blink className="text-[2rem]" />
         <h1 className="display mt-6 text-[2.2rem] sm:text-[2.6rem]">Sign in to Holt</h1>
         <p className="prose-sans mt-3">
@@ -80,6 +82,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
           Holt only asks for your name, email and avatar. It never gets access to your repositories and never posts anything.
         </p>
       </div>
+    </div>
     </div>
   );
 }
