@@ -41,18 +41,19 @@ def _key(name: str) -> str:
 
 def describe(bindings) -> list[tuple[str, str]]:
     """`(key, what it does)` for every binding with a description."""
-    rows: list[tuple[str, str]] = []
-    seen: set[str] = set()
+    # Keys that do the same thing share a row: `↓, ↑  recent`, not two rows.
+    grouped: dict[str, list[str]] = {}
     for item in bindings:
         if isinstance(item, Binding):
             key, description = item.key, item.description
         else:
             key, _action, description = (*item, "")[:3]
-        if not description or key in seen:
+        if not description:
             continue
-        seen.add(key)
-        rows.append((_key(key), description))
-    return rows
+        keys = grouped.setdefault(description, [])
+        if _key(key) not in keys:
+            keys.append(_key(key))
+    return [(", ".join(keys), description) for description, keys in grouped.items()]
 
 
 class HelpScreen(ModalScreen[None]):
@@ -75,7 +76,7 @@ class HelpScreen(ModalScreen[None]):
             yield Line(Text(f"Keys on this screen ({self.title_text})", style=theme.DIM))
             for key, description in self.rows:
                 row = Text()
-                row.append(f"{key:<12}")
+                row.append(f"{key:<16}")
                 row.append(description, style=theme.FAINT)
                 yield Line(row)
             yield Line("")
