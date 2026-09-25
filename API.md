@@ -33,6 +33,18 @@ this server, e.g. payments before the Razorpay keys exist),
 `invalid_signature` 400 (a payment or webhook signature did not verify),
 `already_subscribed` 409.
 
+## Rate limits
+
+Two separate hourly buckets, per IP for anonymous callers and per user when
+signed in:
+
+- **work** — new analyses (`POST /v1/analyses` that queues a job) and
+  `POST /v1/find`. Small (anonymous: 10/h). Cached answers are free.
+- **read** — cache misses on reads (`/starter-issues`). Generous (anonymous:
+  120/h). Viewing, reloading and sharing report pages can never use up work.
+
+`GET /v1/reports/…` reads only the cache and is not rate limited.
+
 ## Repo identifiers
 
 `{owner}/{repo}`, case-insensitive, normalised to GitHub's canonical casing in
@@ -106,7 +118,9 @@ key like every `/v1` route.
 
 ### `GET /v1/repos/{owner}/{repo}/starter-issues?limit=20`
 Open, unassigned issues in this repo that suit a newcomer, best first:
-`{"repo": "…", "issues": [StarterIssue]}`.
+`{"repo": "…", "issues": [StarterIssue]}`. Cached per repository for 1 hour;
+a cache hit costs no GitHub call and no rate limit. A miss counts against the
+**read** limit, never the work limit (see Rate limits).
 
 ### `POST /v1/find`
 Body: `{"languages": ["python"], "topics": [], "days": 7, "hacktoberfest": true, "limit": 20}`

@@ -178,12 +178,12 @@ class Database:
 
 
 # --- billing ------------------------------------------------------------------
-
-LIVE_SUBSCRIPTION = ("status IN ('created', 'authenticated', 'active', 'pending') "
-                     "AND NOT cancel_at_period_end")
 #
 # No card data is ever stored or seen: the provider's checkout collects it.
 # Amounts are integers in minor units (paise, cents) with their currency.
+
+LIVE_SUBSCRIPTION = ("status IN ('created', 'authenticated', 'active', 'pending') "
+                     "AND NOT cancel_at_period_end")
 
 
 class Subscription(Base):
@@ -273,3 +273,12 @@ class WebhookEvent(Base):
     event_id: Mapped[str] = mapped_column(String(100), primary_key=True)
     type: Mapped[str] = mapped_column(String(60))
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+class StarterCache(Base):
+    """Starter issues per repository, so a report page view costs no GitHub call."""
+
+    __tablename__ = "starter_cache"
+
+    repo_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    repo: Mapped[str] = mapped_column(String(200))
+    issues: Mapped[list] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

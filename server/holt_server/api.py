@@ -21,6 +21,7 @@ from holt_server.db import (
     USER_PRIORITY,
     Job,
     Report,
+    StarterCache,
     Subscription,
     User,
     dedupe_key,
@@ -83,11 +84,18 @@ async def caller(
     return Caller(user_id, ip)
 
 
-def rate_limit(svc: Services, who: Caller) -> None:
+def rate_limit(svc: Services, who: Caller, bucket: str = "work") -> None:
+    """Count one request. `work` is new analyses and find; `read` is cache
+    misses on reads. Separate counters: reading never uses up work."""
     if not who.user_id and not who.ip:
         raise ApiError("invalid_request",
                        "Anonymous requests must say who is asking (X-Holt-Client-Ip).")
-    svc.limiter.hit(who.rate_key, who.limit(svc))
+    if bucket == "read":
+        s = svc.settings
+        limit = s.user_read_rate_per_hour if who.user_id else s.anon_read_rate_per_hour
+        svc.read_limiter.hit(who.rate_key, limit)
+    else:
+        svc.limiter.hit(who.rate_key, who.limit(svc))
 
 
 async def get_user(svc: Services, user_id: str) -> User:
@@ -466,25 +474,68 @@ def sse(svc: Services, job_id: str, kind: str, request: Request) -> StreamingRes
 # --- starter issues and find ------------------------------------------------------
 
 
-@router.get("/repos/{owner}/{repo}/starter-issues")
-async def starter_issues(owner: str, repo: str, request: Request,
-                         limit: int = Query(20, ge=1, le=50),
-                         who: Caller = Depends(caller)) -> dict[str, Any]:
-    svc = services(request)
-    name = repos.normalize(f"{owner}/{repo}")
-    starter.function("starter_issues")  # 501 before spending a rate-limit hit
-    rate_limit(svc, who)
-    canonical = await svc.canonical(name)
+# Issues are ranked once, at this many, and sliced per request.
+STARTER_CACHE_LIMIT = 50
+
+
+async def cached_starter_issues(svc: Services, repo: str) -> StarterCache | None:
+    cutoff = now() - timedelta(hours=svc.settings.starter_cache_hours)
+    async with svc.db.session() as s:
+        row = await s.get(StarterCache, repos.key(repo))
+    return row if row is not None and utc(row.created_at) >= cutoff else None
+
+
+async def fetch_starter_issues(svc: Services, repo: str) -> tuple[str, list[dict]]:
+    """Ask GitHub, store the answer. Concurrent misses for one repo share one
+    call (single-flight, per process)."""
+    key = repos.key(repo)
+    if (pending := svc.inflight.get(key)) is not None:
+        return await asyncio.shield(pending)
+    task = asyncio.ensure_future(_fetch_and_store(svc, repo))
+    svc.inflight[key] = task
+    try:
+        return await asyncio.shield(task)
+    finally:
+        if task.done():
+            svc.inflight.pop(key, None)
+        else:
+            task.add_done_callback(lambda _: svc.inflight.pop(key, None))
+
+
+async def _fetch_and_store(svc: Services, repo: str) -> tuple[str, list[dict]]:
+    canonical = await svc.canonical(repo)
     try:
         issues = await asyncio.to_thread(
-            starter.run_starter_issues, canonical, svc.pool.next(), limit)
+            starter.run_starter_issues, canonical, svc.pool.next(), STARTER_CACHE_LIMIT)
     except ApiError:
         raise
     except Exception as exc:  # noqa: BLE001
         from holt_server.engine import translate
 
         raise translate(exc, canonical) from exc
-    return {"repo": canonical, "issues": issues}
+    async with svc.db.session() as s:
+        row = await s.get(StarterCache, repos.key(canonical))
+        if row is None:
+            s.add(StarterCache(repo_key=repos.key(canonical), repo=canonical, issues=issues))
+        else:
+            row.repo, row.issues, row.created_at = canonical, issues, now()
+        await s.commit()
+    return canonical, issues
+
+
+@router.get("/repos/{owner}/{repo}/starter-issues")
+async def starter_issues(owner: str, repo: str, request: Request,
+                         limit: int = Query(20, ge=1, le=50),
+                         who: Caller = Depends(caller)) -> dict[str, Any]:
+    svc = services(request)
+    name = repos.normalize(f"{owner}/{repo}")
+    # A cache hit costs nothing: no rate limit, no GitHub.
+    if (hit := await cached_starter_issues(svc, name)) is not None:
+        return {"repo": hit.repo, "issues": hit.issues[:limit]}
+    starter.function("starter_issues")  # 501 before spending a rate-limit hit
+    rate_limit(svc, who, "read")
+    canonical, issues = await fetch_starter_issues(svc, name)
+    return {"repo": canonical, "issues": issues[:limit]}
 
 
 @router.post("/find")
