@@ -4,8 +4,9 @@
 # One run: fetch origin; if main, any open PR labelled `staging`, or any
 # branch in deploy/staging/extra-branches moved, build a preview commit
 # (origin/main merged with each of them, skipping ones that conflict),
-# rebuild the images and restart only the stage-holt-new stack. Then prune
-# this stack's dangling images and its own build cache.
+# rebuild the images and restart only the stage-holt-new stack. Then run the
+# e2e smoke suite once (result on /__build) and prune this stack's dangling
+# images and its own build cache.
 #
 # The systemd --user timer from install.sh runs it every 3 minutes.
 # By hand:   preview.sh            (no-op when nothing changed)
@@ -143,7 +144,12 @@ try:
         live = json.load(f)
 except FileNotFoundError:
     live = None
-doc = {"site": "https://holt-new.aahil-khan.xyz", "live": live, "last_attempt": attempt}
+try:
+    with open(os.path.join(env["STATE"], "smoke.json"), encoding="utf-8") as f:
+        smoke = json.load(f)
+except FileNotFoundError:
+    smoke = None
+doc = {"site": "https://holt-new.aahil-khan.xyz", "live": live, "smoke": smoke, "last_attempt": attempt}
 tmp = env["OUT"] + ".tmp"
 with open(tmp, "w", encoding="utf-8") as f:
     json.dump(doc, f, indent=2)
@@ -235,9 +241,64 @@ for _ in $(seq 1 60); do
 done
 (( ok )) || fail "the site did not answer 200 within 5 minutes (last status $code); see $blog"
 
+rm -f "$STATE/smoke.json"   # belongs to the previous build
 write_build_json live "live" "$preview_sha"
 echo "$fingerprint" > "$STATE/fingerprint"
 log "live: ${preview_sha:0:7} on 127.0.0.1:$port"
+
+# --- smoke tests (e2e/) against the public URL --------------------------------------
+# Once per live build, one browser at a time. A failure doesn't roll back; it shows
+# on /__build as "smoke": {"status": "failed", "failures": [...]}.
+write_smoke() {   # status message [playwright-json-report]
+    STATUS="$1" MESSAGE="$2" REPORT="${3:-}" PREVIEW="$preview_sha" OUT="$STATE/smoke.json" python3 - <<'PY'
+import json, os, datetime
+env = os.environ
+doc = {"status": env["STATUS"], "message": env["MESSAGE"], "preview_sha": env["PREVIEW"],
+       "at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+if env["REPORT"] and os.path.exists(env["REPORT"]):
+    with open(env["REPORT"], encoding="utf-8") as f:
+        rep = json.load(f)
+    failures = []
+    def walk(suite, trail):
+        for spec in suite.get("specs", []):
+            for t in spec.get("tests", []):
+                if t.get("status") == "unexpected":
+                    err = next((r.get("error", {}).get("message", "") for r in t.get("results", []) if r.get("error")), "")
+                    failures.append({"test": " > ".join(trail + [spec["title"]]), "project": t.get("projectName"),
+                                     "error": " ".join(err.split())[:300]})
+        for sub in suite.get("suites", []):
+            walk(sub, trail)
+    for s in rep.get("suites", []):
+        walk(s, [])
+    st = rep.get("stats", {})
+    doc.update(passed=st.get("expected", 0), failed=st.get("unexpected", 0), skipped=st.get("skipped", 0),
+               flaky=st.get("flaky", 0), duration_s=round(st.get("duration", 0) / 1000), failures=failures)
+with open(env["OUT"], "w", encoding="utf-8") as f:
+    json.dump(doc, f, indent=2)
+PY
+    write_build_json live "live" "$preview_sha" || true
+}
+
+E2E="$SRC/e2e"
+if [[ -f "$E2E/package.json" && "${HOLT_STAGE_SMOKE:-1}" == 1 ]]; then
+    slog="$STATE/logs/smoke-$(date -u +%Y%m%dT%H%M%SZ).log"
+    write_smoke running "running the smoke tests"
+    if ! (cd "$E2E" && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --no-audit --no-fund) >"$slog" 2>&1; then
+        write_smoke failed "couldn't install the smoke tests (npm ci); see $slog"
+    else
+        report="$RUN/smoke.json"
+        if (cd "$E2E" && PLAYWRIGHT_JSON_OUTPUT_NAME="$report" BASE_URL="https://holt-new.aahil-khan.xyz" \
+                timeout 900 npx playwright test --workers=1 --reporter=json) >>"$slog" 2>&1; then
+            write_smoke passed "all smoke tests passed" "$report"
+        elif [[ -s "$report" ]]; then
+            write_smoke failed "some smoke tests failed; see failures" "$report"
+        else
+            write_smoke failed "the smoke run crashed or timed out; see $slog"
+        fi
+    fi
+    log "smoke: $(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d["status"], d.get("passed",""), "passed", d.get("failed",""), "failed")' "$STATE/smoke.json")"
+    ls -1t "$STATE"/logs/smoke-*.log 2>/dev/null | tail -n +11 | xargs -r rm -f
+fi
 
 # --- clean up after ourselves only ----------------------------------------------------
 docker image prune -f --filter "label=$LABEL" >/dev/null || true

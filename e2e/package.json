@@ -1,0 +1,16 @@
+{
+  "name": "holt-e2e",
+  "private": true,
+  "description": "Smoke tests against a deployed Holt (staging by default).",
+  "scripts": {
+    "test": "playwright test",
+    "smoke": "playwright test --workers=1",
+    "lighthouse": "node lighthouse.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
