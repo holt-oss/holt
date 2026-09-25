@@ -8,8 +8,8 @@ import { useAnalysis } from "../use-analysis";
 import { ReportView } from "./report-view";
 import { StarterIssues, type IssuesState } from "./starter-issues";
 
-export function AnalysisRunner({ repo, mode, days, signedIn }: { repo: string; mode: Mode; days: number; signedIn: boolean }) {
-  const { state, retry } = useAnalysis(repo, mode, days);
+export function AnalysisRunner({ repo, mode, days, signedIn, model }: { repo: string; mode: Mode; days: number; signedIn: boolean; model?: string }) {
+  const { state, retry } = useAnalysis(repo, mode, days, true, model);
   const [issues, setIssues] = useState<IssuesState>(null);
 
   useEffect(() => {
