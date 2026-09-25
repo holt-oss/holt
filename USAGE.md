@@ -12,39 +12,85 @@ you are reproducing the evaluation or checking benchmark numbers, use
 
 ## Install
 
-Install Holt from PyPI:
+Pick whichever installer you already have. All three work the same on macOS,
+Linux and Windows (PowerShell):
 
 ```sh
+pipx install holt-cli
 uv tool install holt-cli
+pip install --user holt-cli
 ```
 
-[`uv`](https://docs.astral.sh/uv/) installs the right Python and keeps Holt in
-an isolated environment. The `holt` command includes the terminal interface.
+The `holt` command includes the terminal interface.
+
+## Give Holt a GitHub token
+
+GitHub asks for a token even to read public data. Holt only reads, so the token
+needs **no permissions**:
+
+1. [Create a token](https://github.com/settings/tokens/new?description=holt) and
+   leave every box unticked.
+2. Run `holt token` and paste it. It is saved in your config directory, readable
+   only by you, and never printed.
+
+If you already use the GitHub CLI and are logged in (`gh auth login`), Holt uses
+`gh auth token` and you can skip both steps. You can also set it per terminal:
+
+```sh
+export GITHUB_TOKEN=your_token                # macOS / Linux
+```
+
+```powershell
+$env:GITHUB_TOKEN = "your_token"              # Windows PowerShell
+```
+
+The interactive interface (`holt`) asks for the token the first time you need
+one.
 
 ## Ask about a repository
 
-For a repository you care about, read GitHub directly. A classic token with no
-scopes is sufficient for public repositories:
-
 ```sh
-export GITHUB_TOKEN=...      # a classic token with NO scopes is enough
-export OPENAI_API_KEY=...
-holt analyze pallets/flask --live
+holt analyze pallets/flask
 ```
 
-About 40 seconds and about a cent. Holt only reads; it never posts, opens a pull
-request, or contacts anybody.
+About 20 seconds, and free: with no AI model set up, you get the rules-only
+report, which is the verdict and the counts behind it. Holt only reads; it
+never posts, opens a pull request, or contacts anybody.
 
-**No OpenAI key?** Drop it and add `--no-model`:
+Add `--json` for machine-readable output. When you pipe or redirect the report
+(`holt analyze pallets/flask > flask.md`) it stays plain Markdown; on a terminal
+it is formatted, and every piece of evidence is a clickable link to the pull
+request on GitHub.
+
+### Optional: a written explanation
+
+With a model set up, the report adds a plain-English explanation and quotes the
+pull request threads it relied on. The verdict itself does not change: it is
+computed by rules, and the model only explains. The cheapest start for students
+is Gemini's free tier ([get a key](https://aistudio.google.com/apikey)):
 
 ```sh
-export GITHUB_TOKEN=...
-holt analyze pallets/flask --live --no-model
+holt models --provider gemini --model gemini-2.5-flash
+export GEMINI_API_KEY=your_key                # PowerShell: $env:GEMINI_API_KEY = "your_key"
 ```
 
-You still get the verdict and the counts behind it. You lose the prose and the
-quoted threads — the report says so itself. `holt models` points Holt at another
-provider, including a local one, if you would rather not use OpenAI at all.
+Other providers: `--provider openrouter` (one key for many models, some free;
+`OPENROUTER_API_KEY`), `anthropic` (`ANTHROPIC_API_KEY`), `openai`
+(`OPENAI_API_KEY`), `ollama` (runs on your computer, no key), or
+`openai-compatible` with `--base-url`. `holt models` shows what is set up, and
+`--no-model` forces the free rules-only report even when a model is.
+
+## When something goes wrong
+
+Every error is one sentence plus the command that fixes it. The common ones:
+
+| Holt says | Do this |
+|---|---|
+| needs a GitHub token | `holt token` (see above) |
+| GitHub did not accept your token | create a new one and run `holt token` again |
+| rate limit was reached | wait a few minutes and re-run the same command |
+| could not find owner/name | check the spelling in the repository's URL; private repositories are not supported |
+| `GEMINI_API_KEY` (or another key) is not set | set it as shown above, or add `--no-model` |
 
 ## Reading the answer
 
@@ -71,12 +117,11 @@ The third is a real answer, not a failure. Then:
   > Outsiders attempted these and none were merged: `pkgs/applications` (6),
   > `pkgs/build-support` (6).
 
-- **Evidence** — every claim above with the thread id it came from, e.g.
-  `pr:NixOS/nixpkgs#526361:opened`. Paste it after `github.com/` and read the
-  thread yourself. Anything Holt could not back this way was dropped before you
-  saw it.
-
-Watch that dropping happen with `--show-verification`.
+- **Evidence** (with a model) — every claim above with a link to the pull
+  request it came from, e.g.
+  [pull request #526361](https://github.com/NixOS/nixpkgs/pull/526361). Open it
+  and read the thread yourself. Anything Holt could not back this way was
+  dropped before you saw it.
 
 ## Say how much time you have
 
@@ -85,8 +130,8 @@ first reply is four days is a different proposition on a 3-day budget than on a
 90-day one:
 
 ```sh
-holt analyze pallets/flask --live --days 3
-holt analyze pallets/flask --live --days 90
+holt analyze pallets/flask --days 3
+holt analyze pallets/flask --days 90
 ```
 
 Changing `--days` costs nothing: the verdict is arithmetic, so no model runs.
@@ -96,10 +141,10 @@ Changing `--days` costs nothing: the verdict is arithmetic, so no model runs.
 Nobody decides about one repository.
 
 ```sh
-holt compare pallets/flask fastapi/fastapi --live
+holt compare pallets/flask astral-sh/uv
 ```
 
-One row each, in the order you asked for — verdict, how many outsiders got in,
+One row each, in the order you asked for — the answer, how many outsiders got in,
 how fast the first reply comes, and the rule that decided it. It does not sort
 them, because sorting would be a claim it has not measured.
 
@@ -115,16 +160,14 @@ holt discover --live
 `discover` pulls candidates from GitHub search, screens them cheaply, and only
 runs the full assessment on the survivors — so a 25-candidate session costs
 cents rather than dollars. Screening reads only the newest threads, so treat its
-numbers as a filter and the full report as the answer. Without `--live` it
-replays a recorded demo session, which is a good way to see the shape of it
-first.
+numbers as a filter and the full report as the answer.
 
 ## After you have landed something
 
 Once you have merged work in a repository, ask what to pick up next:
 
 ```sh
-holt next NixOS/nixpkgs --as mweinelt --live
+holt next NixOS/nixpkgs --as mweinelt
 ```
 
 Open issues that name files or directories you have already touched come first,
@@ -138,7 +181,12 @@ every list, so you can weigh it honestly.
 holt
 ```
 
-Same commands, same evidence, browsable.
+Same commands, same evidence, browsable. Press `?` on any screen for the keys;
+`o` opens the selected evidence on GitHub, `q` on a report goes back.
+
+If you cloned the Holt repository rather than installing it, repositories that
+have committed evidence (such as `pallets/flask`) are answered from that
+snapshot; add `--live` for today's data.
 
 ---
 
