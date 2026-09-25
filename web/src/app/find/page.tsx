@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ErrorPanel } from "@/components/error-panel";
 import { FindResults } from "@/components/find/find-results";
 import { FindRunner } from "@/components/find/find-runner";
-import { find } from "@/lib/api";
+import { cachedFind } from "@/lib/find-cached";
 import { hacktoberfest } from "@/lib/site";
 import { caller } from "@/lib/session";
 
@@ -30,7 +30,7 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
   const hf = sp.hacktoberfest != null ? sp.hacktoberfest === "1" : searched ? false : hfDefault;
 
   const result = searched
-    ? await find({ languages: langs, topics: [], days, hacktoberfest: hf, limit: 12 }, await caller())
+    ? await cachedFind({ languages: langs, topics: [], days, hacktoberfest: hf, limit: 12 }, await caller())
     : null;
 
   return (
