@@ -7,21 +7,57 @@ disagree, the determinism claim would be worth nothing.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 
 from holt.agent import landing, stages
 from holt.agent.findings import Finding, Findings
-from holt.agent.signals import Signals, build_threads, compute
+from holt.agent.signals import MIN_AGE_HOURS, Signals, build_threads, compute
 from holt.agent.verdict import classify as decide
-from holt.agent.verdict import contested_kind
+from holt.agent.verdict import contested_kind, hours_phrase, headline, legacy_trace
 from holt.agent.verify import check_quotes, verify
 from holt.evidence.provider import EvidenceProvider
 from holt.model import ModelClient
-from holt.report import VERDICT_HEADLINES, Assessment, Claim, Verdict
+from holt.report import Assessment, Claim
 
 MAX_CLAIM_CHARS = 240
 MAX_QUOTE_CHARS = 180
+
+# A model's rationale is its reading of the evidence, not the evidence. Where
+# one is shown next to a verified citation it says so, so a reader cannot take
+# the model's words for something the record says.
+MODEL_NOTE_LABEL = "AI's reading, not a quote"
+
+# Assessment fields written by a model in the full pipeline. Everything else --
+# the verdict, the rules, the counts, the landing table, the citations -- is
+# computed. Carried on the Trace so a front end can label these as AI-written.
+MODEL_WRITTEN_FIELDS = ("summary", "bottom_line", "limits")
+
+# Called with a plain-English stage and overall progress from 0 to 1. The web
+# server streams these to the browser as they happen.
+Progress = Callable[[str, float], None]
+
+
+def _reporter(progress: Progress | None) -> Progress:
+    """Never let a broken progress callback break an analysis."""
+    if progress is None:
+        return lambda stage, fraction: None
+
+    def report(stage: str, fraction: float) -> None:
+        try:
+            progress(stage, max(0.0, min(1.0, fraction)))
+        except Exception:  # noqa: BLE001 - a display hook must not fail the run
+            pass
+
+    return report
+
+
+def _min_age(provider: EvidenceProvider, min_age_hours: float | None) -> float:
+    """The "too new to judge" window: on for live reads, off for frozen captures."""
+    if min_age_hours is not None:
+        return min_age_hours
+    return MIN_AGE_HOURS if getattr(provider, "judges_recency", True) else 0.0
 
 
 def clip(text: str, limit: int) -> str:
@@ -45,6 +81,8 @@ class Trace:
     # Findings whose id resolved but whose quotation is not in the record.
     invented: list[Finding] = field(default_factory=list)
     rules: list[str] = field(default_factory=list)
+    # Which Assessment fields a model wrote; empty when no model ran.
+    model_written: tuple[str, ...] = ()
 
 
 def analyze(
@@ -53,18 +91,42 @@ def analyze(
     model: ModelClient | None,
     contributor_days: int = 7,
     as_of: datetime | None = None,
+    progress: Progress | None = None,
+    min_age_hours: float | None = None,
 ) -> tuple[Assessment, Trace]:
+    """The full assessment. The web server and the CLI both call this.
+
+    `progress`, if given, is called with a plain-English stage and a fraction
+    from 0 to 1 as each stage starts, and with ("Done", 1.0) at the end.
+
+    `min_age_hours` is how new an unanswered pull request can be before its
+    silence counts as being ignored, measured back from `as_of` (or now). By
+    default it applies to live evidence and not to committed fixtures, whose
+    published numbers were computed without it.
+    """
     if model is None:
-        return analyze_without_model(repo, provider, contributor_days, as_of)
+        return analyze_without_model(
+            repo, provider, contributor_days, as_of,
+            progress=progress, min_age_hours=min_age_hours,
+        )
+    report = _reporter(progress)
+    report("Fetching pull requests", 0.0)
     records = provider.fetch(repo)
+    report("Counting replies and merges", 0.3)
     threads = build_threads(records)
-    signals = compute(threads)
+    signals = compute(
+        threads, as_of or datetime.now(UTC), _min_age(provider, min_age_hours)
+    )
 
     findings = Findings()
+    report("Working out what kind of project this is", 0.35)
     stages.classify(repo, records, threads, model, findings)
+    report("Reading the contributing guide", 0.45)
     stages.assess_opportunity(repo, records, model, findings)
+    report("Reading threads", 0.55)
     stages.read_outcomes(repo, threads, model, findings)
 
+    report("Checking evidence", 0.75)
     before = len(findings)
     findings, dropped = verify(findings, provider)
 
@@ -92,8 +154,15 @@ def analyze(
         if k not in ("reviewed_share", "merge_rate", "merged_files_median",
                      "merged_dirs_median", "merged_with_files")
     }
+    # Likewise the rule trace: the reader sees plain sentences, and the narrator
+    # is handed the wording the recordings were made with.
+    narrated_signals = {
+        k: v for k, v in narrated_signals.items()
+        if k not in ("outsider_awaiting_reply", "outsider_answered")
+    }
+    report("Writing the report", 0.85)
     narrated = stages.narrate(
-        repo, verdict.value, rules, findings, narrated_signals, model
+        repo, verdict.value, legacy_trace(rules), findings, narrated_signals, model
     )
 
     # The evidence list is built from verified findings, not written by the
@@ -120,7 +189,8 @@ def analyze(
                     else f"{outcome}, nothing said")
         else:
             text = f"{item.field.replace('_', ' ')}: {item.value}" + (
-                f" — {clip(item.note, MAX_CLAIM_CHARS)}" if item.note else "")
+                f" ({MODEL_NOTE_LABEL}: {clip(item.note, MAX_CLAIM_CHARS)})"
+                if item.note else "")
         claims.append(Claim(text=text, evidence_id=item.evidence_ids[0]))
 
     assessment = Assessment(
@@ -139,6 +209,7 @@ def analyze(
         models=list(model.usage.models),
         dropped_claims=len(dropped) + len(invented),
     )
+    report("Done", 1.0)
     return assessment, Trace(
         signals=signals,
         before_verification=before,
@@ -146,6 +217,7 @@ def analyze(
         dropped=dropped,
         invented=invented,
         rules=rules,
+        model_written=MODEL_WRITTEN_FIELDS,
     )
 
 
@@ -176,11 +248,21 @@ def analyze_without_model(
     provider: EvidenceProvider,
     contributor_days: int = 7,
     as_of: datetime | None = None,
+    progress: Progress | None = None,
+    min_age_hours: float | None = None,
 ) -> tuple[Assessment, Trace]:
-    """The verdict, with no model call anywhere and the cost of that printed."""
+    """The verdict, with no model call anywhere and the cost of that printed.
+
+    `progress` and `min_age_hours` behave as in `analyze`.
+    """
+    report = _reporter(progress)
+    report("Fetching pull requests", 0.0)
     records = provider.fetch(repo)
+    report("Counting replies and merges", 0.6)
     threads = build_threads(records)
-    signals = compute(threads)
+    signals = compute(
+        threads, as_of or datetime.now(UTC), _min_age(provider, min_age_hours)
+    )
 
     findings = Findings()
     # `is_archived` is a structured GitHub field. Stage A was asking a model to
@@ -193,41 +275,50 @@ def analyze_without_model(
         findings.add("is_archived", True, (meta.evidence_id,),
                      "GitHub reports this repository as archived")
 
+    report("Applying the rules", 0.9)
     verdict, rules = decide(findings, signals, contributor_days)
 
     s = signals.as_dict()
     if signals.outsider_threads:
         summary = (
-            f"{s['outsider_merged']} of {s['outsider_threads']} outsider pull "
-            f"requests merged, by {s['distinct_merged_authors']} distinct people "
-            f"out of {s['distinct_outsider_authors']} who tried"
+            f"{s['outsider_merged']} of {s['outsider_threads']} pull requests from "
+            f"newcomers were merged, by {s['distinct_merged_authors']} of the "
+            f"{s['distinct_outsider_authors']} people who tried."
         )
         if s["median_first_response_hours"] is not None:
-            summary += f"; median first response {s['median_first_response_hours']}h"
-        summary += (
-            f"; {s['outsider_ignored']} drew no response at all. "
-            "Counted from the pull request record, not judged."
-        )
+            summary += (
+                f" Of the {s['outsider_answered']} that got a reply, half heard "
+                f"back within {hours_phrase(s['median_first_response_hours'])}."
+            )
+        summary += f" {s['outsider_ignored']} got no reply at all."
+        if s["outsider_awaiting_reply"]:
+            summary += (
+                f" {s['outsider_awaiting_reply']} are too new to have had a reply "
+                "yet and weren't counted as ignored."
+            )
+        summary += " These are counts from the pull request history, not an AI's judgement."
     else:
         summary = (
-            "No outsider pull requests in the period read, so the arithmetic has "
-            "nothing to count."
+            "Nobody from outside the project opened a pull request in the period "
+            "we looked at, so there was nothing to count."
         )
+    deciding = next((r for r in rules if getattr(r, "code", "") != "awaiting_reply"),
+                    rules[0] if rules else "")
 
     return Assessment(
         repo=repo,
         verdict=verdict,
         summary=summary,
-        bottom_line=f"{VERDICT_HEADLINES[verdict]}. " + (rules[0] if rules else ""),
+        bottom_line=f"{headline(verdict)}. " + deciding,
         limits=(
-            "No model ran. This report is the verdict and the rule that produced "
-            "it; the parts a model writes — what specific threads said, who was "
-            "welcoming, what kind of project this is, and the prose explaining "
-            "any of it — are absent, not merely brief. Measured: this mode scores "
-            "MCC +0.60 against the full pipeline's +0.61 in sample, but +0.55 "
-            "against +0.63 out of sample, and writes 0 citable statements against "
-            "its 11.8 (eval/evidence_integrity.py). Run without --no-model for a "
-            "report you can check against the record."
+            "No model ran. This answer comes from counting the pull request "
+            "history, so it can't tell you what specific threads said, who was "
+            "welcoming, or what kind of project this is, and it cites no specific "
+            "threads, where a full AI report cites about 12. In our testing on "
+            "repositories it hadn't seen, counting alone predicted how newcomers "
+            "would fare a little less well than the full report (a score of 0.55 "
+            "against 0.63, where 1 is perfect). Ask for the AI report for "
+            "something you can check thread by thread."
         ),
         rules=list(rules),
         contributor_days=contributor_days,
@@ -241,4 +332,9 @@ def analyze_without_model(
         replayed=False,
         models=[],
         dropped_claims=0,
-    ), Trace(signals=signals, rules=rules)
+    ), _done(report, Trace(signals=signals, rules=rules))
+
+
+def _done(report: Progress, trace: Trace) -> Trace:
+    report("Done", 1.0)
+    return trace

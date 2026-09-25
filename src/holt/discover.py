@@ -154,14 +154,17 @@ def _categorise(verdict: Verdict, trace: list[str]) -> str | None:
     emits; a test walks every bucket so a rewording fails loudly here."""
     if verdict is Verdict.VIABLE:
         return None
-    joined = " ".join(trace)
-    if "archived" in joined:
+    # Rules from verdict.py carry a stable `code`; plain strings fall back to
+    # the wording they used to be matched on.
+    codes = {getattr(r, "code", "") for r in trace}
+    joined = " ".join(getattr(r, "legacy", r) for r in trace)
+    if "archived" in codes or "archived" in joined:
         return CAT_ARCHIVED
-    if "waved through unread" in joined:
+    if "rubber_stamp" in codes or "waved through unread" in joined:
         return CAT_RUBBER_STAMP
-    if "exceeds the" in joined:
+    if "slow" in codes or "exceeds the" in joined:
         return CAT_SLOW
-    if "drew no response" in joined:
+    if "ignored" in codes or "drew no response" in joined:
         return CAT_HOSTILE
     return CAT_NO_LANDING
 

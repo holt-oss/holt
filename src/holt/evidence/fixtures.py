@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,7 +20,14 @@ from holt.evidence.provider import EvidenceProvider
 from holt.evidence.redact import redact_payload
 from holt.types import T_CUTOFF, EvidenceRecord, Window
 
+# Committed evidence lives in a repository clone, relative to its root. Only
+# fixture (replay) runs read it; a live run never does. `HOLT_FIXTURE_ROOT`
+# points an installed copy, or a server, at a checkout elsewhere.
 FIXTURE_ROOT = Path("fixtures")
+
+
+def fixture_root() -> Path:
+    return Path(os.environ.get("HOLT_FIXTURE_ROOT") or FIXTURE_ROOT)
 
 
 def slug_to_filename(repo_slug: str) -> str:
@@ -82,12 +90,13 @@ def write_fixture(
     repo_slug: str,
     window: Window,
     records: Iterable[EvidenceRecord],
-    root: Path = FIXTURE_ROOT,
+    root: Path | None = None,
     cutoff: datetime = T_CUTOFF,
 ) -> Path:
     # Scrubbed before the hash is taken, so the committed hash describes the
     # committed bytes and a later re-capture of the same evidence reproduces it.
     records, removed = redact_records(records)
+    root = fixture_root() if root is None else Path(root)
     path = root / window.value / slug_to_filename(repo_slug)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -104,7 +113,8 @@ def write_fixture(
             indent=1,
             sort_keys=True,
         )
-        + "\n"
+        + "\n",
+        encoding="utf-8",
     )
     return path
 
@@ -112,14 +122,17 @@ def write_fixture(
 class FixtureProvider(EvidenceProvider):
     """Reads committed evidence. No network, no token, no rate limit."""
 
+    # A frozen capture; see `EvidenceProvider.judges_recency`.
+    judges_recency = False
+
     def __init__(
         self,
         window: Window,
-        root: Path = FIXTURE_ROOT,
+        root: Path | None = None,
         cutoff: datetime = T_CUTOFF,
     ) -> None:
         super().__init__(window, cutoff)
-        self.root = Path(root)
+        self.root = fixture_root() if root is None else Path(root)
         self._loaded: dict[str, EvidenceRecord] = {}
 
     def path_for(self, repo_slug: str) -> Path:
@@ -132,7 +145,7 @@ class FixtureProvider(EvidenceProvider):
                 f"No {self.window.value} fixture for {request} at {path}. "
                 "Capture it in live mode first; fixture mode never reaches the network."
             )
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
 
         if data["window"] != self.window.value:
             raise ValueError(

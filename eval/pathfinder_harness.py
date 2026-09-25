@@ -102,7 +102,7 @@ def main() -> None:
         scores["random"].append(truth["base_rate"])
 
         path = TRAJECTORY_DIR / "pathfinder" / (slug.replace("/", "__") + ".jsonl")
-        model = ReplayModel(path) if args.replay else OpenAIModel(path)
+        model = ReplayModel(path) if args.replay else OpenAIModel(path, record=True)
         # The same call the CLI makes. If these diverged, the published precision
         # would describe something no user ever runs.
         ranked = entry.rank(slug, list(pre_i), list(pre_p), model)

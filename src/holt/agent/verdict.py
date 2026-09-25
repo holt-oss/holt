@@ -14,7 +14,7 @@ it cannot change. A test asserts the rendered report and this function agree.
 from __future__ import annotations
 
 from holt.agent.findings import Findings
-from holt.agent.signals import Signals
+from holt.agent.signals import MIN_AGE_HOURS, Signals
 from holt.report import Verdict
 
 # Kinds where a merged pull request is not a software contribution. Landing work
@@ -23,6 +23,13 @@ NON_SOFTWARE_KINDS = {"registry", "awesome_list", "portfolio", "course_material"
 
 # Kinds where outside contribution is not accepted regardless of activity.
 CLOSED_KINDS = {"mirror"}
+
+# Kinds that decide on the model's word alone, with nothing in the evidence to
+# contest them against (see below). They only decide when the classification
+# cites a record that resolved -- a README, a thread -- so a bare assertion, or
+# one planted by text in the repository asking to be called a portfolio, cannot
+# turn a project away by itself.
+CITATION_REQUIRED_KINDS = {"portfolio", "course_material"}
 
 # --- contesting the one field that can decide alone -------------------------
 #
@@ -92,6 +99,98 @@ IGNORED_SHARE = 0.7
 MIN_ATTEMPTS_FOR_HOSTILE = 8
 
 
+# --- what the reader sees ------------------------------------------------------
+#
+# Every rule line is printed under "What decided it", to beginners. So each is a
+# plain sentence with no field names, and each also carries two things the
+# reader never sees:
+#
+# * `code`, a stable name for the rule, so code that needs to know *which* rule
+#   fired (discover's rejection buckets) does not match on wording that is
+#   allowed to improve;
+# * `legacy`, the wording the rule had when the committed trajectories were
+#   recorded. The narration prompt quotes the rule trace, and a prompt that
+#   changes is a replay miss, so the narrator is handed `legacy_trace(rules)`
+#   and the recordings keep replaying. A rule added since then has no legacy
+#   wording and passes its plain sentence through.
+
+
+class Rule(str):
+    """A rule sentence for the reader, with its stable code and recorded wording."""
+
+    code: str
+    legacy: str
+
+    def __new__(cls, text: str, code: str = "", legacy: str | None = None) -> Rule:
+        rule = super().__new__(cls, text)
+        rule.code = code
+        rule.legacy = text if legacy is None else legacy
+        return rule
+
+
+def legacy_trace(rules: list[str]) -> list[str]:
+    """The trace as the narration prompt was recorded with it."""
+    return [getattr(r, "legacy", r) for r in rules]
+
+
+def rule_codes(rules: list[str]) -> list[str]:
+    return [getattr(r, "code", "") for r in rules]
+
+
+HEADLINES = {
+    Verdict.VIABLE: "Worth your time",
+    Verdict.NOT_VIABLE: "Not worth your time",
+    Verdict.INSUFFICIENT_EVIDENCE: "Not enough evidence",
+}
+
+
+def headline(verdict: Verdict | str) -> str:
+    """The words a reader sees for a verdict: the API's `headline` field."""
+    return HEADLINES[Verdict(verdict)]
+
+
+def hours_phrase(h: float) -> str:
+    """0.8 -> "48 minutes", 30 -> "30 hours", 200 -> "8.3 days"."""
+    if h < 1:
+        minutes = max(1, round(h * 60))
+        return f"{minutes} minute" + ("" if minutes == 1 else "s")
+    if h < 48:
+        return f"{h:g} hour" + ("" if h == 1 else "s")
+    return f"{h / 24:.1f} days"
+
+
+def _n(count: int, noun: str, plural: str | None = None) -> str:
+    return f"{count} {noun if count == 1 else (plural or noun + 's')}"
+
+
+_KIND_SENTENCES = {
+    "registry": (
+        "This repository is a catalogue of entries, like package or plugin "
+        "listings. Changes get merged easily here, but they aren't software work."
+    ),
+    "awesome_list": (
+        "This repository is a curated list of links. Adding a link isn't a "
+        "software contribution."
+    ),
+    "portfolio": (
+        "This looks like someone's personal project or portfolio, so it isn't "
+        "really set up for outside contributions."
+    ),
+    "course_material": (
+        "This looks like course or teaching material, so a merged change here "
+        "isn't a software contribution."
+    ),
+}
+
+_KIND_NAMES = {
+    "registry": "a catalogue of entries",
+    "awesome_list": "a list of links",
+    "mirror": "a read-only copy of a project developed elsewhere",
+    "portfolio": "a personal project",
+    "course_material": "course material",
+}
+
+
 def contested_kind(
     findings: Findings, signals: Signals, meta: dict | None = None
 ) -> str | None:
@@ -108,11 +207,18 @@ def contested_kind(
             and signals.merged_dirs_median is not None
             and signals.merged_dirs_median >= CATALOGUE_DIRS_MAX
         ):
-            return (
-                f"repo_kind={kind} was claimed, but merged work here spans a "
-                f"median of {signals.merged_dirs_median:g} top-level directories "
-                "rather than landing in one place, which is not a catalogue "
-                "entry; the field is dropped and decided nothing"
+            return Rule(
+                f"The AI guessed this is {_KIND_NAMES[kind]}, but merged changes "
+                f"here usually touch {signals.merged_dirs_median:g} different "
+                "top-level folders, which a catalogue entry wouldn't. That guess "
+                "was set aside and didn't affect the answer.",
+                code="kind_contested",
+                legacy=(
+                    f"repo_kind={kind} was claimed, but merged work here spans a "
+                    f"median of {signals.merged_dirs_median:g} top-level directories "
+                    "rather than landing in one place, which is not a catalogue "
+                    "entry; the field is dropped and decided nothing"
+                ),
             )
 
     if kind in CLOSED_KINDS:
@@ -124,14 +230,27 @@ def contested_kind(
             and signals.outsider_merged >= MIN_MERGES
             and signals.distinct_merged_authors >= MIN_DISTINCT_AUTHORS
         ):
-            return (
-                f"repo_kind={kind} was claimed, but GitHub does not report this "
-                f"repository as a mirror and {signals.outsider_merged} outside "
-                f"pull requests by {signals.distinct_merged_authors} people were "
-                "merged in the period read; the field is dropped and decided nothing"
+            return Rule(
+                f"The AI guessed this is {_KIND_NAMES[kind]}, but GitHub doesn't "
+                f"mark it as a mirror, and {_n(signals.outsider_merged, 'pull request')} "
+                f"from {_n(signals.distinct_merged_authors, 'outside contributor')} "
+                "were merged. That guess was set aside and didn't affect the answer.",
+                code="kind_contested",
+                legacy=(
+                    f"repo_kind={kind} was claimed, but GitHub does not report this "
+                    f"repository as a mirror and {signals.outsider_merged} outside "
+                    f"pull requests by {signals.distinct_merged_authors} people were "
+                    "merged in the period read; the field is dropped and decided nothing"
+                ),
             )
 
     return None
+
+
+def _kind_is_cited(findings: Findings) -> bool:
+    return any(
+        item.field == "repo_kind" and item.evidence_ids for item in findings
+    )
 
 
 def classify(
@@ -145,82 +264,174 @@ def classify(
     function with a different budget costs nothing and calls no model, because
     the findings are already computed -- which is a thing a single prompt cannot
     do without paying for the whole assessment again.
+
+    The trace is a list of `Rule`s: plain sentences for the reader, each with a
+    stable `code` and the `legacy` wording the narration prompt is keyed on.
     """
     trace: list[str] = []
     slow_response_hours = contributor_days * 24.0
     kind = findings.get("repo_kind")
+    days = _n(contributor_days, "day")
 
     if findings.get("is_archived"):
-        trace.append("archived: no longer accepting work")
+        trace.append(Rule(
+            "The owners have archived this repository, so it no longer accepts "
+            "contributions.",
+            code="archived", legacy="archived: no longer accepting work",
+        ))
         return Verdict.NOT_VIABLE, trace
 
     if kind in CLOSED_KINDS:
-        trace.append(f"repo_kind={kind}: outside pull requests are not the contribution path")
+        trace.append(Rule(
+            "This is a read-only copy of a project developed somewhere else, so "
+            "a pull request here isn't how you contribute.",
+            code="closed_kind",
+            legacy=f"repo_kind={kind}: outside pull requests are not the contribution path",
+        ))
         return Verdict.NOT_VIABLE, trace
 
     if kind in NON_SOFTWARE_KINDS:
-        trace.append(f"repo_kind={kind}: merged work here is not a software contribution")
-        return Verdict.NOT_VIABLE, trace
+        if kind in CITATION_REQUIRED_KINDS and not _kind_is_cited(findings):
+            trace.append(Rule(
+                f"The AI guessed this is {_KIND_NAMES[kind]}, but pointed to "
+                "nothing in the repository that shows it, so that guess didn't "
+                "affect the answer.",
+                code="kind_uncited",
+            ))
+        else:
+            trace.append(Rule(
+                _KIND_SENTENCES[kind],
+                code="non_software_kind",
+                legacy=f"repo_kind={kind}: merged work here is not a software contribution",
+            ))
+            return Verdict.NOT_VIABLE, trace
+
+    if signals.outsider_awaiting_reply:
+        trace.append(Rule(
+            f"{_n(signals.outsider_awaiting_reply, 'pull request')} from newcomers "
+            f"{'was' if signals.outsider_awaiting_reply == 1 else 'were'} opened "
+            f"in the last {MIN_AGE_HOURS:g} hours and haven't had time to get a "
+            "reply yet, so they aren't counted as ignored.",
+            code="awaiting_reply",
+        ))
 
     if signals.outsider_threads == 0:
-        # "In the period read", not "before the cutoff": the cutoff is an
+        # "The period we looked at", not "before the cutoff": the cutoff is an
         # evaluation device, and this line is printed verbatim to users.
-        trace.append("no outsider attempts in the period read: nothing to judge from")
+        trace.append(Rule(
+            "Nobody from outside the project opened a pull request in the period "
+            "we looked at, so there's nothing to judge from.",
+            code="no_attempts",
+            legacy="no outsider attempts in the period read: nothing to judge from",
+        ))
         return Verdict.INSUFFICIENT_EVIDENCE, trace
 
-    ignored_share = signals.outsider_ignored / signals.outsider_threads
+    # Attempts too new to have been answered are neither ignored nor evidence
+    # of being ignored: they leave both sides of the share.
+    judgeable = signals.outsider_judgeable
+    ignored_share = signals.outsider_ignored / judgeable if judgeable else 0.0
     if (
         signals.outsider_merged == 0
         and ignored_share > IGNORED_SHARE
-        and signals.outsider_threads >= MIN_ATTEMPTS_FOR_HOSTILE
+        and judgeable >= MIN_ATTEMPTS_FOR_HOSTILE
     ):
-        trace.append(
-            f"{signals.outsider_ignored}/{signals.outsider_threads} outsider attempts "
-            "drew no response and none merged"
-        )
+        trace.append(Rule(
+            f"{signals.outsider_ignored} of {_n(judgeable, 'pull request')} from "
+            "newcomers got no reply at all, and none were merged.",
+            code="ignored",
+            legacy=(
+                f"{signals.outsider_ignored}/{signals.outsider_threads} outsider attempts "
+                "drew no response and none merged"
+            ),
+        ))
         return Verdict.NOT_VIABLE, trace
 
-    slow = (
-        signals.median_first_response_hours is not None
-        and signals.median_first_response_hours > slow_response_hours
-    )
+    median = signals.median_first_response_hours
+    slow = median is not None and median > slow_response_hours
     if (
         signals.outsider_merged >= MIN_MERGES
         and signals.distinct_outsider_authors >= MIN_DISTINCT_AUTHORS
         and not slow
     ):
-        trace.append(
-            f"{signals.outsider_merged} first-time merges by "
-            f"{signals.distinct_merged_authors} distinct people, out of "
-            f"{signals.outsider_threads} attempts by "
-            f"{signals.distinct_outsider_authors}; median first response "
-            f"{signals.median_first_response_hours}h"
+        text = (
+            f"{_n(signals.outsider_merged, 'pull request')} from first-time "
+            f"contributors {'was' if signals.outsider_merged == 1 else 'were'} "
+            f"merged, by {_n(signals.distinct_merged_authors, 'different person', 'different people')}, "
+            f"out of {_n(signals.outsider_threads, 'attempt')} by "
+            f"{_n(signals.distinct_outsider_authors, 'person', 'people')}."
         )
+        if median is not None:
+            text += (
+                " Among newcomers who got a reply, half heard back within "
+                f"{hours_phrase(median)}."
+            )
+        # The median covers only attempts that got a reply; the ones that never
+        # did are said next to it, or a fast median hides a silent majority.
+        if signals.outsider_ignored:
+            text += (
+                f" {_n(signals.outsider_ignored, 'attempt')} got no reply at all "
+                "and weren't merged."
+            )
+        trace.append(Rule(
+            text,
+            code="merges",
+            legacy=(
+                f"{signals.outsider_merged} first-time merges by "
+                f"{signals.distinct_merged_authors} distinct people, out of "
+                f"{signals.outsider_threads} attempts by "
+                f"{signals.distinct_outsider_authors}; median first response "
+                f"{signals.median_first_response_hours}h"
+            ),
+        ))
         if (
             signals.reviewed_share is not None
             and signals.merge_rate is not None
             and signals.reviewed_share < RUBBER_STAMP_REVIEWED_MAX
             and signals.merge_rate > RUBBER_STAMP_MERGE_RATE_MIN
         ):
-            trace.append(
-                f"but only {signals.reviewed_share:.0%} of merges drew any human "
-                f"reply while {signals.merge_rate:.0%} of attempts landed: work is "
-                "being waved through unread, so a contribution here buys no review"
-            )
+            trace.append(Rule(
+                f"But only {signals.reviewed_share:.0%} of merged pull requests got "
+                f"any comment from a person, while {signals.merge_rate:.0%} of "
+                "newcomer attempts were merged. Changes here seem to be merged "
+                "without anyone reviewing them, so you wouldn't get feedback on yours.",
+                code="rubber_stamp",
+                legacy=(
+                    f"but only {signals.reviewed_share:.0%} of merges drew any human "
+                    f"reply while {signals.merge_rate:.0%} of attempts landed: work is "
+                    "being waved through unread, so a contribution here buys no review"
+                ),
+            ))
             return Verdict.NOT_VIABLE, trace
         return Verdict.VIABLE, trace
 
     if slow:
-        trace.append(
-            f"median first response {signals.median_first_response_hours}h "
-            f"exceeds the {slow_response_hours:.0f}h a {contributor_days}-day "
-            "budget allows"
-        )
+        trace.append(Rule(
+            f"Newcomers who got a reply typically waited {hours_phrase(median)} for it, "
+            f"longer than the {days} you have.",
+            code="slow",
+            legacy=(
+                f"median first response {signals.median_first_response_hours}h "
+                f"exceeds the {slow_response_hours:.0f}h a {contributor_days}-day "
+                "budget allows"
+            ),
+        ))
     if signals.outsider_merged == 0 and ignored_share > IGNORED_SHARE:
-        trace.append(
-            f"{signals.outsider_ignored}/{signals.outsider_threads} attempts ignored, "
-            f"but fewer than {MIN_ATTEMPTS_FOR_HOSTILE} attempts is too thin to call hostile"
-        )
+        trace.append(Rule(
+            f"{signals.outsider_ignored} of {_n(judgeable, 'pull request')} from "
+            "newcomers got no reply, but that's too few attempts to be sure the "
+            "project ignores newcomers.",
+            code="too_few_attempts",
+            legacy=(
+                f"{signals.outsider_ignored}/{signals.outsider_threads} attempts ignored, "
+                f"but fewer than {MIN_ATTEMPTS_FOR_HOSTILE} attempts is too thin to call hostile"
+            ),
+        ))
     elif signals.outsider_merged < MIN_MERGES:
-        trace.append(f"only {signals.outsider_merged} outsider merges in the period read")
+        trace.append(Rule(
+            f"Only {_n(signals.outsider_merged, 'pull request')} from first-time "
+            "contributors got merged in the period we looked at, too few to show "
+            "a pattern.",
+            code="few_merges",
+            legacy=f"only {signals.outsider_merged} outsider merges in the period read",
+        ))
     return Verdict.INSUFFICIENT_EVIDENCE, trace
