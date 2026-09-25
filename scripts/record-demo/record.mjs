@@ -73,6 +73,8 @@ async function mainFlow(page, mobile) {
   const input = page.locator("#repo-input");
   await input.click();
   await input.pressSequentially(REPO_URL, { delay: 45 });
+  // Never submit a mistyped URL on camera.
+  if ((await input.inputValue()) !== REPO_URL) await input.fill(REPO_URL);
   await wait(page, 500);
   await input.press("Enter");
   // A cached report renders at once; an uncached one streams its stages first.
