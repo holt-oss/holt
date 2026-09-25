@@ -8,7 +8,9 @@ import "./globals.css";
 
 const mono = JetBrains_Mono({
   variable: "--font-jetbrains",
-  subsets: ["latin"],
+  // greek: the ω in the header cat is on every page; preloading it with latin
+  // saves a second font swap (and re-layout) right after first paint.
+  subsets: ["latin", "greek"],
   display: "swap",
 });
 

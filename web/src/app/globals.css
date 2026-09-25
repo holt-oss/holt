@@ -344,6 +344,13 @@
     animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
     animation-delay: var(--d, 0s);
   }
+  /* Phones: slide without the fade. Text that starts at opacity 0 can't count
+     as the largest paint, so the hero's fade held LCP back ~0.4-0.6s. */
+  @media (max-width: 1023px) {
+    .fade-up {
+      animation-name: slide-up;
+    }
+  }
 
   .meter {
     height: 6px;
@@ -397,6 +404,11 @@
 @keyframes fade-up {
   from {
     opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes slide-up {
+  from {
     transform: translateY(14px);
   }
 }
