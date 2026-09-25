@@ -2,4 +2,3 @@
 # `staging` yet. One per line; blank lines and # comments are ignored.
 # Looked up on origin first, then in the local clone at $HOLT_LOCAL_REPO.
 # A branch whose PR later gets the label is included only once.
-worktree-holt-web-app-frontend
