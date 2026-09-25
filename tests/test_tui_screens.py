@@ -60,6 +60,40 @@ def screen_text(app) -> str:
     )
 
 
+async def settle(pilot, check, timeout: float = 5.0, step: float = 0.05) -> None:
+    """Let the app run until `check()` holds, or `timeout` passes.
+
+    A fixed pause races the worker thread on a slow CI machine; this waits for
+    the state the test is about. It never asserts anything itself: the test's
+    own assertions still decide, after it returns.
+    """
+    waited = 0.0
+    while not check() and waited < timeout:
+        await pilot.pause(step)
+        waited += step
+
+
+async def caught_up(app, pilot, session=None, timeout: float = 5.0) -> None:
+    """Wait until a run's queued events are drained and the screen has taken
+    in every one of them (the live screen's cursor reaches the end of the
+    log), then let what it just added render. Replaces fixed pauses that
+    raced the app's pump on slow machines."""
+    session = session or app.session
+
+    def done() -> bool:
+        cursor = getattr(app.screen, "_cursor", None)
+        return session._queue.empty() and (cursor is None or cursor >= len(session.log))
+
+    await settle(pilot, done, timeout)
+    await pilot.pause(0.05)
+
+
+async def workers_done(app, pilot, timeout: float = 10.0) -> None:
+    """Wait for the screen's background workers (e.g. a ranking) to finish."""
+    await asyncio.wait_for(app.workers.wait_for_complete(), timeout)
+    await pilot.pause(0.05)
+
+
 def drive(body, store_root: Path, size=(100, 44)):
     """Open the app on a private store, then hand the pilot to `body`."""
     from holt.tui import store
@@ -94,7 +128,7 @@ async def show_run(app, pilot, complete: bool = True, **script_kw):
     app.session = session
     app.runs[session.options.repo] = session
     await app.push_screen(LiveScreen())
-    await pilot.pause(0.3)
+    await caught_up(app, pilot, session)
     return app.screen
 
 
@@ -247,7 +281,7 @@ def test_a_stale_assessment_is_not_reused(tmp_path):
 
 def test_the_live_view_shows_the_drop_and_names_the_claim(tmp_path):
     async def body(app, pilot):
-        await show_run(app, pilot, drop=True)
+        await show_run(app, pilot, complete=False, drop=True)
         text = screen_text(app)
         assert "15 findings → 14 kept, 1 dropped" in text
         assert "onboarding" in text
@@ -260,7 +294,7 @@ def test_the_live_view_shows_the_drop_and_names_the_claim(tmp_path):
 
 def test_a_clean_run_shows_no_drop_and_no_red(tmp_path):
     async def body(app, pilot):
-        await show_run(app, pilot, drop=False)
+        await show_run(app, pilot, complete=False, drop=False)
         text = screen_text(app)
         assert "15 findings → 15 kept, 0 dropped" in text
         assert "Dropped, not softened" not in text
@@ -532,7 +566,7 @@ def test_a_live_assessment_stored_before_records_were_kept_says_so(tmp_path):
 def test_trace_goes_back_to_the_run_you_came_from(tmp_path):
     async def body(app, pilot):
         await show_run(app, pilot)
-        await pilot.pause(0.9)
+        await settle(pilot, lambda: app.screen.__class__.__name__ == "AssessmentScreen")
         assert app.screen.__class__.__name__ == "AssessmentScreen"
         await pilot.press("t")
         await pilot.pause(0.3)
@@ -594,7 +628,7 @@ def test_an_assessment_stored_without_a_trace_says_so(tmp_path):
 def test_finishing_a_run_stores_it_and_home_lists_it(tmp_path):
     async def body(app, pilot):
         await show_run(app, pilot)
-        await pilot.pause(0.9)
+        await settle(pilot, lambda: app.screen.__class__.__name__ == "AssessmentScreen")
         assert app.screen.__class__.__name__ == "AssessmentScreen"
 
         await pilot.press("escape")
@@ -619,7 +653,7 @@ async def _choose_recording(app, pilot):
     index = [c.action for c in choices.choices].index("replay")
     choices.index = index
     await pilot.press("enter")
-    await pilot.pause(0.6)
+    await workers_done(app, pilot)
 
 
 def test_discover_opens_on_a_choice_not_on_a_canned_list(tmp_path):
@@ -1010,7 +1044,7 @@ def test_what_next_never_shows_an_order_without_its_measurement(tmp_path):
         await pilot.pause(0.3)
         await type_repo(pilot, "frenck")
         await pilot.press("enter")
-        await pilot.pause(2.0)
+        await workers_done(app, pilot)
         flat = " ".join(screen_text(app).split())
         assert "merged" in flat, flat[:400]
         # The measured claim, in the words the harness measured it in.
@@ -1034,7 +1068,7 @@ def test_what_next_names_the_token_rather_than_blaming_the_recording(
         await pilot.pause(0.3)
         await type_repo(pilot, "somebody")
         await pilot.press("enter")
-        await pilot.pause(0.8)
+        await workers_done(app, pilot)
         flat = " ".join(screen_text(app).split())
         assert "GITHUB_TOKEN" in flat, flat[:400]
 
@@ -1232,7 +1266,7 @@ def test_what_next_offers_the_committed_evidence_rather_than_taking_it(tmp_path,
 
         await type_repo(pilot, "frenck")
         await pilot.press("enter")
-        await pilot.pause(2.0)
+        await workers_done(app, pilot)
 
         flat = " ".join(screen_text(app).split())
         assert "ctrl+e" in flat, flat[:400]
@@ -1243,7 +1277,7 @@ def test_what_next_offers_the_committed_evidence_rather_than_taking_it(tmp_path,
 
         # Now ask for it, and the fixtures answer.
         await screen.action_use_committed()
-        await pilot.pause(2.0)
+        await workers_done(app, pilot)
         flat = " ".join(screen_text(app).split())
         assert "merged" in flat, flat[:400]
         assert "read from committed evidence" in flat
@@ -1266,13 +1300,13 @@ def test_what_next_reuses_a_read_and_says_how_old_it_is(tmp_path):
         await pilot.pause(0.3)
         await type_repo(pilot, "frenck")
         await pilot.press("enter")
-        await pilot.pause(2.0)
+        await workers_done(app, pilot)
         assert "reused from a read" not in screen_text(app), "first read is not a reuse"
         assert next_steps._CACHE, "and it must have been kept"
 
         # Ask again. Nothing is fetched, and the answer dates itself.
         await pilot.press("enter")
-        await pilot.pause(2.0)
+        await workers_done(app, pilot)
         flat = " ".join(screen_text(app).split())
         assert "reused from a read just now" in flat, flat[:400]
 
@@ -1310,7 +1344,7 @@ def test_what_next_says_plainly_when_the_login_has_landed_nothing(tmp_path):
         await pilot.pause(0.3)
         await type_repo(pilot, "nobody-at-all")
         await pilot.press("enter")
-        await pilot.pause(0.6)
+        await workers_done(app, pilot)
         text = screen_text(app)
         assert "no merged pull request here" in text
 
@@ -1751,25 +1785,12 @@ def attach(app, repo: str, script: list):
     return session
 
 
-async def settle(pilot, check, timeout: float = 5.0, step: float = 0.05) -> None:
-    """Let the app run until `check()` holds, or `timeout` passes.
-
-    A fixed pause races the worker thread on a slow CI machine; this waits for
-    the state the test is about. It never asserts anything itself: the test's
-    own assertions still decide, after it returns.
-    """
-    waited = 0.0
-    while not check() and waited < timeout:
-        await pilot.pause(step)
-        waited += step
-
-
 async def watch(app, pilot):
     """Put the live screen up on whatever `app.session` currently is."""
     from holt.tui.screens.live import LiveScreen
 
     await app.push_screen(LiveScreen())
-    await pilot.pause(0.2)
+    await caught_up(app, pilot)
 
 
 def unfinished(repo: str, **kw) -> list:
@@ -1805,7 +1826,8 @@ def test_a_run_that_finishes_while_nobody_watches_is_still_kept(tmp_path):
         session._queue.put(
             _events.RunFinished(assessment=fake_run.assessment(CLEAN), trace=None)
         )
-        await pilot.pause(0.4)
+        await settle(pilot, lambda: session.assessment is not None
+                     and bool(app.store.all()) and CLEAN not in app.runs)
 
         assert session.assessment is not None, "the result was never absorbed"
         assert [e.repo for e in app.store.all()] == [CLEAN]
@@ -1822,7 +1844,7 @@ def test_two_repositories_can_be_assessed_at_once(tmp_path):
     async def body(app, pilot):
         first = attach(app, CLEAN, unfinished(CLEAN))
         second = attach(app, other, unfinished(other))
-        await pilot.pause(0.2)
+        await settle(pilot, lambda: first._queue.empty() and second._queue.empty())
 
         assert {s.options.repo for s in app.in_flight} == {CLEAN, other}
 
@@ -1830,7 +1852,7 @@ def test_two_repositories_can_be_assessed_at_once(tmp_path):
             session._queue.put(
                 _events.RunFinished(assessment=fake_run.assessment(repo), trace=None)
             )
-        await pilot.pause(0.4)
+        await settle(pilot, lambda: not app.in_flight)
 
         assert {e.repo for e in app.store.all()} == {CLEAN, other}
         assert app.in_flight == []
@@ -1878,7 +1900,7 @@ def test_home_lists_a_run_in_flight_and_enter_rejoins_it(tmp_path):
         session = attach(app, CLEAN, unfinished(CLEAN))
         # Let the app absorb the stream first: the row names the stage the run
         # is in, and before anything is drained it can only say "starting".
-        await pilot.pause(0.3)
+        await settle(pilot, lambda: session._queue.empty() and len(session.log) > 5)
         await app.screen.refresh_entries()
         await pilot.pause(0.2)
 
