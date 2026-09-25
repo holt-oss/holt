@@ -125,10 +125,15 @@ class HoltCommands(Provider):
         except Exception:  # noqa: BLE001 - a palette must not raise over a bad store
             return
         for entry in entries:
-            verdict = getattr(entry.assessment.verdict, "value", "")
+            from holt.report import VERDICT_HEADLINES
+
+            verdict = entry.assessment.verdict
+            said = VERDICT_HEADLINES.get(verdict) or str(
+                getattr(verdict, "value", verdict)
+            ).replace("_", " ")
             age = store.describe_age(entry.age_seconds)
             yield (
                 f"open {entry.repo}",
-                f"{verdict.replace('_', ' ')} · assessed {age} · {entry.mode}",
+                f"{said} · assessed {age} · {entry.mode}",
                 lambda e=entry: app.open_stored(e),
             )

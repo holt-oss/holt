@@ -33,7 +33,6 @@ enter on a row starts an ordinary run.
 from __future__ import annotations
 
 import json
-import os
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -128,12 +127,11 @@ def missing_token() -> str | None:
     required to find candidates — only to assess one afterwards. Saying
     otherwise would turn a free feature into one that looks paid.
     """
-    if os.environ.get("GITHUB_TOKEN"):
+    from holt import credentials
+
+    if credentials.ensure_token():
         return None
-    return (
-        "GITHUB_TOKEN is not set. A live search reads GitHub directly; "
-        "export a token, or put it in .env, and try again."
-    )
+    return "Holt needs a GitHub token to search. Choose this again to add one."
 
 
 @dataclass
@@ -264,7 +262,7 @@ def load(name: str = DEFAULT_SESSION, days: int | None = None) -> Session:
     Raises `FileNotFoundError` when the session is not on disk, which the screen
     turns into a sentence rather than a traceback.
     """
-    manifest: dict[str, Any] = json.loads(discover.manifest_path(name).read_text())
+    manifest: dict[str, Any] = json.loads(discover.manifest_path(name).read_text(encoding="utf-8"))
     as_of = datetime.fromisoformat(manifest["as_of"])
 
     from holt.profile import Profile

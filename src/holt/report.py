@@ -34,6 +34,42 @@ VERDICT_HEADLINES = {
 }
 
 
+def evidence_url(evidence_id: str) -> str:
+    """The github.com page an evidence id points at, or "" if it names none.
+
+    Ids look like `pr:owner/name#123:opened` or `issue:owner/name#45:closed`;
+    anything else that names a repository (`repo:owner/name:meta`, a README)
+    links to the repository itself. Derived from the id rather than looked up,
+    so a report can be made clickable without the records that back it.
+    """
+    kind, _, rest = (evidence_id or "").partition(":")
+    slug, hashed, tail = rest.partition("#")
+    slug = slug.split(":", 1)[0].strip("/")
+    if slug.count("/") != 1 or not all(slug.split("/")):
+        return ""
+    base = f"https://github.com/{slug}"
+    number = "".join(c for c in tail.split(":", 1)[0] if c.isdigit()) if hashed else ""
+    if not number:
+        return base
+    return f"{base}/{'pull' if kind == 'pr' else 'issues'}/{number}"
+
+
+def evidence_label(evidence_id: str) -> str:
+    """`pull request #123`, `issue #45`, or the repository name."""
+    kind, _, rest = (evidence_id or "").partition(":")
+    _, hashed, tail = rest.partition("#")
+    number = "".join(c for c in tail.split(":", 1)[0] if c.isdigit()) if hashed else ""
+    if number:
+        return f"{'pull request' if kind == 'pr' else 'issue'} #{number}"
+    return rest.split(":", 1)[0] or evidence_id
+
+
+def cite(evidence_id: str) -> str:
+    """An evidence id as a Markdown link a reader can click."""
+    url = evidence_url(evidence_id)
+    return f"[{evidence_label(evidence_id)}]({url})" if url else f"`{evidence_id}`"
+
+
 @dataclass(frozen=True, slots=True)
 class Claim:
     """A statement with the evidence id that backs it.
@@ -138,7 +174,7 @@ class Assessment:
         if self.claims:
             lines += ["## Evidence", ""]
             for claim in self.claims:
-                where = f" — `{claim.evidence_id}`" if claim.evidence_id else ""
+                where = f" — {cite(claim.evidence_id)}" if claim.evidence_id else ""
                 lines.append(f"- {claim.text}{where}")
         if self.entry_points:
             # The disclaimer is emitted by the renderer, not by the caller, so
@@ -148,10 +184,48 @@ class Assessment:
 
             lines += ["", "## Where to start", "", DISCLAIMER, ""]
             for point in self.entry_points:
-                lines.append(f"- **{point.first_step}** — `{point.evidence_id}`")
+                lines.append(f"- **{point.first_step}** — {cite(point.evidence_id)}")
                 if point.why:
                     lines.append(f"  {point.why}")
         lines += ["", f"*{self.method}*"]
         if self.models:
             lines += [f"*Model output from {', '.join(self.models)}.*"]
         return "\n".join(lines).rstrip() + "\n"
+
+    def to_dict(self, stats: dict | None = None, mode: str = "") -> dict:
+        """The report as JSON, shaped like the Report object in `API.md`.
+
+        Fields the command line cannot know (cost, a server's generated time
+        zone conventions) are filled as best it can; `stats` comes from the
+        run's signals, which the assessment itself does not carry.
+        """
+        from datetime import UTC, datetime
+
+        from holt.agent.verdict import headline
+
+        return {
+            "repo": self.repo,
+            "mode": mode or ("ai" if self.models else "rules"),
+            "days": self.contributor_days,
+            "verdict": self.verdict.value,
+            "headline": headline(self.verdict),
+            "bottom_line": self.bottom_line or None,
+            "summary": self.summary or None,
+            "stats": stats,
+            "decided_by": list(self.rules),
+            "unknowns": [self.limits] if self.limits else [],
+            "evidence": [
+                {"id": c.evidence_id, "url": evidence_url(c.evidence_id or ""),
+                 "text": c.text}
+                for c in self.claims
+            ],
+            "entry_points": [
+                {"id": p.evidence_id, "url": evidence_url(p.evidence_id),
+                 "first_step": p.first_step, "why": p.why}
+                for p in self.entry_points
+            ],
+            "evidence_until": self.as_of.isoformat() if self.as_of else None,
+            "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            "models": list(self.models),
+            "dropped_claims": self.dropped_claims,
+        }

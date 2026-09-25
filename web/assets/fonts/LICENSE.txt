@@ -1,0 +1,2 @@
+JetBrains Mono (https://github.com/JetBrains/JetBrainsMono), used for Open Graph images.
+Copyright 2020 The JetBrains Mono Project Authors. Licensed under the SIL Open Font License 1.1: https://openfontlicense.org

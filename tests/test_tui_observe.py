@@ -200,14 +200,16 @@ def test_a_live_run_records_outside_the_committed_fixtures():
     `OpenAIModel` appends every call to the path it is handed. Pointing it at
     `fixtures/trajectories/` would have a TUI session rewrite the recordings the
     eval harness reproduces its numbers from. This asserts the path chosen for a
-    live run lands under `runs/` and nowhere near the fixtures.
+    live run lands under the user data directory and nowhere near the fixtures
+    — or the current directory, which is somebody's project.
     """
-    from holt import model
+    from holt import model, paths
 
     opts = RunOptions(repo=CLEAN, replay=False, live=True)
     for kind in ("verdict", "pathfinder"):
         path = opts.recording(CLEAN, kind)
-        assert path.parts[0] == "runs"
+        assert paths.runs_dir() in path.parents
+        assert path.is_absolute()
         assert model.TRAJECTORY_DIR not in path.parents
         assert "fixtures" not in path.parts
     # Both halves of one run share a directory, so a session is one artefact.
@@ -225,20 +227,55 @@ def test_replay_still_reads_the_committed_trajectories():
     assert _client(CLEAN, opts, "verdict").replayed is True
 
 
-def test_missing_credentials_names_what_a_run_needs(monkeypatch):
+def test_missing_credentials_asks_only_for_a_github_token(monkeypatch):
+    """A model is never required: without one a run is rules-only."""
+    from holt import credentials
     from holt.tui.session import missing_credentials
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
 
     assert missing_credentials(RunOptions(repo=CLEAN, replay=True)) == []
+    assert missing_credentials(RunOptions(repo=CLEAN, replay=False, live=False)) == []
 
     live = missing_credentials(RunOptions(repo=CLEAN, replay=False, live=True))
-    assert any("OPENAI_API_KEY" in m for m in live)
-    assert any("GITHUB_TOKEN" in m for m in live)
+    assert len(live) == 1 and credentials.TOKEN_URL in live[0]
+    assert "OPENAI" not in live[0]
 
-    monkeypatch.setenv("OPENAI_API_KEY", "x")
-    assert missing_credentials(RunOptions(repo=CLEAN, replay=False, live=False)) == []
+    monkeypatch.setenv("GITHUB_TOKEN", "x")
+    assert missing_credentials(RunOptions(repo=CLEAN, replay=False, live=True)) == []
+
+
+def test_with_no_model_set_up_a_run_is_rules_only(monkeypatch):
+    from holt import model
+    from holt.tui.session import Session, _client
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    model.enable_user_models_config(model.ModelsConfig())
+    opts = RunOptions(repo=CLEAN, replay=False, live=False)
+    assert opts.rules_only
+    assert _client(CLEAN, opts, "verdict") is None
+
+    session = Session(opts)
+    session.start()
+    session.wait(timeout=60)
+    assert session.error is None, session.error
+    assert session.assessment is not None
+    assert not session.assessment.models  # no model wrote anything
+
+
+def test_the_interface_honours_the_chosen_provider(monkeypatch, tmp_path):
+    from holt import model
+    from holt.tui.session import _client
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
+    model.enable_user_models_config(model.ModelsConfig(provider="anthropic"))
+    try:
+        opts = RunOptions(repo=CLEAN, replay=False, live=False, run_root=tmp_path)
+        assert not opts.rules_only
+        assert isinstance(_client(CLEAN, opts, "verdict"), model.AnthropicModel)
+    finally:
+        model.enable_user_models_config(model.ModelsConfig())
 
 
 def test_env_file_fills_gaps_without_overriding(tmp_path, monkeypatch):
