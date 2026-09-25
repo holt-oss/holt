@@ -189,11 +189,26 @@ PROVIDER_PRESETS: dict[str, dict[str, str]] = {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "api_key_env": "GEMINI_API_KEY",
     },
+    # One key, hundreds of models, several of them free. OpenAI wire protocol.
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key_env": "OPENROUTER_API_KEY",
+    },
     "openai-compatible": {"api_key_env": "OPENAI_API_KEY"},
 }
 
+#: Where to get a key for each hosted provider, for the setup hint. Gemini is
+#: listed first on purpose: its free tier is the cheapest way for a student to
+#: get the written explanation.
+KEY_URLS: dict[str, str] = {
+    "gemini": "https://aistudio.google.com/apikey",
+    "openrouter": "https://openrouter.ai/keys",
+    "anthropic": "https://console.anthropic.com/settings/keys",
+    "openai": "https://platform.openai.com/api-keys",
+}
+
 # Providers that speak the OpenAI wire protocol; everything except anthropic.
-_OPENAI_WIRE = {"openai", "ollama", "gemini", "openai-compatible"}
+_OPENAI_WIRE = {"openai", "ollama", "gemini", "openrouter", "openai-compatible"}
 
 
 @dataclass(slots=True)
@@ -217,8 +232,9 @@ class ModelsConfig:
 
 
 def models_config_path() -> Path:
-    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(base) / "holt" / "models.toml"
+    from holt import paths
+
+    return paths.config_dir() / "models.toml"
 
 
 def load_models_config(path: Path | None = None) -> ModelsConfig:
@@ -271,6 +287,47 @@ def enable_user_models_config(config: ModelsConfig | None = None) -> ModelsConfi
 
 def active_config() -> ModelsConfig:
     return _user_config if _user_config is not None else ModelsConfig()
+
+
+def model_ready(config: ModelsConfig | None = None) -> bool:
+    """Whether a live model call could be made right now.
+
+    True when the provider's key is in the environment, or when a local server
+    (Ollama, or any OpenAI-compatible endpoint on this machine) has been chosen
+    deliberately — those take no key. Everything else runs rules-only: the
+    verdict needs no model, and a beginner with no key still gets an answer.
+    """
+    config = config or active_config()
+    if os.environ.get(config.resolved_key_env()):
+        return True
+    base = config.resolved_base_url()
+    return bool(base) and ("localhost" in base or "127.0.0.1" in base)
+
+
+def model_setup_hint() -> str:
+    """One paragraph on how to get the written explanation. Plain English."""
+    return (
+        "This is the rules-only report: the verdict and the numbers, no AI "
+        "write-up. To add a written, cited explanation, set up a model once, "
+        "for example Gemini, which has a free tier:\n"
+        f"  1. Get a key: {KEY_URLS['gemini']}\n"
+        "  2. holt models --provider gemini --model gemini-2.5-flash\n"
+        "  3. export GEMINI_API_KEY=<your key>   "
+        "(PowerShell: $env:GEMINI_API_KEY = \"<your key>\")"
+    )
+
+
+def missing_key_message(config: ModelsConfig | None = None) -> str:
+    config = config or active_config()
+    key_env = config.resolved_key_env()
+    url = KEY_URLS.get(config.provider, "")
+    where = f" Get one at {url}." if url else ""
+    return (
+        f"{key_env} is not set, so the {config.provider} model cannot be called."
+        f"{where} Then run:\n"
+        f"  export {key_env}=<your key>   (PowerShell: $env:{key_env} = \"<your key>\")\n"
+        "Or add --no-model for the free rules-only report."
+    )
 
 
 def model_for(label: str) -> str:
@@ -359,10 +416,7 @@ class OpenAIModel:
                 # accept any key; a missing variable must not block them.
                 api_key = "unused"
             else:
-                raise RuntimeError(
-                    f"{key_env} is not set. Use --replay to reproduce recorded "
-                    "results with no key and no spend."
-                )
+                raise RuntimeError(missing_key_message(config))
         # A request with no timeout can hang for hours on a half-open socket, and
         # a recording run that stalls silently is worse than one that fails: the
         # log simply stops and nothing says why. Bounded and retried instead.
@@ -484,10 +538,7 @@ def anthropic_client_kwargs() -> dict[str, Any]:
     key_env = config.resolved_key_env()
     api_key = os.environ.get(key_env)
     if not api_key:
-        raise RuntimeError(
-            f"{key_env} is not set. Use --replay to reproduce recorded "
-            "results with no key and no spend."
-        )
+        raise RuntimeError(missing_key_message(config))
     kwargs: dict[str, Any] = {
         "api_key": api_key, "timeout": REQUEST_TIMEOUT_S, "max_retries": MAX_RETRIES,
     }

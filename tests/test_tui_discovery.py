@@ -289,4 +289,4 @@ def test_a_live_search_needs_only_a_github_token(monkeypatch):
 
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     message = discovery.missing_token()
-    assert message and "GITHUB_TOKEN" in message
+    assert message and "GitHub token" in message

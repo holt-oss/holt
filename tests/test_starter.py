@@ -361,7 +361,11 @@ def test_discover_merges_topic_queries_without_duplicates():
 def test_cli_start_needs_a_token(monkeypatch, capsys):
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     assert cli.main(["start", "--lang", "python"]) == 2
-    assert "GITHUB_TOKEN" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    # The same message every command gives, with the link and the fix.
+    from holt import credentials
+
+    assert err.strip() == credentials.missing_token_message().strip()
 
 
 def test_cli_start_needs_something_to_search_for(monkeypatch, capsys):
