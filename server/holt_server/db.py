@@ -153,3 +153,21 @@ class Database:
 
     async def dispose(self) -> None:
         await self.engine.dispose()
+
+
+class FindCache(Base):
+    """Finished `/v1/find` results by profile, so a repeated search is instant."""
+
+    __tablename__ = "find_cache"
+
+    key: Mapped[str] = mapped_column(String(300), primary_key=True)
+    params: Mapped[dict] = mapped_column(JSON)
+    results: Mapped[list] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+def find_key(languages: list[str], topics: list[str], hacktoberfest: bool, days: int) -> str:
+    """Same search, same key: case, order and duplicates don't matter."""
+    langs = ",".join(sorted({x.strip().lower() for x in languages if x.strip()}))
+    tops = ",".join(sorted({x.strip().lower() for x in topics if x.strip()}))
+    return f"l={langs};t={tops};h={int(bool(hacktoberfest))};d={days}"[:300]
