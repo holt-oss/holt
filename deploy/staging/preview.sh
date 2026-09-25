@@ -50,45 +50,53 @@ fi
 cd "$SRC"
 
 # --- what should be in the preview ------------------------------------------
-git fetch -q --prune origin '+refs/heads/*:refs/remotes/origin/*'
-main_sha="$(git rev-parse refs/remotes/origin/main)"
+# Sets main_sha, CANDIDATES, fingerprint and $RUN/skipped.tsv. Called again
+# after waiting for room, so the build uses what is current by then.
+resolve() {
+    git fetch -q --prune origin '+refs/heads/*:refs/remotes/origin/*'
+    main_sha="$(git rev-parse refs/remotes/origin/main)"
 
-declare -a CANDIDATES=()   # "kind<TAB>name<TAB>branch<TAB>sha<TAB>title<TAB>url"
-pr_branches=" "
-while IFS=$'\t' read -r num branch title url; do
-    [[ -z "$num" ]] && continue
-    git fetch -q origin "+refs/pull/$num/head:refs/remotes/pr/$num"
-    sha="$(git rev-parse "refs/remotes/pr/$num")"
-    CANDIDATES+=("pr"$'\t'"#$num"$'\t'"$branch"$'\t'"$sha"$'\t'"$title"$'\t'"$url")
-    pr_branches+="$branch "
-done < <(gh pr list -R "$REPO" --label staging --state open --limit 50 \
-            --json number,headRefName,title,url \
-            --jq 'sort_by(.number) | .[] | [.number, .headRefName, .title, .url] | @tsv')
+    CANDIDATES=()
+    : > "$RUN/skipped.tsv"
+    # each: "kind<TAB>name<TAB>branch<TAB>sha<TAB>title<TAB>url"
+    pr_branches=" "
+    while IFS=$'\t' read -r num branch title url; do
+        [[ -z "$num" ]] && continue
+        git fetch -q origin "+refs/pull/$num/head:refs/remotes/pr/$num"
+        sha="$(git rev-parse "refs/remotes/pr/$num")"
+        CANDIDATES+=("pr"$'\t'"#$num"$'\t'"$branch"$'\t'"$sha"$'\t'"$title"$'\t'"$url")
+        pr_branches+="$branch "
+    done < <(gh pr list -R "$REPO" --label staging --state open --limit 50 \
+                --json number,headRefName,title,url \
+                --jq 'sort_by(.number) | .[] | [.number, .headRefName, .title, .url] | @tsv')
 
-# extra-branches: union of the file on main and in each labelled PR.
-{
-    git show "$main_sha:deploy/staging/extra-branches" 2>/dev/null || true
-    for c in "${CANDIDATES[@]}"; do
-        git show "$(cut -f4 <<<"$c"):deploy/staging/extra-branches" 2>/dev/null || true
-    done
-} | sed 's/#.*//; s/[[:space:]]//g; /^$/d' | awk '!seen[$0]++' > "$RUN/extra"
+    # extra-branches: union of the file on main and in each labelled PR.
+    {
+        git show "$main_sha:deploy/staging/extra-branches" 2>/dev/null || true
+        for c in "${CANDIDATES[@]}"; do
+            git show "$(cut -f4 <<<"$c"):deploy/staging/extra-branches" 2>/dev/null || true
+        done
+    } | sed 's/#.*//; s/[[:space:]]//g; /^$/d' | awk '!seen[$0]++' > "$RUN/extra"
 
-while read -r b; do
-    [[ "$pr_branches" == *" $b "* ]] && continue    # its PR is labelled; already in
-    url="https://github.com/$REPO/tree/$b"
-    if sha="$(git rev-parse -q --verify "refs/remotes/origin/$b")"; then
-        CANDIDATES+=("branch"$'\t'"$b"$'\t'"$b"$'\t'"$sha"$'\t'"(no PR yet)"$'\t'"$url")
-    elif [[ -d "$LOCAL_REPO/.git" || -f "$LOCAL_REPO/.git" ]] \
-         && git -C "$LOCAL_REPO" rev-parse -q --verify "refs/heads/$b" >/dev/null; then
-        git fetch -q "$LOCAL_REPO" "+refs/heads/$b:refs/remotes/local/$b"
-        sha="$(git rev-parse "refs/remotes/local/$b")"
-        CANDIDATES+=("branch"$'\t'"$b"$'\t'"$b"$'\t'"$sha"$'\t'"(no PR yet; local, not pushed)"$'\t'"")
-    else
-        printf 'branch\t%s\t%s\t\t\t\t%s\n' "$b" "$b" "branch not found on origin or locally" >> "$RUN/skipped.tsv"
-    fi
-done < "$RUN/extra"
+    while read -r b; do
+        [[ "$pr_branches" == *" $b "* ]] && continue    # its PR is labelled; already in
+        url="https://github.com/$REPO/tree/$b"
+        if sha="$(git rev-parse -q --verify "refs/remotes/origin/$b")"; then
+            CANDIDATES+=("branch"$'\t'"$b"$'\t'"$b"$'\t'"$sha"$'\t'"(no PR yet)"$'\t'"$url")
+        elif [[ -d "$LOCAL_REPO/.git" || -f "$LOCAL_REPO/.git" ]] \
+             && git -C "$LOCAL_REPO" rev-parse -q --verify "refs/heads/$b" >/dev/null; then
+            git fetch -q "$LOCAL_REPO" "+refs/heads/$b:refs/remotes/local/$b"
+            sha="$(git rev-parse "refs/remotes/local/$b")"
+            CANDIDATES+=("branch"$'\t'"$b"$'\t'"$b"$'\t'"$sha"$'\t'"(no PR yet; local, not pushed)"$'\t'"")
+        else
+            printf 'branch\t%s\t%s\t\t\t\t%s\n' "$b" "$b" "branch not found on origin or locally" >> "$RUN/skipped.tsv"
+        fi
+    done < "$RUN/extra"
+    fingerprint="$( { echo "main $main_sha"; printf '%s\n' "${CANDIDATES[@]}" | cut -f1-4; cat "$RUN/skipped.tsv"; } | sha256sum | cut -c1-16)"
+}
 
-fingerprint="$( { echo "main $main_sha"; printf '%s\n' "${CANDIDATES[@]}" | cut -f1-4; cat "$RUN/skipped.tsv"; } | sha256sum | cut -c1-16)"
+declare -a CANDIDATES=()
+resolve
 if [[ "$FORCE" != 1 && "$fingerprint" == "$(cat "$STATE/fingerprint" 2>/dev/null || true)" ]]; then
     exit 0   # nothing changed; stay quiet so the journal stays readable
 fi
@@ -146,7 +154,8 @@ PY
 
 # --- wait for room ------------------------------------------------------------
 wait_for_room() {
-    local waited=0 load avail
+    local load avail
+    waited=0
     while :; do
         load="$(cut -d' ' -f1 /proc/loadavg)"
         avail="$(awk '/^MemAvailable:/{print int($2/1024)}' /proc/meminfo)"
@@ -158,6 +167,14 @@ wait_for_room() {
         sleep 30; waited=$((waited + 30))
     done
 }
+
+if [[ "$FORCE" != 1 ]]; then
+    if ! wait_for_room; then
+        write_build_json waiting "waiting for the server to be less busy" || true
+        exit 0
+    fi
+    (( waited > 0 )) && resolve   # things may have moved while we waited
+fi
 
 # --- merge --------------------------------------------------------------------
 git checkout -q -f --detach "$main_sha"
@@ -188,10 +205,6 @@ fail() {   # record a failed attempt; don't retry the same inputs until somethin
 [[ -f "$SRC/web/package.json" ]] || fail "the preview has no web/ app (is the web branch labelled or in extra-branches?)"
 [[ -f "$DEPLOY/.env" ]] || "$DEPLOY/make-env.sh"
 
-if [[ "$FORCE" != 1 ]] && ! wait_for_room; then
-    write_build_json waiting "waiting for the server to be less busy" "$preview_sha" || true
-    exit 0
-fi
 
 # --- build and restart this stack only ------------------------------------------
 write_build_json building "building ${preview_sha:0:7}" "$preview_sha"
@@ -206,9 +219,12 @@ port="$(sed -n 's/^HOLT_STAGE_PORT=//p' "$DEPLOY/.env")"; port="${port:-9110}"
 
 blog="$STATE/logs/build-$(date -u +%Y%m%dT%H%M%SZ).log"
 log "building (log: $blog)"
-if ! compose build >"$blog" 2>&1; then
-    fail "image build failed; last lines: $(tail -5 "$blog" | tr '\n' ' ' | cut -c1-600)"
-fi
+# One image at a time: two builds at once is too much for this box.
+for svc in server web; do
+    if ! compose build "$svc" >>"$blog" 2>&1; then
+        fail "$svc image build failed; last lines: $(tail -5 "$blog" | tr '\n' ' ' | cut -c1-600)"
+    fi
+done
 compose up -d --remove-orphans >>"$blog" 2>&1 || fail "compose up failed; see $blog"
 
 ok=0
