@@ -1,0 +1,21 @@
+{
+  "name": "holt-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shows a Holt verdict chip on GitHub repository pages.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "fixture": "npm run build && esbuild fixtures/fixture.ts --bundle --format=iife --outfile=dist/fixture.js --log-level=warning"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.0",
+    "esbuild": "^0.28.2",
+    "jsdom": "^29.1.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}
