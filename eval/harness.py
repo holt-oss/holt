@@ -175,7 +175,7 @@ def main() -> None:
             return ReplayModel(path)
         if args.patch:
             return PatchModel(path)
-        return OpenAIModel(path)
+        return OpenAIModel(path, record=True)
 
     skipped: list[str] = []
     for i, slug in enumerate(repos, 1):

@@ -92,12 +92,13 @@ class _FakeAnthropic:
 def test_anthropic_client_honors_the_complete_contract(tmp_path):
     model_mod.enable_user_models_config(ModelsConfig(provider="anthropic"))
     fake = _FakeAnthropic(_fake_anthropic_response({"verdict": "viable"}))
-    client = AnthropicModel(tmp_path / "t.jsonl", _client=fake)
+    # Recording is opt-in; this test is about the recorded shape, so it asks.
+    client = AnthropicModel(tmp_path / "t.jsonl", _client=fake, record=True)
     out = client.complete(label="classify", system="s", prompt="p",
                           schema={"type": "object"})
     assert out == {"verdict": "viable"}
     # Recorded in the same shape as every other trajectory, keyed for replay.
-    entry = json.loads((tmp_path / "t.jsonl").read_text())
+    entry = json.loads((tmp_path / "t.jsonl").read_text(encoding="utf-8"))
     assert entry["key"] == call_key("classify", "s", "p")
     assert entry["model"] == "claude-opus-5"
     assert entry["response"] == {"verdict": "viable"}

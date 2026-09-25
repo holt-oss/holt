@@ -7,7 +7,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from holt import baseline, model
+from holt import baseline, model, reponame
 from holt.agent import entry, pipeline
 from holt.evidence.fixtures import FixtureProvider
 from holt.evidence.provider import EvidenceProvider
@@ -23,10 +23,19 @@ PATHFINDER_TRAJECTORIES = "pathfinder"
 
 
 def normalise(repo: str) -> str:
-    repo = repo.strip().rstrip("/")
-    if "github.com" in repo:
-        repo = repo.split("github.com", 1)[1].lstrip("/:")
-    return "/".join(repo.split("/")[:2])
+    """Best-effort `owner/repo`, never raising.
+
+    Kept lenient for the TUI, which calls it on stored and half-typed names.
+    Commands use `reponame.normalise`, which rejects what is not a GitHub
+    repository with a message that says what to type instead.
+    """
+    try:
+        return reponame.normalise(repo)
+    except ValueError:
+        repo = repo.strip().rstrip("/")
+        if "github.com" in repo:
+            repo = repo.split("github.com", 1)[1].lstrip("/:")
+        return "/".join(repo.split("/")[:2])
 
 
 def as_of_from(args: argparse.Namespace) -> datetime:
@@ -91,7 +100,7 @@ def add_entry_points(assessment, repo: str, provider, args) -> None:
 
 
 def cmd_analyze(args: argparse.Namespace) -> int:
-    repo = normalise(args.repo)
+    repo = reponame.normalise(args.repo)
     as_of = as_of_from(args)
     provider = make_provider(args.live, as_of)
     # Not built at all under --no-model: the mode's whole claim is that it needs
@@ -143,7 +152,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
     provider = make_provider(args.live, as_of)
     rows = []
     for raw in args.repos:
-        repo = normalise(raw)
+        repo = reponame.normalise(raw)
         client = model.build(repo, replay=args.replay)
         assessment, trace = pipeline.analyze(
             repo, provider, client, contributor_days=args.days, as_of=as_of
@@ -221,7 +230,7 @@ def cmd_tui(args: argparse.Namespace) -> int:
         return 0
 
     options = RunOptions(
-        repo=normalise(repo),
+        repo=reponame.normalise(repo),
         replay=args.replay,
         live=args.live,
         entry_points=args.entry_points,
@@ -254,7 +263,7 @@ def cmd_next(args: argparse.Namespace) -> int:
     from holt.agent.signals import build_threads
     from holt.issues import open_at_cutoff
 
-    repo = normalise(args.repo)
+    repo = reponame.normalise(args.repo)
     as_of = as_of_from(args)
     records = make_provider(args.live, as_of).fetch(repo)
     contributor = progression.history_for(args.as_login, build_threads(records))
@@ -607,7 +616,7 @@ def main(argv: list[str] | None = None) -> int:
     # that under twenty frames of our internals, so print the message and stop.
     try:
         return args.func(args)
-    except (FileNotFoundError, RuntimeError) as exc:
+    except (FileNotFoundError, RuntimeError, ValueError) as exc:
         print(f"holt: {exc}", file=sys.stderr)
         return 1
 
