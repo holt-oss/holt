@@ -367,9 +367,10 @@ def charge_ai(user: User, plan, job: Job):
     transaction as the job insert: a lost dedupe race refunds itself."""
 
     async def charge(s) -> None:
-        pool, window = await quota.charge(s, user, plan)
+        pool, window, pack_payment = await quota.charge(s, user, plan)
         job.quota_pool = pool
-        job.params = {**(job.params or {}), "ai_period": window}
+        job.params = {**(job.params or {}), "ai_period": window,
+                      "pack_payment_id": pack_payment}
 
     return charge
 

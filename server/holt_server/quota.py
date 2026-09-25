@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from holt_server.db import PAID_PRIORITY, USER_PRIORITY, Job, User, now, utc
+from holt_server.db import PAID_PRIORITY, USER_PRIORITY, Job, Payment, User, now, utc
 from holt_server.errors import ApiError
 from holt_server.plans import FREE, Catalog, Plan
 
@@ -66,8 +66,8 @@ def job_priority(plan: Plan) -> int:
     return PAID_PRIORITY if plan.priority else USER_PRIORITY
 
 
-async def charge(s: AsyncSession, user: User, plan: Plan) -> tuple[str, str]:
-    """Spend one report. Returns (pool, period key). Caller commits.
+async def charge(s: AsyncSession, user: User, plan: Plan) -> tuple[str, str, int | None]:
+    """Spend one report. Returns (pool, period key, pack payment id). Caller commits.
 
     Raises `quota_exceeded` when both pools are empty.
     """
@@ -80,13 +80,13 @@ async def charge(s: AsyncSession, user: User, plan: Plan) -> tuple[str, str]:
                            User.ai_used < plan.ai_reports_per_month)
         .values(ai_used=User.ai_used + 1))
     if took.rowcount == 1:
-        return PLAN, key
+        return PLAN, key, None
     took = await s.execute(
         update(User).where(User.id == user.id, User.pack_credits > 0,
                            User.packs_frozen.is_(False))
         .values(pack_credits=User.pack_credits - 1))
     if took.rowcount == 1:
-        return PACK, key
+        return PACK, key, await _spend_from_oldest_pack(s, user.id)
     await s.rollback()
     limit = plan.ai_reports_per_month
     raise ApiError(
@@ -97,16 +97,46 @@ async def charge(s: AsyncSession, user: User, plan: Plan) -> tuple[str, str]:
     )
 
 
+async def _spend_from_oldest_pack(s: AsyncSession, user_id: str) -> int | None:
+    """Take the credit from the oldest pack that has one; returns its payment id.
+
+    None when the credit had no pack behind it (granted by hand).
+    """
+    for _ in range(5):  # a concurrent spend may empty the row we picked
+        pid = (await s.execute(
+            select(Payment.id).where(Payment.user_id == user_id, Payment.kind == "pack",
+                                     Payment.credits_left > 0)
+            .order_by(Payment.created_at, Payment.id).limit(1))).scalar_one_or_none()
+        if pid is None:
+            return None
+        took = await s.execute(update(Payment).where(Payment.id == pid,
+                                                     Payment.credits_left > 0)
+                               .values(credits_left=Payment.credits_left - 1))
+        if took.rowcount == 1:
+            return pid
+    return None
+
+
 async def refund(s: AsyncSession, job: Job) -> None:
     """Give a failed job's report back to the pool it came from. Caller commits."""
     if not job.charged or not job.user_id:
         return
+    params = job.params or {}
     if job.quota_pool == PACK:
+        pack_payment = params.get("pack_payment_id")
+        if pack_payment is not None:
+            # Back to the same pack, unless that pack has since been fully
+            # refunded: the money is back with the payer already.
+            back = await s.execute(update(Payment).where(
+                Payment.id == pack_payment, Payment.status != "refunded")
+                .values(credits_left=Payment.credits_left + 1))
+            if back.rowcount != 1:
+                return
         await s.execute(update(User).where(User.id == job.user_id)
                         .values(pack_credits=User.pack_credits + 1))
         return
     # The allowance, and only in the window it was charged to.
     await s.execute(update(User).where(
         User.id == job.user_id, User.ai_used > 0,
-        User.ai_period == (job.params or {}).get("ai_period", ""),
+        User.ai_period == params.get("ai_period", ""),
     ).values(ai_used=User.ai_used - 1))

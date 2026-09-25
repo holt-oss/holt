@@ -237,6 +237,12 @@ class Payment(Base):
     credited: Mapped[bool] = mapped_column(Boolean, default=False)
     # Minor units refunded so far (partial refunds add up).
     refunded_amount: Mapped[int] = mapped_column(Integer, default=0)
+    # Pack ledger. `credits_left`: this pack's unspent reports (packs are spent
+    # oldest first). `credits_taken`: reports clawed back for refunds so far,
+    # as ceil(reports * refunded / amount); each new refund takes only the
+    # difference, and only from this pack's unspent credits.
+    credits_left: Mapped[int] = mapped_column(Integer, default=0)
+    credits_taken: Mapped[int] = mapped_column(Integer, default=0)
     disputed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now,

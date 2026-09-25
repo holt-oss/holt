@@ -673,9 +673,11 @@ def test_refund_of_subscription_payment(bh):
     assert me(bh, "subber")["plan"] == "free"  # now fully refunded
 
 
-def test_refund_for_unknown_payment_is_ignored(bh):
+def test_refund_for_unknown_payment_is_recorded_not_dropped(bh):
     r = webhook(bh, "refund.processed", refund_body("rfnd_x", "pay_unknown", 100))
-    assert r.json()["result"] == "ignored"
+    assert r.json()["result"] == "recorded"
+    [row] = [p for p in rows(bh, Payment) if p.provider_payment_id == "pay_unknown"]
+    assert (row.kind, row.refunded_amount) == ("unmatched", 100)
 
 
 def test_dispute_freezes_pack_credits_until_resolved(make_harness):
@@ -754,3 +756,110 @@ def test_empty_internal_key_header_is_rejected(bh):
     for value in ("", " "):
         r = bh.client.get("/v1/plans", headers={"X-Holt-Internal-Key": value})
         assert r.status_code == 401, repr(value)
+
+
+
+# --- round 3: dispute phases, cumulative clawback, early refunds, resume ------------------
+
+
+@pytest.mark.parametrize("phase", ["created", "under_review", "action_required"])
+def test_open_dispute_phases_keep_credits_frozen(bh, phase):
+    paid_pack(bh)
+    webhook(bh, "payment.dispute.created", dispute_body("disp_1", "pay_1"))
+    body = {**dispute_body("disp_1", "pay_1"), "phase": phase}  # distinct body per phase
+    webhook(bh, f"payment.dispute.{phase}", body)
+    user = [u for u in rows(bh, User) if u.id == "buyer"][0]
+    assert user.packs_frozen is True
+    assert rows(bh, Payment)[0].disputed is True
+
+
+@pytest.mark.parametrize("phase", ["won", "closed"])
+def test_settled_dispute_unfreezes(bh, phase):
+    paid_pack(bh)
+    webhook(bh, "payment.dispute.created", dispute_body("disp_1", "pay_1"))
+    webhook(bh, f"payment.dispute.{phase}", dispute_body("disp_1", "pay_1"))
+    user = [u for u in rows(bh, User) if u.id == "buyer"][0]
+    assert user.packs_frozen is False and user.pack_credits == 10
+
+
+def test_many_tiny_refunds_take_what_one_big_refund_takes(bh):
+    paid_pack(bh, user="tiny", pid="pay_t")
+    for i in range(10):  # ten refunds of 1% each
+        webhook(bh, "refund.processed", refund_body(f"rfnd_t{i}", "pay_t", 49))
+    paid_pack(bh, user="big", pid="pay_b")
+    webhook(bh, "refund.processed", refund_body("rfnd_b", "pay_b", 490))
+    assert me(bh, "tiny")["pack_credits"] == me(bh, "big")["pack_credits"] == 9
+    tiny = next(p for p in rows(bh, Payment) if p.provider_payment_id == "pay_t")
+    assert (tiny.refunded_amount, tiny.credits_taken, tiny.credits_left) == (490, 1, 9)
+
+
+def test_clawback_never_touches_another_packs_credits(bh):
+    paid_pack(bh, pid="pay_a")  # older pack, spent first
+    time.sleep(0.01)
+    paid_pack(bh, pid="pay_b")
+    assert me(bh, "buyer")["pack_credits"] == 20
+    set_user(bh, "buyer", ai_used=2, ai_period=datetime.now(UTC).strftime("%Y-%m"))
+    bh.engine.gate.clear()
+    try:
+        for repo in ("octo/one", "octo/two", "octo/three", "octo/four"):
+            assert ai(bh, repo, "buyer").status_code == 202  # four credits, all from A
+    finally:
+        bh.engine.gate.set()
+    ledger = {p.provider_payment_id: p.credits_left for p in rows(bh, Payment)}
+    assert ledger == {"pay_a": 6, "pay_b": 10}
+    # Refunding pack A in full takes only what is left of A.
+    webhook(bh, "refund.processed", refund_body("rfnd_a", "pay_a", 4900))
+    assert me(bh, "buyer")["pack_credits"] == 10
+    assert {p.provider_payment_id: p.credits_left for p in rows(bh, Payment)} == {
+        "pay_a": 0, "pay_b": 10}
+
+
+def test_refund_before_verify_credits_only_the_rest(bh):
+    order = buy_pack(bh)["order_id"]
+    # No order id in this event: kept against the payment id until the order shows up.
+    assert webhook(bh, "refund.processed",
+                   refund_body("rfnd_1", "pay_1", 2450)).json()["result"] == "recorded"
+    assert verify_order(bh, order, "pay_1").status_code == 200
+    assert me(bh, "buyer")["pack_credits"] == 5
+    [payment] = rows(bh, Payment)  # the early record was folded into the order
+    assert (payment.provider_order_id, payment.refunded_amount, payment.credits_taken,
+            payment.status) == (order, 2450, 5, "partially_refunded")
+
+
+def test_full_refund_before_capture_credits_nothing(bh):
+    order = buy_pack(bh)["order_id"]
+    body = {**refund_body("rfnd_1", "pay_1", 4900), **payment_entity("pay_1", order)}
+    assert webhook(bh, "refund.processed", body).json()["result"] == "refunded"
+    webhook(bh, "payment.captured", payment_entity("pay_1", order))
+    assert me(bh, "buyer")["pack_credits"] == 0
+    assert rows(bh, Payment)[0].status == "refunded"
+    assert verify_order(bh, order, "pay_1").status_code == 200
+    assert me(bh, "buyer")["pack_credits"] == 0
+
+
+def test_failed_job_returns_its_credit_to_the_same_pack(make_harness):
+    h = make_harness(run_jobs=False, OPENROUTER_API_KEY="sk-or-server",
+                     RAZORPAY_KEY_ID=KEY_ID, RAZORPAY_KEY_SECRET=KEY_SECRET,
+                     RAZORPAY_WEBHOOK_SECRET=WEBHOOK_SECRET)
+    h.svc.payments = Razorpay(KEY_ID, KEY_SECRET, WEBHOOK_SECRET, client=httpx.Client(
+        transport=httpx.MockTransport(FakeRazorpayApi())))
+    paid_pack(h, user="f1")
+    set_user(h, "f1", ai_used=2, ai_period=datetime.now(UTC).strftime("%Y-%m"))
+    job_id = ai(h, "octo/one", "f1").json()["job_id"]
+    assert rows(h, Payment)[0].credits_left == 9
+    job = h.client.portal.call(h.svc.runner._claim)
+    assert job.id == job_id and job.params["pack_payment_id"] == rows(h, Payment)[0].id
+    h.client.portal.call(h.svc.runner._fail, job, ApiError("upstream", "x"))
+    assert rows(h, Payment)[0].credits_left == 10
+    assert me(h, "f1")["pack_credits"] == 10
+
+
+def test_resumed_after_paused_in_the_same_period_restores_access(bh):
+    sid = start_subscription(bh)
+    now = int(time.time())
+    period = (now - DAY, now + 29 * DAY)
+    webhook(bh, "subscription.activated", sub_entity(sid, "active", *period))
+    webhook(bh, "subscription.paused", sub_entity(sid, "paused", *period))
+    assert me(bh, "subber")["plan"] == "free"
+    webhook(bh, "subscription.resumed", sub_entity(sid, "active", *period))
+    assert me(bh, "subber")["plan"] == "student"
