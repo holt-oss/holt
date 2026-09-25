@@ -8,7 +8,7 @@ import sys
 import types
 
 import pytest
-from holt_server.db import PAID_PRIORITY, USER_PRIORITY, Job, User
+from holt_server.db import USER_PRIORITY, Job, User
 from holt_server.errors import ApiError
 from sqlalchemy import select
 

@@ -272,7 +272,16 @@ async def razorpay_webhook(
         except IntegrityError:
             await s.rollback()
             return {"ok": True, "duplicate": True}
-        result = await service.apply_event(s, svc.catalog, event)
-        await s.commit()
+        try:
+            result = await service.apply_event(s, svc.catalog, event)
+            await s.commit()
+        except IntegrityError:
+            # e.g. a payment id already used on another order. It will never
+            # apply, so record it and say 200 rather than have it retried forever.
+            await s.rollback()
+            log.error("webhook %s %s conflicts with stored payments", event.id, event.type)
+            s.add(WebhookEvent(provider=pay.name, event_id=event.id, type=event.type))
+            await s.commit()
+            result = "conflict"
     log.info("webhook %s %s -> %s", event.id, event.type, result)
     return {"ok": True, "result": result}
