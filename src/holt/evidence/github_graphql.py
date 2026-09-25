@@ -184,6 +184,8 @@ query($q:String!, $cursor:String) {
       ... on Repository {
         nameWithOwner description stargazerCount pushedAt isArchived isFork
         primaryLanguage { name }
+        goodFirstIssues: issues(states:OPEN, labels:["good first issue",
+          "good-first-issue", "beginner", "first-timers-only", "easy"]) { totalCount }
       }
     }
   }

@@ -331,6 +331,66 @@ def cmd_discover(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_start(args: argparse.Namespace) -> int:
+    """Where to start: starter issues in repositories that merge newcomers' work."""
+    import json
+    import os
+
+    from holt import starter
+
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        print("`holt start` searches GitHub live and needs a GITHUB_TOKEN. "
+              "Create one at https://github.com/settings/tokens (no scopes needed) "
+              "and export it.", file=sys.stderr)
+        return 2
+    progress = (lambda s: None) if args.json else (lambda s: print(s, file=sys.stderr))
+    try:
+        if args.repo:
+            from holt import reponame
+
+            repo = reponame.normalise(args.repo)
+            transport = starter.GitHub(token=token)
+            as_of = datetime.now(UTC)
+            landing = []
+            try:
+                # Where outsider work landed boosts issues that name it. Only a
+                # bonus: if the screen fails, the issues still list.
+                landing = starter.rules_screen(transport, as_of, args.days)(repo).landing
+            except starter.RateLimited:
+                raise
+            except Exception as err:
+                progress(f"Could not read pull-request history ({err}); listing issues only")
+            issues = starter.starter_issues(repo, token, limit=args.limit, as_of=as_of,
+                                            landing=landing,
+                                            hacktoberfest=args.hacktoberfest,
+                                            transport=transport)
+            print(json.dumps({"repo": repo, "issues": [i.as_dict() for i in issues]},
+                             indent=1) if args.json else starter.render_repo(repo, issues))
+            return 0
+        languages = [x for x in (args.lang or "").split(",") if x.strip()]
+        topics = [x for x in (args.topic or "").split(",") if x.strip()]
+        if not (languages or topics or args.hacktoberfest):
+            print("Say what you want to work on: --lang python, --topic cli, "
+                  "or --hacktoberfest. Or name a repository: holt start owner/repo.",
+                  file=sys.stderr)
+            return 2
+        results = starter.find(languages, topics, args.hacktoberfest, token,
+                               limit=args.limit, progress=progress, days=args.days)
+    except starter.RateLimited as err:
+        print(f"holt: {err}", file=sys.stderr)
+        return 1
+    except (starter.RepoNotFound, ValueError) as err:
+        print(f"holt: {err}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps({"results": [r.as_dict() for r in results]}, indent=1))
+    else:
+        describe = ", ".join(languages + topics + (["Hacktoberfest"] if args.hacktoberfest else []))
+        print(starter.render_find(results, describe))
+    return 0
+
+
 def cmd_models(args: argparse.Namespace) -> int:
     """Show or change which model answers, per provider. The default stays the
     pinned OpenAI ids the benchmark was measured on."""
@@ -533,6 +593,25 @@ def main(argv: list[str] | None = None) -> int:
                             help="which recorded session to replay "
                                  "(default: demo)")
     discover_p.set_defaults(func=cmd_discover)
+
+    start_p = sub.add_parser(
+        "start",
+        help="find open starter issues in repositories that merge newcomers' work",
+    )
+    start_p.add_argument("repo", nargs="?",
+                         help="owner/name or a github.com URL: list starter issues "
+                              "in this one repository")
+    start_p.add_argument("--lang", help="comma-separated languages")
+    start_p.add_argument("--topic", help="comma-separated GitHub topics (any of them)")
+    start_p.add_argument("--hacktoberfest", action="store_true",
+                         help="only issues and repositories taking part in Hacktoberfest")
+    start_p.add_argument("--limit", type=int, default=10,
+                         help="how many repositories (or issues, for one repository)")
+    start_p.add_argument("--days", type=int, default=7,
+                         help="how many days you actually have")
+    start_p.add_argument("--json", action="store_true",
+                         help="print the API's JSON shape instead of text")
+    start_p.set_defaults(func=cmd_start)
 
     models_p = sub.add_parser(
         "models",
