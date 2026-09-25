@@ -153,3 +153,14 @@ class Database:
 
     async def dispose(self) -> None:
         await self.engine.dispose()
+
+
+class StarterCache(Base):
+    """Starter issues per repository, so a report page view costs no GitHub call."""
+
+    __tablename__ = "starter_cache"
+
+    repo_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    repo: Mapped[str] = mapped_column(String(200))
+    issues: Mapped[list] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
