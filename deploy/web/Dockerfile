@@ -34,7 +34,6 @@ RUN mkdir /out && \
     fi
 
 FROM node:22-bookworm-slim
-LABEL holt.stage="holt-new"
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000
 COPY --from=build --chown=node:node /out /app
