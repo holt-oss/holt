@@ -120,7 +120,7 @@ done
 Record the **real** time from each `time`, not user or sys.
 
 Expect roughly 40 s and about $0.012 per repository
-([`REPRODUCTION.md`](../REPRODUCTION.md), costs table). If a live run fails on
+([`docs/research/REPRODUCTION.md`](../docs/research/REPRODUCTION.md), costs table). If a live run fails on
 rate limits, note it and retry — a failed crawl is not a timing.
 
 Also record, separately and labelled as such, the replay path, because that is

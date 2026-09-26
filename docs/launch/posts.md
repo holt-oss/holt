@@ -12,7 +12,7 @@ own words. Please don't post a guessed version of them.
 | pallets/flask | Worth your time (long odds) | 5 of 189 | 100 of 189 | ~30 minutes |
 | psf/requests | Worth your time (long odds) | 13 of 151 | 100 of 151 | ~5 hours |
 
-From the evaluation (see `docs/EVALUATION.md` and `REPRODUCTION.md`): Holt's
+From the evaluation (see `docs/research/EVALUATION.md` and `docs/research/REPRODUCTION.md`): Holt's
 verdicts agreed with real contributor outcomes it hadn't seen far better than a
 README-only prompt (Matthews correlation 0.63 vs 0.21), and 55 of 55 verdicts
 were identical across three runs. Holt won "Most useful real-world workflow" in

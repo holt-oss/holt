@@ -6,7 +6,7 @@ request threads it decided from.
 
 This guide gets you from installation to a current repository assessment. If
 you are reproducing the evaluation or checking benchmark numbers, use
-[REPRODUCTION.md](REPRODUCTION.md) instead.
+[docs/research/REPRODUCTION.md](research/REPRODUCTION.md) instead.
 
 ---
 
@@ -226,7 +226,7 @@ snapshot; add `--live` for today's data.
 
 ## More
 
-- [docs/COMMANDS.md](docs/COMMANDS.md) — every command and flag, with real output.
-- [REPRODUCTION.md](REPRODUCTION.md) — the evaluation, reproducible from a clean
+- [docs/COMMANDS.md](COMMANDS.md) — every command and flag, with real output.
+- [docs/research/REPRODUCTION.md](research/REPRODUCTION.md) — the evaluation, reproducible from a clean
   clone with no key.
-- [docs/EVALUATION.md](docs/EVALUATION.md) — how well it works, and where it does not.
+- [docs/research/EVALUATION.md](research/EVALUATION.md) — how well it works, and where it does not.

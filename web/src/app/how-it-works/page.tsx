@@ -107,8 +107,8 @@ export default function HowItWorks() {
           </ul>
           <p className="mt-6 text-[0.82rem] text-faint">
             Score: Matthews correlation, out of sample.{" "}
-            <a className="text-link" href={`${GITHUB_REPO_URL}/blob/main/REPRODUCTION.md`}>[ reproduce the result → ]</a>{" "}
-            <a className="text-link" href={`${GITHUB_REPO_URL}/blob/main/docs/EVALUATION.md`}>[ full evaluation ]</a>
+            <a className="text-link" href={`${GITHUB_REPO_URL}/blob/main/docs/research/REPRODUCTION.md`}>[ reproduce the result → ]</a>{" "}
+            <a className="text-link" href={`${GITHUB_REPO_URL}/blob/main/docs/research/EVALUATION.md`}>[ full evaluation ]</a>
           </p>
         </Block>
 

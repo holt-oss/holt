@@ -2,7 +2,7 @@
 
 Written for someone starting from a clean machine with nothing installed, who
 wants to check the result rather than use the tool. **If you just want to use
-Holt on a repository, [USAGE.md](USAGE.md) is the shorter page.**
+Holt on a repository, [docs/USAGE.md](../USAGE.md) is the shorter page.**
 
 **The headline result needs no API key, no GitHub token, and no money.**
 
@@ -18,7 +18,7 @@ verify the published measurements without making live API calls.
 |---|---|
 | Python | 3.12 (pinned in `.python-version`; `uv` installs it for you) |
 | Package manager | [`uv`](https://docs.astral.sh/uv/) — `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| Disk | ~120 MB for the clone (evidence fixtures are the bulk) |
+| Disk | ~400 MB for a full clone; `fixtures/` is about 315 MB of it |
 | Network | to clone and to install dependencies; **not** to reproduce the result |
 
 Nothing else. No API key for the headline number.
@@ -35,13 +35,30 @@ uv sync
 
 `uv sync` installs the pinned Python and dependencies from `uv.lock`.
 
+### Not reproducing the benchmark? Skip the evidence
+
+Everything in this file needs the full clone. If you only want to work on the
+docs, the web app, the server or the extension, a partial clone without
+`fixtures/` is about 11 MB instead of 400:
+
+```sh
+git clone --filter=blob:none --sparse https://github.com/holt-oss/holt.git
+cd holt
+git sparse-checkout set --no-cone '/*' '!/fixtures/'
+```
+
+`--filter=blob:none` downloads file contents only when a checkout needs them,
+and the sparse checkout never needs anything under `fixtures/`. The engine's
+tests read `fixtures/`, so for engine work either use a full clone or bring the
+evidence back later with `git sparse-checkout disable`.
+
 ## 2. Run the tests
 
 ```sh
 uv run pytest -rs
 ```
 
-**Expected:** at least `388 passed` (the suite only grows), no failures, no skips. **Runtime:** about three minutes.
+**Expected:** at least `650 passed` (the suite only grows), no failures, no skips. **Runtime:** about three minutes.
 
 The `-rs` flag reports skipped tests explicitly — a skipped test is not a
 passing one.
@@ -51,7 +68,7 @@ reads the import graph and fails if any label module imports the agent,
 `tests/test_evidence_bounds.py` constructs a deliberately misbehaving provider
 subclass to confirm it still cannot return evidence from the wrong side of the
 cutoff, and `tests/test_docs_claims.py` recomputes the numbers printed in this
-guide, `README.md` and `USAGE.md` from the committed results and runs every
+guide, `README.md` and `docs/USAGE.md` from the committed results and runs every
 command either guide prints — so a claim that goes stale fails the build rather
 than sitting on the page.
 

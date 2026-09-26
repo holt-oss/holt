@@ -20,9 +20,14 @@ beginners (college students first). Every change should be judged by
 | `src/holt/` | The engine + CLI + TUI (Python package `holt-cli` on PyPI) | Python 3.11+, uv |
 | `src/holt/agent/` | Signals, model stages, verification, verdict rules | |
 | `src/holt/evidence/` | GitHub GraphQL provider, fixtures, redaction | |
-| `server/` | HTTP API wrapping the engine (FastAPI) — see `API.md` | Python |
-| `web/` | The web app (Next.js App Router, TypeScript, Tailwind, Auth.js) | TypeScript |
-| `website/` | Old static landing page. Being replaced by `web/`; don't extend it. | |
+| `src/holt/tui/` | The terminal interface (Textual) | |
+| `server/` | HTTP API wrapping the engine (FastAPI, Postgres) — see `API.md` and `server/README.md` | Python |
+| `web/` | The web app (Next.js App Router, TypeScript, Tailwind, Auth.js) — `web/README.md` | TypeScript |
+| `extension/` | Browser extension: a Holt chip on github.com, talks to the web app's public API — `extension/README.md` | TypeScript |
+| `e2e/` | Playwright smoke tests against a deployed Holt (staging by default) — `e2e/README.md` | TypeScript |
+| `deploy/` | Dockerfiles and the staging preview stack — `deploy/README.md` | |
+| `website/` | Legacy static landing page. Still serves the live site until `web/` launches; don't extend it. | |
+| `docs/` | All documentation; `docs/README.md` is the index. `docs/research/` holds the evaluation and reproduction guides. | |
 | `eval/`, `fixtures/`, `trajectories/`, `scripts/` | Research/benchmark material from the competition. Large. Don't touch unless the task is about evaluation. | |
 | `tests/` | pytest suite (runs from fixtures, no network) | |
 
@@ -34,13 +39,13 @@ same PR as the code that implements the change, and say so in the PR.
 ```sh
 export PATH="$HOME/.local/bin:$PATH"   # uv lives here on the server
 uv sync
-uv run pytest -q                        # ~390 tests, ~3 min, no network
+uv run pytest -q                        # ~675 tests, ~3 min, no network
 uv run holt analyze NixOS/nixpkgs --replay          # offline smoke test (from a clone)
 uv run holt analyze pallets/flask --live --no-model # needs GITHUB_TOKEN
 ```
 
-Web (once `web/` exists): `cd web && npm ci && npm run dev -- -p $PORT`.
-Server (once `server/` exists): see `server/README.md`.
+Web: `cd web && npm ci && npm run dev -- -p $PORT` (see `web/README.md`).
+Server: see `server/README.md`. Extension: `cd extension && npm ci && npm test`.
 
 `.cx/setup` does `uv sync` and `npm ci` in a fresh worktree.
 
@@ -52,7 +57,7 @@ Server (once `server/` exists): see `server/README.md`.
 - Holt is read-only toward GitHub. It never posts, opens PRs, or contacts anyone.
 - User-facing text is plain English for beginners. No internal enum names
   (`not_viable`), no statistics jargon (MCC, p-values) in product output.
-  Research detail belongs in `docs/EVALUATION.md`.
+  Research detail belongs in `docs/research/EVALUATION.md`.
 - Anything installed from PyPI must work outside a repo clone: no paths
   relative to the current directory. User data goes under the platform data
   dir (`~/.local/share/holt` on Linux).
@@ -67,10 +72,12 @@ Server (once `server/` exists): see `server/README.md`.
 
 ## Deploy
 
-Production domain: **githolt.com** (bought; DNS on Cloudflare). The hook is
-"swap hub for holt": github.com/o/r → githolt.com/o/r. Hosting is still
-pending (Hetzner planned); staging is https://holt-new.aahil-khan.xyz. PyPI
-releases go through
-`.github/workflows/publish.yml` on a GitHub release (see `RELEASING.md`).
+Production: **https://githolt.com** (domain on Cloudflare). The hook is
+"swap hub for holt": github.com/o/r → githolt.com/o/r. It runs on the home
+server for now (stack `holt-prod`, `deploy/prod/`, deployed only from `main`
+with `deploy/prod/deploy.sh` after the user approves); Hetzner later. Staging
+is https://holt-new.aahil-khan.xyz (auto-updates from main plus PRs labelled
+`staging`). PyPI releases go through `.github/workflows/publish.yml` on a
+GitHub release (see `docs/RELEASING.md`).
 
 Orchestrator may deploy after a merge: no

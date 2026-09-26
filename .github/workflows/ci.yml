@@ -1,5 +1,5 @@
 # The failure this repository already had once: a passing-count sat in
-# REPRODUCTION.md while one of those tests was failing. `test_docs_claims.py`
+# docs/research/REPRODUCTION.md while one of those tests was failing. `test_docs_claims.py`
 # checks the number the guide promises against the number the suite *collects*,
 # because a test that runs the whole suite inside itself does not terminate --
 # so nothing was checking that the suite still passed. This is that check.
