@@ -64,8 +64,10 @@ Server (once `server/` exists): see `server/README.md`.
 
 ## Deploy
 
-Not decided yet (hosting to be chosen; domains available: operationally.systems,
-aahil-khan.xyz, plus a new one to be bought). PyPI releases go through
+Production domain: **githolt.com** (bought; DNS on Cloudflare). The hook is
+"swap hub for holt": github.com/o/r → githolt.com/o/r. Hosting is still
+pending (Hetzner planned); staging is https://holt-new.aahil-khan.xyz. PyPI
+releases go through
 `.github/workflows/publish.yml` on a GitHub release (see `RELEASING.md`).
 
 Orchestrator may deploy after a merge: no
