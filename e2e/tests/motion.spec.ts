@@ -53,6 +53,7 @@ interface Timeline {
   maxOpacity: number;
   content: number | null; // skeleton gone, report in place
   response: number | null;
+  viaFallback: boolean; // the layout's RouteFallback rendered the skeleton (the router had committed nothing)
 }
 
 /**
@@ -60,12 +61,23 @@ interface Timeline {
  * prefetched (so the loading skeleton can show at once) and records, frame by
  * frame, when the skeleton appears and when the report replaces it.
  * `delay` holds the navigation's server response back by that many ms.
+ *
+ * `racePrefetch` reproduces the production race: the prefetch is held for
+ * 800ms (a slow tunnel), and the click follows its response within 30ms,
+ * while the router is still applying it. Next then commits the route as
+ * nothing (its page segment's prefetched data resolves to null) until the
+ * real response lands; the layout's RouteFallback has to cover that. The
+ * window is about 100ms wide after the response and only opens when the
+ * prefetch was slow, so `viaFallback` says whether the click landed in it.
  */
-async function openReportFromLanding(page: Page, delay: number): Promise<Timeline> {
+async function openReportFromLanding(page: Page, delay: number, { racePrefetch = false } = {}): Promise<Timeline> {
   let response: number | null = null;
   await page.route((u) => u.pathname === "/pallets/flask" && u.searchParams.has("_rsc"), async (route) => {
     const h = route.request().headers();
-    if (h["next-router-prefetch"]) return route.continue();
+    if (h["next-router-prefetch"]) {
+      if (racePrefetch) await new Promise((r) => setTimeout(r, 800));
+      return route.continue();
+    }
     const sent = Date.now();
     if (delay) await new Promise((r) => setTimeout(r, delay));
     const res = await route.fetch();
@@ -75,17 +87,24 @@ async function openReportFromLanding(page: Page, delay: number): Promise<Timelin
   const link = page.locator('main a[href="/pallets/flask"]').first();
   const prefetched = page.waitForRequest((r) => r.url().includes("/pallets/flask?_rsc=") && Boolean(r.headers()["next-router-prefetch"]), { timeout: 15_000 }).catch(() => null);
   await link.scrollIntoViewIfNeeded();
-  test.skip(!(await prefetched), "the report link was never prefetched");
-  await page.waitForTimeout(500);
+  const prefetchRequest = await prefetched;
+  test.skip(!prefetchRequest, "the report link was never prefetched");
+  if (racePrefetch) {
+    await prefetchRequest!.response();
+    await page.waitForTimeout(30);
+  } else {
+    await page.waitForTimeout(500);
+  }
   await page.evaluate(() => {
     const w = window as unknown as { __tl: Timeline; __t0: number };
-    w.__tl = { committed: null, visible: null, maxOpacity: 0, content: null, response: null };
+    w.__tl = { committed: null, visible: null, maxOpacity: 0, content: null, response: null, viaFallback: false };
     w.__t0 = performance.now();
     const tick = () => {
       const t = Math.round(performance.now() - w.__t0);
       const sk = document.querySelector("main [data-skeleton]");
       if (sk) {
         w.__tl.committed ??= t;
+        if (sk.closest("[data-route-fallback]")) w.__tl.viaFallback = true;
         const o = Number(getComputedStyle(sk).opacity);
         w.__tl.maxOpacity = Math.max(w.__tl.maxOpacity, o);
         if (o >= 0.5) w.__tl.visible ??= t;
@@ -123,6 +142,27 @@ test.describe("skeletons", () => {
     const tl = await openReportFromLanding(page, 0);
     test.skip(tl.response == null || tl.response > 100, `the server took ${tl.response}ms; this needs an answer under 100ms`);
     expect(tl.maxOpacity, JSON.stringify(tl)).toBeLessThan(0.1);
+  });
+
+  // The production bug behind #57: a click while the prefetch is still being
+  // applied made the router commit the route as nothing, so no skeleton showed
+  // and the footer jumped up under the header and back down (CLS 0.19 / 0.38).
+  test("show even when the router commits the route as nothing (a click mid-prefetch), and nothing moves", async ({ page }) => {
+    await watchShifts(page);
+    // The window is narrow; a click can miss it on a busy host. Three tries.
+    let tl!: Timeline;
+    for (let attempt = 0; attempt < 3 && !tl?.viaFallback; attempt++) {
+      await page.unrouteAll();
+      await page.goto("/");
+      tl = await openReportFromLanding(page, 1200, { racePrefetch: true });
+    }
+    const why = JSON.stringify(tl);
+    expect(tl.viaFallback, `the click missed the race window three times, so the layout's fallback never rendered: ${why}`).toBe(true);
+    expect(tl.visible, `the skeleton never became visible: ${why}`).not.toBeNull();
+    expect(tl.content, why).not.toBeNull();
+    await page.waitForTimeout(1500);
+    const s = await shifts(page);
+    expect(s.cls, s.list.join(" | ")).toBeLessThan(0.01);
   });
 });
 
