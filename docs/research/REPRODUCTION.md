@@ -2,7 +2,7 @@
 
 Written for someone starting from a clean machine with nothing installed, who
 wants to check the result rather than use the tool. **If you just want to use
-Holt on a repository, [USAGE.md](USAGE.md) is the shorter page.**
+Holt on a repository, [docs/USAGE.md](../USAGE.md) is the shorter page.**
 
 **The headline result needs no API key, no GitHub token, and no money.**
 
@@ -58,7 +58,7 @@ evidence back later with `git sparse-checkout disable`.
 uv run pytest -rs
 ```
 
-**Expected:** at least `388 passed` (the suite only grows), no failures, no skips. **Runtime:** about three minutes.
+**Expected:** at least `650 passed` (the suite only grows), no failures, no skips. **Runtime:** about three minutes.
 
 The `-rs` flag reports skipped tests explicitly — a skipped test is not a
 passing one.
@@ -68,7 +68,7 @@ reads the import graph and fails if any label module imports the agent,
 `tests/test_evidence_bounds.py` constructs a deliberately misbehaving provider
 subclass to confirm it still cannot return evidence from the wrong side of the
 cutoff, and `tests/test_docs_claims.py` recomputes the numbers printed in this
-guide, `README.md` and `USAGE.md` from the committed results and runs every
+guide, `README.md` and `docs/USAGE.md` from the committed results and runs every
 command either guide prints — so a claim that goes stale fails the build rather
 than sitting on the page.
 

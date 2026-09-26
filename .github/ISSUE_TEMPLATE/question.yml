@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Please check USAGE.md, docs/COMMANDS.md, and existing issues first.
+        Please check docs/USAGE.md, docs/COMMANDS.md, and existing issues first.
         Remove API keys, tokens, and private repository data before posting.
 
   - type: textarea

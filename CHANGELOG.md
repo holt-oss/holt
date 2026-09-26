@@ -37,6 +37,10 @@ Hacktoberfest.
   render as formatted text on a terminal, and use "Worth your time" instead of
   internal names. (#8)
 - The rules that decide a verdict are explained in plain English. (#7)
+- The README presents the web app, the command line and the browser
+  extension as equals. Research and reproduction guides moved under
+  `docs/research/`, the usage and release guides under `docs/`, with
+  `docs/README.md` as the index.
 - A model call records a trajectory only when `HOLT_RECORD_TRAJECTORIES=1`. (#7)
 
 ### Fixed

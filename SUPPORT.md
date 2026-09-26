@@ -1,8 +1,8 @@
 # Getting help with Holt
 
-Start with [USAGE.md](USAGE.md) for installation and the normal workflow, then
+Start with [docs/USAGE.md](docs/USAGE.md) for installation and the normal workflow, then
 check [docs/COMMANDS.md](docs/COMMANDS.md) for command details and
-[REPRODUCTION.md](REPRODUCTION.md) for evaluation questions.
+[docs/research/REPRODUCTION.md](docs/research/REPRODUCTION.md) for evaluation questions.
 
 If those do not answer the question, search the
 [existing issues](https://github.com/holt-oss/holt/issues). Use the question

@@ -15,7 +15,8 @@ the private process in [SECURITY.md](SECURITY.md), not a public issue.
 say which files they touch and how to check your change. Comment on the issue
 so nobody else starts the same one.
 
-**2. Find your way around.** The repository in six lines:
+**2. Find your way around.** The repository in eight lines
+([docs/README.md](docs/README.md) indexes everything else):
 
 | Path | What it is | Language |
 |---|---|---|
@@ -23,8 +24,9 @@ so nobody else starts the same one.
 | `server/` | The HTTP API the web app calls ([API.md](API.md) is the contract) | Python, FastAPI |
 | `web/` | The web app | TypeScript, Next.js |
 | `extension/` | The browser extension that puts a chip on GitHub pages | TypeScript |
+| `e2e/`, `deploy/` | Smoke tests against a deployed Holt; container images and staging | TypeScript, shell |
 | `eval/`, `fixtures/` | The benchmark and its recorded evidence (large; only for evaluation work) | Python, JSON |
-| `docs/`, `*.md` | Documentation | Markdown |
+| `docs/`, `*.md` | Documentation; `website/` is the legacy landing page, don't extend it | Markdown |
 
 **3. Get the code.** A docs or extension change does not need the ~315 MB of
 benchmark evidence, so you can skip it:
@@ -36,7 +38,7 @@ git sparse-checkout set --no-cone '/*' '!/fixtures/'
 ```
 
 Leave out the last line if you are working on the engine, whose tests read
-`fixtures/`. [REPRODUCTION.md](REPRODUCTION.md#not-reproducing-the-benchmark-skip-the-evidence) has the
+`fixtures/`. [docs/research/REPRODUCTION.md](docs/research/REPRODUCTION.md#not-reproducing-the-benchmark-skip-the-evidence) has the
 details.
 
 **4. Run only the part you touch.**
@@ -105,7 +107,7 @@ must record their design and outcome when they happen, including unsuccessful
 experiments. Do not rewrite historical evaluation records to make a later
 result appear pre-registered.
 
-Maintainer releases follow [RELEASING.md](RELEASING.md).
+Maintainer releases follow [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Changing the verdict rules
 
@@ -113,7 +115,7 @@ Most contributions never touch this. If yours changes what verdict Holt gives,
 open a feature request first: the evidence model and the evaluation design are
 part of the product contract, so an implementation can be sound and still not
 belong in Holt. Read [docs/DESIGN.md](docs/DESIGN.md) before changing the
-engine and [docs/EVALUATION.md](docs/EVALUATION.md) before changing the
+engine and [docs/research/EVALUATION.md](docs/research/EVALUATION.md) before changing the
 benchmark, labels, sampling, or headline metrics.
 
 These invariants are load-bearing rather than stylistic:

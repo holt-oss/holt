@@ -181,18 +181,18 @@ still shows it in a clone. Add a test that monkeypatches
 `recordings_available` to `False` and checks the footer text. Run
 `uv run pytest tests/test_tui_screens.py -q -k mode`.
 
-## 12. USAGE.md: explain why new pull requests are not counted as ignored
+## 12. docs/USAGE.md: explain why new pull requests are not counted as ignored
 
 **Labels:** good first issue, area:docs
-**Files:** `USAGE.md` ("Reading the answer")
+**Files:** `docs/USAGE.md` ("Reading the answer")
 
 Since 0.2.0, a pull request opened in the last 48 hours with no reply is not
 counted as ignored, so a repository is not punished for a PR opened this
-morning. Reports say "N are too new to have had a reply", but USAGE.md never
+morning. Reports say "N are too new to have had a reply", but docs/USAGE.md never
 explains it, so a reader has to guess what that means for the answer. Add two
 or three plain sentences under "Reading the answer". The rule is
 `awaiting_reply` in `src/holt/agent/signals.py`; the report sentence is in
 `src/holt/agent/pipeline.py`.
 
-**Done when:** USAGE.md explains the 48-hour rule in plain English, with no
+**Done when:** docs/USAGE.md explains the 48-hour rule in plain English, with no
 internal names, and says it applies to live runs.

@@ -36,7 +36,7 @@ directory.
 
 A clone carries committed evidence and recorded model output, so the benchmark
 reproduces with **no API key, no GitHub token and no spend** — see
-[REPRODUCTION.md](../REPRODUCTION.md):
+[docs/research/REPRODUCTION.md](research/REPRODUCTION.md):
 
 ```sh
 uv sync
@@ -46,7 +46,7 @@ PYTHONPATH=. uv run holt analyze NixOS/nixpkgs --replay
 In a clone, a repository with committed evidence is answered from that snapshot
 unless you pass `--live`. The hidden flags `--replay`, `--baseline` and
 `--show-verification` exist for evaluation work and are documented in
-REPRODUCTION.md.
+docs/research/REPRODUCTION.md.
 
 ---|---|---|
 | `holt analyze <repo>` | the full assessment for one repository | 5 stages |
@@ -148,5 +148,5 @@ rule: issues naming a file or directory you have already touched come first,
 newest first, then the rest by recency. No model call. The rule ships because it
 is the best of five methods we measured, and the output prints how well it
 did, with its uncertainty, above every ranking. The measurement itself is in
-[EVALUATION.md](EVALUATION.md). Each row says
+[docs/research/EVALUATION.md](research/EVALUATION.md). Each row says
 which path tokens overlapped, or that none did.

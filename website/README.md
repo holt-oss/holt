@@ -1,6 +1,8 @@
-# Holt website
+# Holt website (legacy)
 
-Production landing page for Holt.
+**This is the old static landing page.** It still serves the live site until
+the web app in [`web/`](../web/) launches in production, and then it goes.
+Don't extend it: new pages, copy and features belong in `web/`.
 
 ```sh
 cd website

@@ -28,9 +28,9 @@ import pytest
 
 from holt.cli import main
 
-EVALUATION = Path("docs/EVALUATION.md")
-REPRODUCTION = Path("REPRODUCTION.md")
-USAGE = Path("USAGE.md")
+EVALUATION = Path("docs/research/EVALUATION.md")
+REPRODUCTION = Path("docs/research/REPRODUCTION.md")
+USAGE = Path("docs/USAGE.md")
 
 POOL1 = [Path(f"eval/results_eval_run{i}.json") for i in (1, 2, 3)]
 POOL2 = [Path(f"eval/results_eval_p2r{i}.json") for i in (1, 2, 3)]
@@ -90,7 +90,7 @@ def test_evaluation_headline_mcc_matches_the_committed_runs(paths, method):
     """Every MCC in the two headline tables is recomputed and must be on the page."""
     value = mean_metric(paths, method, "mcc")
     assert f"{value:.2f}" in EVALUATION.read_text(), (
-        f"{method} MCC {value:.2f} is not stated in docs/EVALUATION.md"
+        f"{method} MCC {value:.2f} is not stated in docs/research/EVALUATION.md"
     )
 
 
@@ -105,7 +105,7 @@ def test_usage_states_the_measured_balanced_accuracy():
     for paths in (POOL1, POOL2):
         value = mean_metric(paths, "holt", "balanced_accuracy")
         assert f"{value:.2f}" in text, (
-            f"USAGE.md should state balanced accuracy {value:.2f}"
+            f"docs/USAGE.md should state balanced accuracy {value:.2f}"
         )
 
 
@@ -115,7 +115,7 @@ def test_usage_states_the_measured_balanced_accuracy():
 def documented_holt_commands() -> list[list[str]]:
     """Every `holt ...` invocation the docs print, minus the paid ones.
 
-    Both guides are covered. `USAGE.md` is the page a user actually follows, so
+    Both guides are covered. `docs/USAGE.md` is the page a user actually follows, so
     a command that only appears there is exactly the kind that breaks unnoticed
     -- which is how `--baseline --replay` came to be broken on every repository
     while the benchmark stayed green.
@@ -147,7 +147,7 @@ def test_the_guides_actually_print_commands():
     """Guards the parser above: a silent zero would make the next test vacuous."""
     assert len(documented_holt_commands()) >= 5
     assert any(a[:1] == ["profile"] for a in documented_holt_commands()), (
-        "USAGE.md should still show how to state a profile"
+        "docs/USAGE.md should still show how to state a profile"
     )
 
 
@@ -207,7 +207,7 @@ def test_reproduction_promises_the_real_test_count():
     """
     promised = [int(n) for n in re.findall(
         r"at least `(\d+) passed", REPRODUCTION.read_text(encoding="utf-8"))]
-    assert promised, "REPRODUCTION.md no longer states an expected test count"
+    assert promised, "docs/research/REPRODUCTION.md no longer states an expected test count"
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider"],
         capture_output=True, text=True,
@@ -216,5 +216,5 @@ def test_reproduction_promises_the_real_test_count():
     assert collected, f"could not read a collection count:\n{result.stdout[-2000:]}"
     assert int(collected.group(1)) >= max(promised), (
         f"the suite collects {collected.group(1)} tests; "
-        f"REPRODUCTION.md promises at least {max(promised)}"
+        f"docs/research/REPRODUCTION.md promises at least {max(promised)}"
     )

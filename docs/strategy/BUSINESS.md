@@ -35,7 +35,7 @@ Cost per report on OpenRouter. Prices come from the OpenRouter models API. The c
 | deepseek/deepseek-v4.1-flash | 0.099 / 0.60 | ₹0.46 | ₹0.59 | ₹458 |
 | qwen/qwen3.8-flash | 0.15 / 0.47 | ₹0.42 | ₹0.56 | ₹425 |
 
-**A:** The token counts are from gpt-5-mini. Other models write more or less (especially reasoning tokens), so these costs are estimates. **Don't switch models on price alone.** Run the evaluation in `docs/EVALUATION.md` first. A cheaper model that explains verdicts badly would hurt the brand more than it saves.
+**A:** The token counts are from gpt-5-mini. Other models write more or less (especially reasoning tokens), so these costs are estimates. **Don't switch models on price alone.** Run the evaluation in `docs/research/EVALUATION.md` first. A cheaper model that explains verdicts badly would hurt the brand more than it saves.
 
 **The cache matters.** A finished AI report for the same repo, mode and days is served to *anyone* for 24 hours, and it costs nothing and uses no quota (`server/holt_server/api.py`). During Hacktoberfest many students will open the same popular repos.
 
