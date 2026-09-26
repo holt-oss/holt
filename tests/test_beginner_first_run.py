@@ -240,6 +240,38 @@ def test_help_has_no_statistics_jargon(capsys):
             assert jargon not in text, (argv, jargon)
 
 
+def test_version_prints_holt_and_exits_zero(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--version"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "holt" in out
+
+
+def test_version_installed_package(monkeypatch, capsys):
+    import importlib.metadata
+
+    monkeypatch.setattr(importlib.metadata, "version", lambda pkg: "0.2.0")
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--version"])
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip() == "holt 0.2.0"
+
+
+def test_version_fallback_when_metadata_missing(monkeypatch, capsys):
+    import importlib.metadata
+
+    def fake_version(pkg):
+        raise importlib.metadata.PackageNotFoundError(pkg)
+
+    monkeypatch.setattr(importlib.metadata, "version", fake_version)
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--version"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "holt" in out
+
+
 # ─── the report ─────────────────────────────────────────────────────────────
 
 
