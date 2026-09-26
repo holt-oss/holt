@@ -92,6 +92,11 @@ export default function PricingPage() {
             </li>
           ))}
         </ul>
+        <p className="mt-6 max-w-2xl font-sans text-[0.9rem] text-muted">
+          Paid plans will be billed as <span className="text-ink">Githolt</span>, in INR through Razorpay or in USD through Dodo Payments.
+          Cancel anytime and keep access until the end of the paid period. Details in the{" "}
+          <Link href="/refunds" className="text-link">refund and cancellation policy</Link>.
+        </p>
         </div>
       </div>
       </>
