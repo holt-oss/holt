@@ -11,7 +11,7 @@ export const CONTACT_CITY = process.env.NEXT_PUBLIC_CONTACT_CITY || "CONTACT_CIT
 /** The name on card statements and processor receipts (Razorpay, Dodo Payments). */
 export const PAYMENT_BRAND = "Githolt";
 /** Shown as "Last updated" on every legal page. Bump it when any of them changes. */
-export const LEGAL_UPDATED = "26 September 2026";
+export const LEGAL_UPDATED = "27 September 2026";
 export const LEGAL_PAGES = [
   { href: "/terms", label: "terms" },
   { href: "/privacy", label: "privacy" },

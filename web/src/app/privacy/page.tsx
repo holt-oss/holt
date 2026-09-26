@@ -19,7 +19,7 @@ export default function PrivacyPage() {
         <p><strong>The short version.</strong></p>
         <ul>
           <li>Holt reads public GitHub data. It never posts anything and never gets access to your repositories.</li>
-          <li>If you sign in, we keep your name and email from GitHub or Google, and your report history.</li>
+          <li>If you sign in, we keep your name, email and profile picture from GitHub or Google, and your report history. Nothing else from either account. See <a href="#google" className="text-link">signing in with Google</a>.</li>
           <li>If you add your own AI key, it is encrypted and never shown back.</li>
           <li>Payments are handled by Razorpay (INR) and Dodo Payments (USD). Card details never reach us.</li>
           <li>One cookie to keep you signed in, one setting for your theme. No trackers, no ads, no selling data.</li>
@@ -42,7 +42,7 @@ export default function PrivacyPage() {
 
       <h3>If you sign in</h3>
       <ul>
-        <li><strong>Your name, email address and profile-picture link</strong> from GitHub or Google. We ask GitHub only for your public profile and email; Holt never gets access to your repositories and can&rsquo;t act on your GitHub account.</li>
+        <li><strong>Your name, email address and profile-picture link</strong> from GitHub or Google, and nothing else from either account. Sections 3 and 4 say exactly what each provider gives us and how to take it back.</li>
         <li><strong>The sign-in library&rsquo;s records:</strong> the provider&rsquo;s ID for your account and the sign-in token it returns, so it can recognise you next time. Holt doesn&rsquo;t use that token to read or write anything on GitHub or Google.</li>
         <li><strong>Your analyses and history:</strong> which repositories you checked, when, in which mode, and the resulting reports, so your history page works.</li>
         <li><strong>Your AI report allowance:</strong> how many of your {FREE_AI_QUOTA} free monthly reports you&rsquo;ve used, and your plan.</li>
@@ -65,14 +65,79 @@ export default function PrivacyPage() {
       <h3>If you email us</h3>
       <p>We keep the email and our reply for as long as we need them to deal with your request.</p>
 
-      <h2>3. Cookies and browser storage</h2>
+      <h2 id="google">3. Signing in with Google</h2>
+      <p>
+        You can sign in to Holt with a Google account. This section says exactly what that involves. It applies on top of everything else on this page.
+      </p>
+      <h3>What Holt receives from Google</h3>
+      <p>
+        When you choose &ldquo;Sign in with Google&rdquo;, Holt asks Google for the three basic sign-in scopes, <strong>openid</strong>, <strong>email</strong> and{" "}
+        <strong>profile</strong>, and nothing more. Through them Google gives Holt:
+      </p>
+      <ul>
+        <li>your <strong>name</strong>,</li>
+        <li>your <strong>email address</strong> (and whether Google has verified it),</li>
+        <li>the <strong>link to your profile picture</strong>,</li>
+        <li>and Google&rsquo;s ID for your account, so Holt can recognise you next time.</li>
+      </ul>
+      <p>
+        That is all. Holt has <strong>no access to your Gmail, Google Drive, Calendar, Contacts, Photos, YouTube or any other Google data</strong>, and it
+        never asks for it. Holt can&rsquo;t read, send, change or delete anything in your Google account.
+      </p>
+      <h3>What it&rsquo;s used for</h3>
+      <p>
+        Only to <strong>create and identify your Holt account</strong> and to <strong>show your name and picture in the header</strong> when you&rsquo;re signed in.
+        Your email address is also how we recognise you if you write to us about your account. We don&rsquo;t send marketing email.
+      </p>
+      <h3>What it&rsquo;s never used for</h3>
+      <ul>
+        <li>It is <strong>never sold</strong>.</li>
+        <li>It is <strong>never shared</strong> with anyone except the services listed in section 8, and only as far as running Holt needs (for example, your name and email go to the payment processor if you buy a plan).</li>
+        <li>It is <strong>never used for advertising</strong>, and Holt shows no ads.</li>
+        <li>It is <strong>never used to train AI models</strong>, ours or anyone else&rsquo;s. AI reports never include anything about you (see section 7).</li>
+        <li>No human at Holt reads it except to answer a request you&rsquo;ve made, or to keep the service running.</li>
+      </ul>
+      <h3>Where it&rsquo;s stored and for how long</h3>
+      <p>
+        Your name, email and picture link are kept in Holt&rsquo;s own database, on the server described in section 8, alongside the sign-in library&rsquo;s
+        record of your Google account ID and the sign-in token Google returned. They are kept <strong>until you delete your account</strong> (see below) and are not
+        copied anywhere else. Holt doesn&rsquo;t use the token to fetch anything further from Google.
+      </p>
+      <h3>How to take it back</h3>
+      <ul>
+        <li>
+          <strong>Revoke Holt&rsquo;s access</strong> at any time from your Google account&rsquo;s permissions page:{" "}
+          <a href="https://myaccount.google.com/permissions" className="text-link" rel="noopener noreferrer">myaccount.google.com/permissions</a>. Holt then
+          can&rsquo;t sign you in with Google until you allow it again.
+        </li>
+        <li>
+          <strong>Have your data deleted</strong> by emailing <ContactEmail /> from the address on your account. We remove your account, the Google details
+          above, your history and any stored AI key. Revoking access at Google doesn&rsquo;t delete your Holt account by itself, so do both if you want everything gone.
+        </li>
+      </ul>
+      <p>
+        Holt&rsquo;s use and transfer of information received from Google APIs adheres to the{" "}
+        <a href="https://developers.google.com/terms/api-services-user-data-policy" className="text-link" rel="noopener noreferrer">Google API Services User Data Policy</a>,
+        including the Limited Use requirements.
+      </p>
+
+      <h2 id="github">4. Signing in with GitHub</h2>
+      <p>
+        Signing in with GitHub works the same way. Holt asks GitHub only for your <strong>public profile</strong> and your <strong>email address</strong> (the
+        read:user and user:email scopes) and receives your name, email, profile-picture link and GitHub account ID. It gets <strong>no access to your repositories</strong>,
+        public or private, and can&rsquo;t star, comment, open pull requests or do anything else on your behalf. The data is used, stored and deleted exactly as
+        described for Google above. You can revoke Holt&rsquo;s access at any time under{" "}
+        <a href="https://github.com/settings/applications" className="text-link" rel="noopener noreferrer">GitHub settings &rarr; Applications</a>, and email us to delete your account.
+      </p>
+
+      <h2>5. Cookies and browser storage</h2>
       <ul>
         <li><strong>One session cookie</strong>, set only when you sign in, so you stay signed in. It contains a random token, not your details.</li>
         <li><strong>Small settings in your browser&rsquo;s local storage:</strong> your light or dark theme choice, and whether you closed the Hacktoberfest banner. These never leave your browser.</li>
       </ul>
       <p>That&rsquo;s all. There are no advertising cookies, no third-party analytics scripts, and no tracking pixels.</p>
 
-      <h2>4. Public GitHub data and reports</h2>
+      <h2>6. Public GitHub data and reports</h2>
       <p>
         Holt fetches public repositories, pull requests and comments through GitHub&rsquo;s API. Reports are cached and shown publicly
         at githolt.com so the next person gets an answer instantly. A report is about how a project treats outside contributors.
@@ -83,7 +148,7 @@ export default function PrivacyPage() {
         If you are a maintainer or contributor and believe a report quotes something it shouldn&rsquo;t, email us and we&rsquo;ll look at it.
       </p>
 
-      <h2>5. AI providers</h2>
+      <h2>7. AI providers</h2>
       <p>
         AI reports are optional. The verdict is computed by rules without a model. When you ask for an AI explanation, Holt sends the
         model the evidence it collected: excerpts of public pull-request titles, comments and metadata from the repository being
@@ -94,7 +159,7 @@ export default function PrivacyPage() {
         <li>With your own key, requests go to the provider you chose (OpenRouter, OpenAI, Anthropic or Google Gemini) under your agreement with them.</li>
       </ul>
 
-      <h2>6. Who else sees data</h2>
+      <h2>8. Who else sees data</h2>
       <p>We don&rsquo;t sell data, and we don&rsquo;t share it with anyone for advertising. The services that touch data in order to run Holt are:</p>
       <ul>
         <li><strong>GitHub</strong>: we read public data through its API. GitHub and Google also handle sign-in.</li>
@@ -105,7 +170,7 @@ export default function PrivacyPage() {
       </ul>
       <p>We&rsquo;ll also disclose data if the law requires it, and we&rsquo;ll tell you when we&rsquo;re allowed to.</p>
 
-      <h2>7. How long we keep things</h2>
+      <h2>9. How long we keep things</h2>
       <ul>
         <li>Account details, your history and your encrypted key: until you delete them or ask us to.</li>
         <li>Rate-limit records: up to an hour, in memory.</li>
@@ -113,7 +178,7 @@ export default function PrivacyPage() {
         <li>Payment records: as long as Indian tax and accounting rules require.</li>
       </ul>
 
-      <h2>8. Your rights and how to delete your data</h2>
+      <h2>10. Your rights and how to delete your data</h2>
       <p>
         You can ask us to show you what we hold about you, correct it, or delete it. To delete your account, email <ContactEmail /> from
         the address on your account, and we&rsquo;ll remove your account, history and any stored key. Cached public reports stay, because they
@@ -124,22 +189,22 @@ export default function PrivacyPage() {
         the same rights apply in practice: ask, and we&rsquo;ll act on it.
       </p>
 
-      <h2>9. Security</h2>
+      <h2>11. Security</h2>
       <p>
         Everything travels over HTTPS. Stored AI keys are encrypted. Access to the server and database is limited to the person running Holt.
         No system is perfect, so if you find a weakness, please email us before posting it publicly and we&rsquo;ll fix it fast.
       </p>
 
-      <h2>10. Children</h2>
+      <h2>12. Children</h2>
       <p>Holt is not for children under 13, and we don&rsquo;t knowingly keep data about them. If you think a child has an account, email us and we&rsquo;ll remove it.</p>
 
-      <h2>11. Changes</h2>
+      <h2>13. Changes</h2>
       <p>
         If this policy changes, the date at the top will change with it, and we&rsquo;ll flag significant changes on the site. See also the{" "}
         <Link href="/terms" className="text-link">terms of service</Link> and the <Link href="/refunds" className="text-link">refund policy</Link>.
       </p>
 
-      <h2>12. Contact</h2>
+      <h2>14. Contact</h2>
       <p>Email <ContactEmail />. Details are on the <Link href="/contact" className="text-link">contact page</Link>.</p>
     </LegalPage>
   );
