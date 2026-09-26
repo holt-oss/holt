@@ -17,7 +17,6 @@ COPY server/ server/
 RUN uv sync --frozen --no-dev --package holt-server --no-editable
 
 FROM python:3.12-slim
-LABEL holt.stage="holt-new"
 RUN useradd --create-home --uid 10001 holt
 COPY --from=build /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 HOST=0.0.0.0 PORT=8000

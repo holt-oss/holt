@@ -49,7 +49,7 @@ describe("ensureChip", () => {
     document.body.innerHTML = repoHeader();
     const chip = ensureChip(document, flask, { state: "found", data: report() })!;
     expect(chip.parentElement!.id).toBe("repo-title-component");
-    expect(chip.href).toBe("https://holt.aahil-khan.xyz/pallets/flask");
+    expect(chip.href).toBe("https://githolt.com/pallets/flask");
     expect(chip.target).toBe("_blank");
     expect(chip.rel).toContain("noopener");
     expect(chip.textContent).toBe("Holt: Worth your time15 of 100 newcomer PRs merged");
@@ -109,5 +109,32 @@ describe("ensureChip", () => {
     ensureChip(document, flask, { state: "loading" });
     removeChips(document);
     expect(document.querySelector(".holt-chip")).toBeNull();
+  });
+});
+
+describe("the loading skeleton", () => {
+  it("keeps the real words, marks the chip busy, and clears it on a verdict", () => {
+    document.body.innerHTML = repoHeader();
+    const chip = ensureChip(document, flask, { state: "loading" })!;
+    expect(chip.dataset.holtState).toBe("loading");
+    expect(chip.getAttribute("aria-busy")).toBe("true");
+    // The label and stat carry the text that sizes the pill; content.css draws
+    // them as blocks, so the chip is as wide and tall as a real one.
+    expect(chip.querySelector(".holt-chip__label")!.textContent).toBe("Holt");
+    expect(chip.querySelector<HTMLElement>(".holt-chip__stat")!.hidden).toBe(false);
+    expect(chip.querySelector(".holt-chip__stat")!.textContent).toBe("checking…");
+    expect(chip.getAttribute("aria-label")).toBe("Holt. checking….");
+
+    updateChip(chip, flask, { state: "found", data: report() });
+    expect(chip.dataset.holtState).toBe("found");
+    expect(chip.hasAttribute("aria-busy")).toBe(false);
+    // Same elements, so the CSS transition on them crossfades block → text.
+    expect(chip.querySelector(".holt-chip__label")!.textContent).toBe("Holt: Worth your time");
+  });
+
+  it("is not busy when the verdict is already known", () => {
+    document.body.innerHTML = repoHeader();
+    const chip = ensureChip(document, flask, { state: "missing" })!;
+    expect(chip.hasAttribute("aria-busy")).toBe(false);
   });
 });

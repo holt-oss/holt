@@ -327,6 +327,73 @@
     box-shadow: var(--card-shadow);
   }
 
+  /* Policy pages (/terms, /privacy, /refunds, /contact): long plain-English
+     prose in the sans face, headings in the mono display face. */
+  .legal {
+    font-family: var(--font-sans);
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .legal h2 {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+    color: var(--ink);
+  }
+  /* Linkable sections (/privacy#google): clear the sticky header when targeted. */
+  .legal h2[id] {
+    scroll-margin-top: 5rem;
+  }
+  .legal h2:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+  .legal h3 {
+    margin-top: 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .legal p,
+  .legal ul,
+  .legal ol {
+    margin-top: 0.85rem;
+  }
+  .legal ul,
+  .legal ol {
+    padding-left: 1.4rem;
+  }
+  .legal ul {
+    list-style: disc;
+  }
+  .legal ol {
+    list-style: decimal;
+  }
+  .legal li {
+    margin-top: 0.35rem;
+  }
+  .legal li::marker {
+    color: var(--faint);
+  }
+  .legal strong {
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .legal .summary {
+    border: 1px solid var(--line-strong);
+    background: var(--panel);
+    padding: 1rem 1.25rem;
+  }
+  .legal .summary p:first-child {
+    margin-top: 0;
+  }
+
   /* A full-width tinted band from inside a centred column: section rhythm
      without restructuring the page. */
   .band-alt {
@@ -803,8 +870,19 @@
     animation: sk-appear var(--dur-fast) var(--ease-out) var(--sk-delay) both;
   }
   /* No footer under a page skeleton: it would jump (layout shift) when the
-     real page, a different height, replaces the skeleton. */
-  body:has(main [data-route-loading]) > footer {
+     real page, a different height, replaces the skeleton. Nor under an empty
+     <main>: the router can commit a route as nothing for a moment before its
+     page arrives (see route-fallback.tsx), and a footer sitting right under
+     the header would then be pushed down the page. Hiding and showing with
+     display doesn't count as a shift; a visible footer moving does. */
+  body:has(main [data-route-loading]) > footer,
+  body:has(main:not(:has(*))) > footer {
+    display: none;
+  }
+  /* The fallback skeleton leaves the instant the page arrives. React removes
+     it a moment later (it holds updates until the page's view transition is
+     ready); without this the page would push it down for one frame. */
+  main > [data-route-fallback]:not(:only-child) {
     display: none;
   }
   /* The report shape under a running analysis: dimmed and still. */

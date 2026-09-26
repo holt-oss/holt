@@ -1,6 +1,7 @@
 # Deploying Holt
 
-Container images and the staging preview for the web app and API server.
+Container images, the staging preview and the production stack for the web
+app and API server.
 
 | Path | What |
 |---|---|
@@ -10,6 +11,7 @@ Container images and the staging preview for the web app and API server.
 | `staging/preview.sh` | One update: build `origin/main` + every open PR labelled `staging` + `staging/extra-branches`, restart the stack. |
 | `staging/install.sh` | One-time setup: systemd `--user` timer (every 3 minutes) and the `stagectl` route. |
 | `staging/make-env.sh` | Writes `staging/.env` (gitignored): random keys, `gh auth token`, site URLs. |
+| `prod/` | Production, https://githolt.com: compose project `holt-prod` on `127.0.0.1:8310` behind a Cloudflare tunnel, built only from `origin/main` by `prod/deploy.sh` (never on a timer), nightly backups. See [`prod/README.md`](prod/README.md) and [`prod/TUNNEL.md`](prod/TUNNEL.md). |
 
 ## Staging: https://holt-new.aahil-khan.xyz
 
@@ -39,12 +41,18 @@ failed + why).
   tries again).
 - Images build on a buildx builder of its own (`holt-stage`, 3 GB memory
   cap), so after each build it prunes only its own cache and only images
-  labelled `holt.stage=holt-new`. It never prunes anything else.
+  labelled `holt.stage=holt-new` (the label comes from `compose.yml`, so
+  production images, labelled `holt.stack=holt-prod`, are never touched).
+  It never prunes anything else.
 - After each build goes live it runs the `e2e/` smoke suite once against the
   public URL (one browser, `--workers=1`). A failure does not roll back; it
   shows on `/__build`. Set `HOLT_STAGE_SMOKE=0` in the environment of the
   service to skip it.
 - Memory limits: web 512m, server 512m, db 256m, edge 32m.
+- The policy pages' contact details (`CONTACT_EMAIL`, `CONTACT_CITY`) are
+  read from `~/.config/holt/secrets.env` on every run, the same file
+  production uses; nothing else is taken from it. Without them the build
+  fails on purpose rather than showing the placeholders.
 - Sign-in has no OAuth app yet, so staging is anonymous: rules reports work,
   AI reports answer "needs a key". Add `AUTH_GITHUB_ID/SECRET` or
   `OPENROUTER_API_KEY` to `.env` and run `FORCE=1 preview.sh` to change that.

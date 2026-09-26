@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GITHUB_REPO_URL } from "@/lib/site";
+import { GITHUB_REPO_URL, LEGAL_PAGES } from "@/lib/site";
 import { CatFace } from "./cat-face";
 
 export function Footer() {
@@ -21,6 +21,9 @@ export function Footer() {
           <a href={`${GITHUB_REPO_URL}/blob/main/docs/USAGE.md`} className="inline-flex min-h-11 items-center hover:text-ink sm:min-h-0 sm:py-1 sm:justify-end">the CLI</a>
           <a href={GITHUB_REPO_URL} className="inline-flex min-h-11 items-center hover:text-ink sm:min-h-0 sm:py-1 sm:justify-end">holt-oss / 2026</a>
           <span className="inline-flex min-h-11 items-center sm:min-h-0 sm:py-1 sm:justify-end">Apache-2.0</span>
+          {LEGAL_PAGES.map((p) => (
+            <Link key={p.href} href={p.href} className="inline-flex min-h-11 items-center hover:text-ink sm:min-h-0 sm:py-1 sm:justify-end">{p.label}</Link>
+          ))}
         </nav>
       </div>
     </footer>

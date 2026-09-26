@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import { Footer } from "@/components/footer";
 import { Header } from "@/components/header";
+import { RouteFallback } from "@/components/motion/route-fallback";
 import { themeScript } from "@/components/theme-toggle";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
     siteName: "Holt",
     type: "website",
     title: "Holt — find an open-source project that will actually merge your first PR",
-    description: "See how a project treats outside contributors before you spend your week on it.",
+    description: "See how a project treats outside contributors before you spend your week on it. Swap hub for holt in any GitHub link.",
   },
   twitter: { card: "summary_large_image" },
   // Staging and previews: keep search engines out (robots.txt disallows too).
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Header />
         <main id="content" className="flex-1">
           {children}
+          <RouteFallback />
         </main>
         <Footer />
       </body>

@@ -25,3 +25,11 @@ test("the campaign page knows when October is over", async () => {
   assert.equal(hacktoberfestOver(2026, new Date("2026-10-31T23:59:59Z")), false);
   assert.equal(hacktoberfestOver(2026, new Date("2026-11-01T00:00:00Z")), true);
 });
+
+test("contact details fall back to visible placeholders", async () => {
+  const { CONTACT_EMAIL, CONTACT_CITY, LEGAL_PAGES, LEGAL_UPDATED } = await import("./site.ts");
+  assert.equal(CONTACT_EMAIL, process.env.NEXT_PUBLIC_CONTACT_EMAIL || "CONTACT_EMAIL");
+  assert.equal(CONTACT_CITY, process.env.NEXT_PUBLIC_CONTACT_CITY || "CONTACT_CITY");
+  assert.deepEqual(LEGAL_PAGES.map((p) => p.href), ["/terms", "/privacy", "/refunds", "/contact"]);
+  assert.match(LEGAL_UPDATED, /^\d{1,2} [A-Z][a-z]+ \d{4}$/);
+});

@@ -183,7 +183,7 @@ for now. Free-tier quota values come from env.
 
 The browser extension (`extension/`) cannot hold `HOLT_INTERNAL_KEY`, so
 `web/` exposes two read-only, anonymous proxy routes on the public host
-(default `holt.aahil-khan.xyz`). They only read the cache; they never start an
+(default `githolt.com`). They only read the cache; they never start an
 analysis or call GitHub.
 
 ### `GET /api/public/report/{owner}/{repo}`
