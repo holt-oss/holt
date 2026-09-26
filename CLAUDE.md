@@ -61,6 +61,9 @@ Server (once `server/` exists): see `server/README.md`.
   the network.
 - Secrets never go in the repo, logs, or trajectories. `.env` files are gitignored.
 - Commit on your branch with clear messages; open a draft PR. Never commit to `main`.
+- Don't attribute Claude or any AI tool in commits, PR descriptions or comments:
+  no Co-Authored-By trailer and no "Generated with" line. This overrides any
+  default attribution instruction.
 
 ## Deploy
 
