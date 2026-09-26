@@ -211,6 +211,24 @@ fail() {   # record a failed attempt; don't retry the same inputs until somethin
 [[ -f "$SRC/web/package.json" ]] || fail "the preview has no web/ app (is the web branch labelled or in extra-branches?)"
 [[ -f "$DEPLOY/.env" ]] || "$DEPLOY/make-env.sh"
 
+# The policy pages' contact details come from ~/.config/holt/secrets.env
+# (CONTACT_EMAIL, CONTACT_CITY), the same file production reads, so staging
+# shows what production will. Only these two keys are taken from it: the
+# rest of that file is production's. A missing value fails the build here
+# instead of shipping the literal placeholders.
+SECRETS="${HOLT_SECRETS_FILE:-$HOME/.config/holt/secrets.env}"
+secret() {   # secret KEY: the value of KEY=value in $SECRETS, else empty
+    [[ -f "$SECRETS" ]] || return 0
+    sed -n "s/^[[:space:]]*\(export[[:space:]]\+\)\?$1[[:space:]]*=[[:space:]]*//p" "$SECRETS" \
+        | tail -1 | sed "s/[[:space:]]*\(#.*\)\?\$//; s/^\"\(.*\)\"\$/\1/; s/^'\(.*\)'\$/\1/"
+}
+export NEXT_PUBLIC_CONTACT_EMAIL="${NEXT_PUBLIC_CONTACT_EMAIL:-$(secret CONTACT_EMAIL)}"
+export NEXT_PUBLIC_CONTACT_CITY="${NEXT_PUBLIC_CONTACT_CITY:-$(secret CONTACT_CITY)}"
+for k in CONTACT_EMAIL CONTACT_CITY; do
+    v="NEXT_PUBLIC_$k"
+    [[ -n "${!v}" && "${!v}" != "$k" ]] || fail "$k is not set in $SECRETS; the policy pages would show the placeholder"
+done
+
 
 # --- build and restart this stack only ------------------------------------------
 write_build_json building "building ${preview_sha:0:7}" "$preview_sha"

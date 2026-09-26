@@ -327,6 +327,69 @@
     box-shadow: var(--card-shadow);
   }
 
+  /* Policy pages (/terms, /privacy, /refunds, /contact): long plain-English
+     prose in the sans face, headings in the mono display face. */
+  .legal {
+    font-family: var(--font-sans);
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .legal h2 {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+    color: var(--ink);
+  }
+  .legal h2:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+  .legal h3 {
+    margin-top: 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .legal p,
+  .legal ul,
+  .legal ol {
+    margin-top: 0.85rem;
+  }
+  .legal ul,
+  .legal ol {
+    padding-left: 1.4rem;
+  }
+  .legal ul {
+    list-style: disc;
+  }
+  .legal ol {
+    list-style: decimal;
+  }
+  .legal li {
+    margin-top: 0.35rem;
+  }
+  .legal li::marker {
+    color: var(--faint);
+  }
+  .legal strong {
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .legal .summary {
+    border: 1px solid var(--line-strong);
+    background: var(--panel);
+    padding: 1rem 1.25rem;
+  }
+  .legal .summary p:first-child {
+    margin-top: 0;
+  }
+
   /* A full-width tinted band from inside a centred column: section rhythm
      without restructuring the page. */
   .band-alt {

@@ -41,6 +41,7 @@ lines, `chmod 600`), read by `deploy.sh` on every run and mapped:
 | `GOOGLE_OAUTH_ID`, `GOOGLE_OAUTH_SECRET` | `AUTH_GOOGLE_ID/SECRET` | Google sign-in shows "isn't set up here" |
 | `OPENROUTER_API_KEY` | the same | AI reports answer `needs_key`; BYOK still works |
 | `GITHUB_TOKENS` | the same | falls back to `gh auth token` |
+| `CONTACT_EMAIL`, `CONTACT_CITY` | `NEXT_PUBLIC_CONTACT_EMAIL/CITY` (build arg and env) | **the deploy stops**: the policy pages must not show placeholders |
 
 There is never a dev sign-in in production: it exists only with
 `NODE_ENV=development`, and the image runs with `NODE_ENV=production`.
