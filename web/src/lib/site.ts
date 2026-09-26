@@ -3,6 +3,22 @@ export const SITE_URL = `${/^(localhost|127\.|\[::1\])/.test(SITE_HOST) ? "http"
 export const FREE_AI_QUOTA = Number(process.env.NEXT_PUBLIC_FREE_AI_QUOTA || 3);
 export const GITHUB_REPO_URL = "https://github.com/holt-oss/holt";
 
+// Who runs Holt, for the legal pages (/terms, /privacy, /refunds, /contact).
+// The values are placeholders until the deployment sets the env; the pages
+// render them as-is so a missing value is visible, not silently blank.
+export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "CONTACT_EMAIL";
+export const CONTACT_CITY = process.env.NEXT_PUBLIC_CONTACT_CITY || "CONTACT_CITY";
+/** The name on card statements and processor receipts (Razorpay, Dodo Payments). */
+export const PAYMENT_BRAND = "Githolt";
+/** Shown as "Last updated" on every legal page. Bump it when any of them changes. */
+export const LEGAL_UPDATED = "26 September 2026";
+export const LEGAL_PAGES = [
+  { href: "/terms", label: "terms" },
+  { href: "/privacy", label: "privacy" },
+  { href: "/refunds", label: "refunds" },
+  { href: "/contact", label: "contact" },
+] as const;
+
 /**
  * Banner copy for `now` (UTC): a countdown in the 45 days before 1 October,
  * "is on" from 1 to 31 October, and nothing after that.

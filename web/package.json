@@ -10,7 +10,8 @@
     "test": "node --test --experimental-strip-types --no-warnings src/lib/*.test.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "e2e": "node --test --experimental-strip-types --no-warnings e2e/*.test.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",

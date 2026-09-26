@@ -49,6 +49,10 @@ failed + why).
   shows on `/__build`. Set `HOLT_STAGE_SMOKE=0` in the environment of the
   service to skip it.
 - Memory limits: web 512m, server 512m, db 256m, edge 32m.
+- The policy pages' contact details (`CONTACT_EMAIL`, `CONTACT_CITY`) are
+  read from `~/.config/holt/secrets.env` on every run, the same file
+  production uses; nothing else is taken from it. Without them the build
+  fails on purpose rather than showing the placeholders.
 - Sign-in has no OAuth app yet, so staging is anonymous: rules reports work,
   AI reports answer "needs a key". Add `AUTH_GITHUB_ID/SECRET` or
   `OPENROUTER_API_KEY` to `.env` and run `FORCE=1 preview.sh` to change that.
