@@ -122,7 +122,7 @@ writes meanwhile):
 B=~/backups/holt/<stamp>
 DB=$(docker ps -q --filter label=com.docker.compose.project=holt-prod --filter label=com.docker.compose.service=db)
 dc stop web server
-docker exec -i $DB psql -U holt -d postgres -c 'DROP DATABASE IF EXISTS holt_restore' 
+docker exec -i $DB psql -U holt -d postgres -c 'DROP DATABASE IF EXISTS holt_restore'
 docker exec -i $DB psql -U holt -d postgres -c 'CREATE DATABASE holt_restore'
 docker exec -i $DB pg_restore -U holt -d holt_restore --no-owner < $B/holt.dump      # try it on a scratch db first
 docker exec -i $DB psql -U holt -d holt_restore -c 'SELECT count(*) FROM reports'   # looks right?
