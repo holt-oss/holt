@@ -24,14 +24,12 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
 
 here="$(cd "$(dirname "$0")" && pwd)"
-STATE="${HOLT_PROD_HOME:-$HOME/.local/share/holt-prod}"
+log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*"; }
+die() { log "ERROR: $*"; exit 1; }
+# shellcheck source=env.sh
+. "$here/env.sh"   # STATE, PROJECT, SECRETS, load_prod_env
 SRC="$STATE/src"
 REPO="${HOLT_REPO:-holt-oss/holt}"
-SECRETS="${HOLT_SECRETS_FILE:-$HOME/.config/holt/secrets.env}"
-# HOLT_PROD_PROJECT: only for a rehearsal on a dev port (README.md); the
-# builder, the label and the image names follow it, so the rehearsal and the
-# real stack never share anything.
-PROJECT="${HOLT_PROD_PROJECT:-holt-prod}"
 LABEL="holt.stack=$PROJECT"
 BUILDER="$PROJECT"
 MAX_LOAD="${HOLT_PROD_MAX_LOAD:-6}"
@@ -43,8 +41,6 @@ REBUILD="${REBUILD:-0}"
 WANT="${1:-origin/main}"
 
 mkdir -p "$STATE/logs" "$STATE/build"
-log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*"; }
-die() { log "ERROR: $*"; exit 1; }
 
 exec 9>"$STATE/lock"
 flock -n 9 || die "another deploy is in progress"
@@ -53,44 +49,13 @@ flock -n 9 || die "another deploy is in progress"
 [[ -f "$STATE/.env" ]] || "$here/make-env.sh"
 port="$(sed -n 's/^HOLT_PROD_PORT=//p' "$STATE/.env")"; port="${port:-8310}"
 
-# ~/.config/holt/secrets.env (optional, user-managed, KEY=value lines):
-#   GITHUB_OAUTH_ID / GITHUB_OAUTH_SECRET  -> AUTH_GITHUB_ID / AUTH_GITHUB_SECRET
-#   GOOGLE_OAUTH_ID / GOOGLE_OAUTH_SECRET  -> AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET
-#   OPENROUTER_API_KEY, GITHUB_TOKENS      -> the same names
-#   CONTACT_EMAIL / CONTACT_CITY           -> NEXT_PUBLIC_CONTACT_EMAIL / _CITY (required)
-# Exported here, so they win over .env for compose. An unset key stays empty
-# and the feature stays off (sign-in hidden, AI reports answer needs_key),
-# except the contact details: the policy pages must never show placeholders,
-# so a deploy without them stops here.
-if [[ -f "$SECRETS" ]]; then
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        line="${line%%#*}"; line="${line#"${line%%[![:space:]]*}"}"
-        [[ "$line" == *=* ]] || continue
-        key="${line%%=*}"; val="${line#*=}"
-        key="${key#export }"; key="${key%"${key##*[![:space:]]}"}"
-        val="${val#"${val%%[![:space:]]*}"}"; val="${val%"${val##*[![:space:]]}"}"
-        [[ "$val" == \"*\" || "$val" == \'*\' ]] && val="${val:1:${#val}-2}"
-        [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-        export "$key=$val"
-    done < "$SECRETS"
-    log "using secrets from $SECRETS"
-fi
-export AUTH_GITHUB_ID="${AUTH_GITHUB_ID:-${GITHUB_OAUTH_ID:-}}"
-export AUTH_GITHUB_SECRET="${AUTH_GITHUB_SECRET:-${GITHUB_OAUTH_SECRET:-}}"
-export AUTH_GOOGLE_ID="${AUTH_GOOGLE_ID:-${GOOGLE_OAUTH_ID:-}}"
-export AUTH_GOOGLE_SECRET="${AUTH_GOOGLE_SECRET:-${GOOGLE_OAUTH_SECRET:-}}"
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
-if [[ -z "${GITHUB_TOKENS:-}" ]]; then
-    GITHUB_TOKENS="$(gh auth token 2>/dev/null || true)"
-    [[ -n "$GITHUB_TOKENS" ]] && log "GITHUB_TOKENS: using gh auth token (no secrets file entry)"
-fi
-export GITHUB_TOKENS
-[[ -n "$GITHUB_TOKENS" ]] || die "no GitHub token: put GITHUB_TOKENS in $SECRETS or run gh auth login"
+# Secrets and the GitHub token (env.sh). The contact details are checked
+# here because only the web build needs them: the policy pages must never
+# show placeholders, so a deploy without them stops before building.
+load_prod_env
 [[ -n "$AUTH_GITHUB_ID" ]] && log "GitHub sign-in: on" || log "GitHub sign-in: off (no GITHUB_OAUTH_ID)"
 [[ -n "$AUTH_GOOGLE_ID" ]] && log "Google sign-in: on" || log "Google sign-in: off (no GOOGLE_OAUTH_ID)"
 [[ -n "$OPENROUTER_API_KEY" ]] && log "server AI key: on" || log "server AI key: off (AI reports need BYOK)"
-export NEXT_PUBLIC_CONTACT_EMAIL="${NEXT_PUBLIC_CONTACT_EMAIL:-${CONTACT_EMAIL:-}}"
-export NEXT_PUBLIC_CONTACT_CITY="${NEXT_PUBLIC_CONTACT_CITY:-${CONTACT_CITY:-}}"
 for k in CONTACT_EMAIL CONTACT_CITY; do
     v="NEXT_PUBLIC_$k"
     [[ -n "${!v}" && "${!v}" != "$k" ]] || die "$k is not set in $SECRETS; the policy pages (/terms, /privacy, /refunds, /contact) would show the placeholder"
@@ -188,6 +153,10 @@ if [[ "$REBUILD" == 1 ]] || ! have_images; then
         docker buildx create --name "$BUILDER" --driver docker-container \
             --driver-opt memory=3g --driver-opt "env.BUILDKIT_STEP_LOG_MAX_SIZE=10485760" >/dev/null
     fi
+    # The builder's container (buildx_buildkit_${BUILDER}0) idles at about
+    # 660 MB once started; stop it when this run ends, however it ends. The
+    # next build starts it again.
+    trap 'docker buildx stop "$BUILDER" >/dev/null 2>&1 || true' EXIT
     write_build_json building "building $short"
     for svc in server web; do   # one at a time: two builds at once is too much for this box
         log "building $svc image $PROJECT-$svc:$short"

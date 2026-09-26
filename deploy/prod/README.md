@@ -10,11 +10,12 @@ is the public route ([TUNNEL.md](TUNNEL.md)). It is built **only from
 | File | What |
 |---|---|
 | `compose.yml` | The stack. Images are tagged with the deployed commit (`holt-prod-web:<sha>`), everything is labelled `holt.stack=holt-prod`, memory limits web 512m / server 512m / db 256m / edge 32m. |
-| `deploy.sh` | One deploy: build main's images, migrate, swap, health-check, roll back on failure, prune only this stack's images. |
+| `deploy.sh` | One deploy: build main's images, migrate, swap, health-check, roll back on failure, prune only this stack's images, stop the builder container. |
+| `env.sh` | Sourced by `deploy.sh` and `warm.sh`: state paths, `secrets.env` and the GitHub token fallback (`load_prod_env`). |
 | `make-env.sh` | Writes `~/.local/share/holt-prod/.env` once: fresh `AUTH_SECRET`, `HOLT_INTERNAL_KEY`, `HOLT_SECRET_KEY`, db password. Nothing shared with staging. |
 | `install.sh` | One-time: the env file plus the nightly backup timer. No deploy timer, on purpose. |
 | `backup.sh` | `pg_dump` of both databases to `~/backups/holt/<stamp>/`, keeps 14 days. |
-| `warm.sh` | Runs `python -m holt_server.warm` detached in the server image (fills the caches). |
+| `warm.sh` | Runs `python -m holt_server.warm` detached in the server image (fills the caches), with the same secrets and token as a deploy. |
 | `edge.conf` | nginx: keeps the port across deploys, `/__build`, `www` → apex redirect, SSE-friendly proxy. |
 | `migrate-web.sh`, `initdb/` | Auth.js tables migration (one-shot `migrate-web` service) and the `holt_web` database. |
 | `TUNNEL.md` | Steps for the user to route githolt.com here. |
@@ -33,14 +34,14 @@ Fixed in `compose.yml`: `HOLT_ENV=production`, `NEXT_PUBLIC_SITE_HOST=githolt.co
 `HOLT_JOB_CONCURRENCY=1`, `HOLT_PROD_PORT=8310`.
 
 Keys the user owns come from **`~/.config/holt/secrets.env`** (`KEY=value`
-lines, `chmod 600`), read by `deploy.sh` on every run and mapped:
+lines, `chmod 600`), read by `deploy.sh` and `warm.sh` on every run (`env.sh`) and mapped:
 
 | In `secrets.env` | Becomes | When missing |
 |---|---|---|
 | `GITHUB_OAUTH_ID`, `GITHUB_OAUTH_SECRET` | `AUTH_GITHUB_ID/SECRET` | GitHub sign-in shows "isn't set up here" |
 | `GOOGLE_OAUTH_ID`, `GOOGLE_OAUTH_SECRET` | `AUTH_GOOGLE_ID/SECRET` | Google sign-in shows "isn't set up here" |
 | `OPENROUTER_API_KEY` | the same | AI reports answer `needs_key`; BYOK still works |
-| `GITHUB_TOKENS` | the same | falls back to `gh auth token` |
+| `GITHUB_TOKENS` | the same | falls back to `gh auth token`; with neither, the run stops (the server would have no API budget and a warm pass would end at "points left 0") |
 | `CONTACT_EMAIL`, `CONTACT_CITY` | `NEXT_PUBLIC_CONTACT_EMAIL/CITY` (build arg and env) | **the deploy stops**: the policy pages must not show placeholders |
 
 There is never a dev sign-in in production: it exists only with

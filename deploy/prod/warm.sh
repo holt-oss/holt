@@ -13,8 +13,8 @@
 # Run it after the first deploy (an empty cache) and after a long outage.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-STATE="${HOLT_PROD_HOME:-$HOME/.local/share/holt-prod}"
-PROJECT="${HOLT_PROD_PROJECT:-holt-prod}"
+# shellcheck source=env.sh
+. "$here/env.sh"   # STATE, PROJECT, load_prod_env
 NAME="$PROJECT-warm"
 sha="$(cat "$STATE/current" 2>/dev/null || true)"
 [[ -n "$sha" ]] || { echo "nothing deployed yet (no $STATE/current)"; exit 1; }
@@ -26,10 +26,16 @@ case "${1:-}" in
     --status)
         if docker ps -q --filter "name=^$NAME$" | grep -q .; then echo "running:"; else echo "not running; last run:"; fi
         docker logs --tail 15 "$NAME" 2>&1 || echo "(no warm container yet)"; exit 0 ;;
-    --dry-run)
-        exec docker compose -p "$PROJECT" -f "$here/compose.yml" --env-file "$STATE/.env" \
-            run --rm --no-deps server python -m holt_server.warm --dry-run ;;
 esac
+
+# The same secrets and GitHub token as deploy.sh: `compose run` takes
+# GITHUB_TOKENS from this shell, and without one the server has no API
+# budget and the pass ends at once ("points left 0").
+load_prod_env
+
+if [[ "${1:-}" == --dry-run ]]; then
+    compose run --rm --no-deps server python -m holt_server.warm --dry-run; exit $?
+fi
 
 if docker ps -q --filter "name=^$NAME$" | grep -q .; then
     echo "a warm pass is already running (warm.sh --logs)"; exit 0
