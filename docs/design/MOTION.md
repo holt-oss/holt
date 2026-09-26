@@ -16,7 +16,7 @@
   1. **Motion tokens** in CSS variables.
   2. **Native popovers + `@starting-style`** for every menu: zero JavaScript, and they close when you click outside.
   3. **React `<ViewTransition>`**, which our Next 16.3 supports with **no configuration**, for a subtle page crossfade, the free/AI tab crossfade and skeleton → content reveals.
-  4. **`loading.tsx` skeletons on every route**, with one shared `<Skeleton>`, a 100 ms appearance delay and a single-sweep shimmer.
+  4. **`loading.tsx` skeletons on every route**, with one shared `<Skeleton>`, a 300 ms appearance delay (§4.1) and a single-sweep shimmer.
   5. **No new JS library.** Motion (motion.dev) costs 8–47 KB gzipped; the CSS we need is under 1 KB.
 - **Performance:** the mobile budget holds. There's no GSAP on phones, and view transitions only run on navigation, never during the first load that Lighthouse measures. Hero text keeps the rule from #34: never start the LCP text at opacity 0 on phones.
 - **Reduced motion:** movement is removed and very short fades stay, as Linear and GitHub do.
@@ -107,7 +107,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
 ```
 
 ```css
-::view-transition-old(.page-out) { animation: var(--dur-exit) var(--ease-in) both vt-fade-out; }
+::view-transition-old(.page-out) { animation: var(--dur-slow) var(--ease-in) both vt-fade-out; }  /* 240 ms, see §4.1 rule 2 */
 ::view-transition-new(.page-in)  { animation: var(--dur-slow) var(--ease-out) both vt-rise-in; }
 @keyframes vt-fade-out { to { opacity: 0; } }
 @keyframes vt-rise-in  { from { opacity: 0; translate: 0 var(--shift); } }
@@ -189,8 +189,9 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
 
 ### 4.1 Rules
 1. **Match the final layout exactly.** Same grid, gaps and heights, with text lines using the real line-height. **The goal is CLS = 0.** Every skeleton gets a test (§8, step 12).
-2. **Don't flash on fast loads.** The skeleton renders at once but becomes visible only after **100 ms**, using `animation: sk-appear var(--dur-fast) var(--ease-out) 100ms both`, with `sk-appear` going from `opacity: 0`. No JS.
-3. **Once shown, keep it at least about 300 ms.** React already does this: the bundled React DOM has `FALLBACK_THROTTLE_MS = 300` (`react-dom-client.development.js`), which holds a Suspense reveal until 300 ms after the fallback was shown. `loading.tsx` is a Suspense fallback, so it inherits this. No extra code.
+2. **Don't flash on fast loads.** The skeleton renders at once but becomes visible only after **300 ms** (`--sk-delay`), using `animation: sk-appear var(--dur-fast) var(--ease-out) var(--sk-delay) both` on `.sk-region`, with `sk-appear` going from `opacity: 0`. No JS.
+   - *Shipped as 300 ms, not the 100 ms first planned (#48).* React holds a Suspense fallback for at least 300 ms once it has been committed (`FALLBACK_THROTTLE_MS`, rule 3), and `loading.tsx` is committed on every navigation, however fast the server answers. With a 100 ms delay the skeleton would therefore fade in on **every** navigation, hold for the rest of the 300 ms, and swap: a flash on each click. Matching the delay to the throttle means the skeleton is only ever seen when the page really took longer than 300 ms.
+   - *Consequence for the page exit (§3.1):* the old page's fade-out is **240 ms** (`--dur-slow`), not the 120 ms `--dur-exit` first planned. During a fast navigation the skeleton is invisible for its first 300 ms; a 120 ms exit would leave the page blank for most of that time. At 240 ms the old page is still fading when the new one starts to rise in.
 4. **Crossfade from skeleton to content** with the Next guide's Suspense-reveal pattern:
    - fallback: `<ViewTransition exit="sk-out" default="none">` (fade out, `--dur-exit`);
    - content: `<ViewTransition enter="sk-in" default="none">` (fade + 6 px, `--dur-base`, starting after the exit).
@@ -235,7 +236,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
 | `/me/history` `loading.tsx` | `history()` | 6 rows (repo, mode chip, verdict pill, date) | |
 | `/how-it-works`, `/signin` | session only | page head + body lines | nearly instant |
 | images: repo avatar (40 px), OG preview in the share row if shown | network | reserved box with `--panel-2` background (already sized 40×40); **no shimmer** (too small) | the OG image is server-generated and never shown in the app; nothing to add |
-| **browser extension chip** (`extension/src/chip.ts`, `state: "loading"`) | the public report API | a pill **the exact width of the final chip** ("holt · checking…" in the same font size), with the same shimmer as a single CSS rule in the content-script stylesheet, turned off under reduced motion; crossfade to the verdict chip in 150 ms by swapping a class | the chip sits inside GitHub's page, so keep the shimmer faint (4%) |
+| **browser extension chip** (`extension/src/chip.ts`, `state: "loading"`) | the public report API | a pill sized by its own text ("Holt · checking…" in the chip's font), with the label and stat drawn as flat blocks and the same 1.8 s shimmer as `.sk` in `content.css`; invisible for the first 300 ms like every skeleton; the blocks crossfade into the verdict text over `--dur-base` (a CSS transition on the same elements, so the title row never moves); static and instant under reduced motion | the chip sits inside GitHub's page, so the shimmer is faint (4%) and takes the chip's text colour. The chip cannot read Holt's tokens, so `content.css` carries copies and a test checks they match `globals.css` |
 
 ---
 
@@ -281,10 +282,10 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
 | press | 80 ms | 80 ms | ease-out |
 | menu | 180 ms, scale .97 + 4 px | 120 ms | ease-out / ease-in |
 | mobile sheet | 240 ms, 8 px + backdrop | 120 ms | ease-out / ease-in |
-| page | 240 ms, fade + 6 px | 120 ms, fade | ease-out / ease-in |
+| page | 240 ms, fade + 6 px | 240 ms, fade (§4.1 rule 2) | ease-out / ease-in |
 | tab content | 180 ms crossfade | 120 ms | ease-out |
 | tab pill | 200 ms slide | — | ease-move |
-| skeleton appears | after 100 ms, 120 ms fade | — | ease-out |
+| skeleton appears | after 300 ms, 120 ms fade | — | ease-out |
 | skeleton → content | 180 ms, fade + 6 px | 120 ms | ease-out / ease-in |
 | shimmer | 1.2 s sweep + 0.6 s rest | — | ease-move |
 | list stagger | 50 ms steps, max 6 | — | — |
@@ -336,7 +337,7 @@ After the mobile-fixes PR lands. One PR, or two: tokens, menus and skeletons fir
     - The menu opens and closes: popover state, Escape, click outside.
     - Under `reducedMotion: "reduce"`, no running animation has transform keyframes.
     - Add these to the staging smoke run.
-13. **`extension/src/chip.ts` and its stylesheet:** the fixed-width loading pill, the shimmer rule (reduced-motion aware) and a 150 ms class-swap crossfade.
+13. **`extension/src/chip.ts` and its stylesheet:** the skeleton loading pill, the shimmer rule (reduced-motion aware) and the crossfade to the verdict (§4.4, last row).
 14. **Re-measure:** `node e2e/lighthouse.mjs --runs 3 --calibrate`, which must stay ≥ 90 on `/`, `/pallets/flask` and `/find`, plus a phone and desktop `shot` of the menu open for the PR.
 
 ---

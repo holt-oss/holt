@@ -1,6 +1,7 @@
 // Drives the real page controller against fixtures/github-repo.html with canned
 // answers, so the chip can be screenshotted without GitHub or a Holt server.
-// Build: npm run fixture. Open fixtures/github-repo.html (?state=missing|not_viable|insufficient_evidence).
+// Build: npm run fixture. Open fixtures/github-repo.html (?state=missing|not_viable|insufficient_evidence,
+// or ?state=loading for the skeleton chip: the lookup never answers).
 import { createPageController, type LookupFn } from "../src/page";
 
 const state = new URLSearchParams(location.search).get("state") ?? "viable";
@@ -18,6 +19,7 @@ const lookup = ((kind) => {
       },
     });
   }
+  if (state === "loading") return new Promise(() => {});
   if (state === "missing") return Promise.resolve({ state: "missing" });
   return Promise.resolve({
     state: "found",
