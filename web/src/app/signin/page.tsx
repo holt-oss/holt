@@ -4,6 +4,7 @@ import { devSignInEnabled, oauthProviders, signIn } from "@/auth";
 import { CatFace } from "@/components/cat-face";
 import { safeCallback } from "@/lib/safe-url";
 import { currentUser } from "@/lib/session";
+import { PageTransition } from "@/components/motion/page-transition";
 
 export const metadata: Metadata = { title: "Sign in", robots: { index: false } };
 
@@ -30,59 +31,61 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
   const configured = new Set(oauthProviders.map((p) => p.id));
 
   return (
-    <div className="relative overflow-hidden">
-    <div aria-hidden="true" className="hero-backdrop" />
-    <div className="wrap relative grid min-h-[70dvh] place-items-center py-12">
-      <div className="w-full max-w-md border border-line-strong bg-panel p-6 shadow-card sm:p-8">
-        <CatFace mood="adoring" blink className="text-[2rem]" />
-        <h1 className="display mt-6 text-[2.2rem] sm:text-[2.6rem]">Sign in to Holt</h1>
-        <p className="prose-sans mt-3">
-          Free reports don&apos;t need an account. Sign in for AI reports, your history, and to use your own API key.
-        </p>
+    <PageTransition>
+      <div className="relative overflow-hidden">
+      <div aria-hidden="true" className="hero-backdrop" />
+      <div className="wrap relative grid min-h-[70dvh] place-items-center py-12">
+        <div className="w-full max-w-md border border-line-strong bg-panel p-6 shadow-card sm:p-8">
+          <CatFace mood="adoring" blink className="text-[2rem]" />
+          <h1 className="display mt-6 text-[2.2rem] sm:text-[2.6rem]">Sign in to Holt</h1>
+          <p className="prose-sans mt-3">
+            Free reports don&apos;t need an account. Sign in for AI reports, your history, and to use your own API key.
+          </p>
 
-        <div className="mt-8 space-y-3">
-          {[
-            { id: "github", name: "GitHub" },
-            { id: "google", name: "Google" },
-          ].map((p) =>
-            configured.has(p.id) ? (
-              <form
-                key={p.id}
-                action={async () => {
-                  "use server";
-                  await signIn(p.id, { redirectTo: callbackUrl });
-                }}
-              >
-                <button type="submit" className="flex min-h-13 w-full items-center justify-center gap-3 border border-line-strong bg-panel text-[0.92rem] font-semibold transition-colors hover:border-blue">
-                  {ICONS[p.id]} continue with {p.name}
-                </button>
-              </form>
-            ) : (
-              <div key={p.id} className="flex min-h-13 w-full items-center justify-center gap-3 border border-dashed border-line-strong text-[0.88rem] text-faint" aria-disabled="true">
-                {ICONS[p.id]} {p.name} sign-in isn&apos;t set up here
+          <div className="mt-8 space-y-3">
+            {[
+              { id: "github", name: "GitHub" },
+              { id: "google", name: "Google" },
+            ].map((p) =>
+              configured.has(p.id) ? (
+                <form
+                  key={p.id}
+                  action={async () => {
+                    "use server";
+                    await signIn(p.id, { redirectTo: callbackUrl });
+                  }}
+                >
+                  <button type="submit" className="flex min-h-13 w-full items-center justify-center gap-3 border border-line-strong bg-panel text-[0.92rem] font-semibold transition-colors hover:border-blue">
+                    {ICONS[p.id]} continue with {p.name}
+                  </button>
+                </form>
+              ) : (
+                <div key={p.id} className="flex min-h-13 w-full items-center justify-center gap-3 border border-dashed border-line-strong text-[0.88rem] text-faint" aria-disabled="true">
+                  {ICONS[p.id]} {p.name} sign-in isn&apos;t set up here
+                </div>
+              ),
+            )}
+          </div>
+
+          {devSignInEnabled && (
+            <form action="/api/dev-signin" method="post" className="mt-8 border border-amber/50 bg-amber/10 p-4">
+              <p className="text-[0.72rem] uppercase tracking-[0.08em] text-amber">development only</p>
+              <p className="mt-1 font-sans text-[0.88rem] text-muted">No OAuth app is configured, so you can sign in as a local test user.</p>
+              <input type="hidden" name="callbackUrl" value={callbackUrl} />
+              <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+                <label htmlFor="dev-name" className="sr-only">Test user name</label>
+                <input id="dev-name" name="name" defaultValue="Dev Student" className="h-11 min-w-0 border border-line-strong bg-bg px-3 text-[0.9rem] outline-none focus:border-blue" />
+                <button type="submit" className="btn-primary min-h-11 bg-amber">dev sign-in</button>
               </div>
-            ),
+            </form>
           )}
+
+          <p className="mt-8 font-sans text-[0.8rem] text-faint">
+            Holt only asks for your name, email and avatar. It never gets access to your repositories and never posts anything.
+          </p>
         </div>
-
-        {devSignInEnabled && (
-          <form action="/api/dev-signin" method="post" className="mt-8 border border-amber/50 bg-amber/10 p-4">
-            <p className="text-[0.72rem] uppercase tracking-[0.08em] text-amber">development only</p>
-            <p className="mt-1 font-sans text-[0.88rem] text-muted">No OAuth app is configured, so you can sign in as a local test user.</p>
-            <input type="hidden" name="callbackUrl" value={callbackUrl} />
-            <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
-              <label htmlFor="dev-name" className="sr-only">Test user name</label>
-              <input id="dev-name" name="name" defaultValue="Dev Student" className="h-11 min-w-0 border border-line-strong bg-bg px-3 text-[0.9rem] outline-none focus:border-blue" />
-              <button type="submit" className="btn-primary min-h-11 bg-amber">dev sign-in</button>
-            </div>
-          </form>
-        )}
-
-        <p className="mt-8 font-sans text-[0.8rem] text-faint">
-          Holt only asks for your name, email and avatar. It never gets access to your repositories and never posts anything.
-        </p>
       </div>
-    </div>
-    </div>
+      </div>
+    </PageTransition>
   );
 }

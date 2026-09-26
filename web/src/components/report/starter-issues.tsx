@@ -1,9 +1,10 @@
 import { nextStep, timeAgo } from "@/lib/format";
 import type { StarterIssue } from "@/lib/types";
+import { SkeletonCard, SkeletonRegion } from "../skeleton";
 
 export function StarterIssueCard({ issue, compact = false }: { issue: StarterIssue; compact?: boolean }) {
   return (
-    <li className="group relative border border-line bg-panel p-4 shadow-soft transition-colors hover:border-blue sm:p-5">
+    <li className="card-hover group relative border border-line bg-panel p-4 shadow-soft sm:p-5">
       <div className="flex flex-wrap items-center gap-2 text-[0.72rem] text-faint">
         <span className="text-blue">#{issue.number}</span>
         {issue.labels.slice(0, 3).map((l) => (
@@ -56,15 +57,7 @@ export function StarterIssues({ issues, repo }: { issues: IssuesState; repo: str
       </p>
     );
   }
-  if (issues === null) {
-    return (
-      <ul className="grid gap-3" aria-busy="true">
-        {[0, 1].map((i) => (
-          <li key={i} className="h-32 animate-pulse border border-line bg-panel" />
-        ))}
-      </ul>
-    );
-  }
+  if (issues === null) return <StarterIssuesSkeleton />;
   if (!issues.length) {
     return (
       <p className="font-sans text-muted">
@@ -81,5 +74,15 @@ export function StarterIssues({ issues, repo }: { issues: IssuesState; repo: str
         <StarterIssueCard key={i.number} issue={i} />
       ))}
     </ul>
+  );
+}
+
+/** Two cards in the real grid, while the issues stream in. */
+export function StarterIssuesSkeleton() {
+  return (
+    <SkeletonRegion as="ul" label="Loading starter issues…" className="grid gap-3 md:grid-cols-2">
+      <SkeletonCard />
+      <SkeletonCard className="hidden md:block" />
+    </SkeletonRegion>
   );
 }

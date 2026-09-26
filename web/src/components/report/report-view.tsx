@@ -13,9 +13,14 @@ import { StatsGrid } from "./stats-grid";
 import { TONE, VERDICT_MOOD } from "./tone";
 import { UpgradeCard } from "./upgrade-card";
 
-export function Section({ n, title, id, children, note }: { n: string; title: string; id: string; children: React.ReactNode; note?: React.ReactNode }) {
+/** Delay for a part of the report that fades in when an analysis finishes on the page. */
+const step = (reveal: boolean | undefined, ms: number) =>
+  reveal ? { className: "reveal", style: { ["--d0" as string]: `${ms}ms` } } : { className: "", style: undefined };
+
+export function Section({ n, title, id, children, note, reveal }: { n: string; title: string; id: string; children: React.ReactNode; note?: React.ReactNode; reveal?: number }) {
+  const r = step(reveal != null, reveal ?? 0);
   return (
-    <section aria-labelledby={id} className="border-t border-line pt-8">
+    <section aria-labelledby={id} className={`border-t border-line pt-8 ${r.className}`} style={r.style}>
       <div className="mb-5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span className="text-[0.72rem] text-blue">{n}</span>
         <h2 id={id} className="text-[1.25rem] font-semibold tracking-tight sm:text-[1.4rem]">{title}</h2>
@@ -26,7 +31,7 @@ export function Section({ n, title, id, children, note }: { n: string; title: st
   );
 }
 
-export function VerdictHero({ report }: { report: Report }) {
+export function VerdictHero({ report, reveal }: { report: Report; reveal?: boolean }) {
   const tone = VERDICT_TONE[report.verdict];
   const t = TONE[tone];
   return (
@@ -35,13 +40,16 @@ export function VerdictHero({ report }: { report: Report }) {
       <div className="p-5 pl-6 sm:p-8 sm:pl-10">
         <div className="flex items-center justify-between gap-4 text-[0.72rem] uppercase tracking-[0.08em] text-faint">
           <span>verdict · {report.mode === "ai" ? "AI report" : "rules report"} · {report.days}-day budget</span>
-          <CatFace mood={VERDICT_MOOD[report.verdict]} blink className="text-[1.1rem] normal-case tracking-normal sm:text-[1.5rem]" />
+          <span className={reveal ? "reveal" : ""}>
+            <CatFace mood={VERDICT_MOOD[report.verdict]} blink className="text-[1.1rem] normal-case tracking-normal sm:text-[1.5rem]" />
+          </span>
         </div>
-        <h1 className={`display mt-4 text-[2.6rem] sm:text-[4rem] ${t.text}`}>
+        {/* The largest paint: on phones it never animates, on desktop it only moves. */}
+        <h1 className={`display mt-4 text-[2.6rem] sm:text-[4rem] ${t.text} ${reveal ? "reveal-lcp" : ""}`}>
           {report.headline}
           <span className="text-ink">.</span>
         </h1>
-        <p className="mt-4 max-w-2xl font-sans text-[1.05rem] leading-relaxed text-ink sm:text-[1.15rem]">{verdictLine(report)}</p>
+        <p className={`mt-4 max-w-2xl font-sans text-[1.05rem] leading-relaxed text-ink sm:text-[1.15rem] ${reveal ? "reveal-lcp" : ""}`}>{verdictLine(report)}</p>
         {report.verdict !== "insufficient_evidence" && <OddsHint odds={odds(report.stats)} />}
         <p className="mt-4 text-[0.74rem] text-faint">
           Based on {report.stats.outsider_attempts} pull requests from outside contributors · data until {shortDate(report.evidence_until)} · checked{" "}
@@ -74,11 +82,14 @@ export function ReportView({
   report,
   issues,
   signedIn,
+  reveal,
 }: {
   report: Report;
   /** The starter-issues block: streamed by the server page, fetched by the runner. */
   issues: React.ReactNode;
   signedIn: boolean;
+  /** The report just arrived on this page: step its parts in. A server-rendered report doesn't wait. */
+  reveal?: boolean;
 }) {
   const repo = report.repo;
   const url = `${SITE_URL}/${repo}`;
@@ -88,7 +99,7 @@ export function ReportView({
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10">
       <div className="min-w-0 space-y-10">
-        <VerdictHero report={report} />
+        <VerdictHero report={report} reveal={reveal} />
 
         {report.summary && (
           <div className="border-l-2 border-blue pl-5">
@@ -111,19 +122,19 @@ export function ReportView({
           </div>
         )}
 
-        <Section n="01" id="issues" title={viable ? "Your first contribution" : "Starter issues"} note="open and unclaimed, best first">
+        <Section n="01" id="issues" title={viable ? "Your first contribution" : "Starter issues"} note="open and unclaimed, best first" reveal={reveal ? 180 : undefined}>
           {issues}
         </Section>
 
         <Section n="02" id="numbers" title="What happened to outside contributors">
-          <StatsGrid stats={report.stats} />
+          <StatsGrid stats={report.stats} reveal={reveal} />
         </Section>
 
-        <Section n="03" id="landing" title="Where newcomer work lands">
+        <Section n="03" id="landing" title="Where newcomer work lands" reveal={reveal ? 230 : undefined}>
           <LandingMap landing={report.landing} neverLanded={report.never_landed} />
         </Section>
 
-        <Section n="04" id="why" title="Why this verdict">
+        <Section n="04" id="why" title="Why this verdict" reveal={reveal ? 255 : undefined}>
           <ul className="space-y-2 font-sans text-[0.98rem]">
             {report.decided_by.map((d) => (
               <li key={d} className="flex gap-3">
@@ -147,7 +158,7 @@ export function ReportView({
           )}
         </Section>
 
-        <Section n="05" id="evidence" title="The evidence" note="every claim links to GitHub">
+        <Section n="05" id="evidence" title="The evidence" note="every claim links to GitHub" reveal={reveal ? 280 : undefined}>
           <EvidenceList evidence={report.evidence} />
         </Section>
 

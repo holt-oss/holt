@@ -36,6 +36,31 @@
   --hf-bg: #ece3fb;
   --hf-line: #c9b5f2;
   color-scheme: light;
+
+  /* Motion (docs/design/MOTION.md). Short, decelerating, tiny distances;
+     exits about two thirds of entrances. */
+  --dur-press: 80ms; /* :active scale */
+  --dur-fast: 120ms; /* hover, colour, small exits */
+  --dur-base: 180ms; /* menus open, tabs, skeleton → content */
+  --dur-slow: 240ms; /* page enter, report sections, mobile sheet */
+  --dur-exit: 120ms;
+  --stagger: 50ms; /* list and report reveal step; stops after 6 items */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1); /* everything that enters */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1); /* exits */
+  --ease-move: cubic-bezier(0.4, 0, 0.2, 1); /* things that move and stay */
+  --ease-expressive: cubic-bezier(0.16, 1, 0.3, 1); /* landing hero only */
+  --shift: 6px; /* enter translate */
+  --pop-scale: 0.97; /* menu enter scale */
+  --sk-delay: 300ms; /* skeletons stay invisible this long (see .sk-region) */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --shift: 0px;
+    --pop-scale: 1;
+    --stagger: 0ms;
+    --dur-slow: var(--dur-fast);
+  }
 }
 
 :root[data-theme="dark"] {
@@ -124,6 +149,9 @@
   --color-hf: var(--hf);
   --color-hf-bg: var(--hf-bg);
   --color-hf-line: var(--hf-line);
+  /* Every Tailwind `transition-*` utility uses the motion tokens. */
+  --default-transition-duration: var(--dur-fast);
+  --default-transition-timing-function: var(--ease-out);
 }
 
 @layer base {
@@ -227,11 +255,15 @@
   .text-link {
     color: var(--green);
     border-bottom: 1px solid color-mix(in oklab, var(--green) 40%, transparent);
-    transition: border-color 160ms ease;
+    transition: border-color var(--dur-fast) var(--ease-out);
   }
-  .text-link:hover,
   .text-link:focus-visible {
     border-color: currentColor;
+  }
+  @media (hover: hover) {
+    .text-link:hover {
+      border-color: currentColor;
+    }
   }
 
   /* "[ start contributing → ]" */
@@ -245,12 +277,31 @@
     border: 1px solid var(--green);
     color: var(--green);
     font-size: 0.82rem;
-    transition: color 160ms ease, background-color 160ms ease;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out),
+      scale var(--dur-press) var(--ease-out);
   }
-  .bracket-link:hover,
+  .bracket-link:active {
+    scale: 0.98;
+  }
   .bracket-link:focus-visible {
     color: var(--on-accent);
     background: var(--green);
+  }
+  @media (hover: hover) {
+    .bracket-link:hover {
+      color: var(--on-accent);
+      background: var(--green);
+    }
+    .bracket-link--orange:hover {
+      color: var(--on-accent);
+      background: var(--orange);
+    }
+    .bracket-link--hf:hover {
+      color: var(--bg);
+      background: var(--hf);
+    }
   }
 
   /* Orange outline: fills on hover with dark-on-orange text. */
@@ -258,7 +309,6 @@
     border-color: var(--orange);
     color: var(--orange);
   }
-  .bracket-link--orange:hover,
   .bracket-link--orange:focus-visible {
     color: var(--on-accent);
     background: var(--orange);
@@ -268,7 +318,6 @@
     border-color: var(--hf);
     color: var(--hf);
   }
-  .bracket-link--hf:hover,
   .bracket-link--hf:focus-visible {
     color: var(--bg);
     background: var(--hf);
@@ -325,13 +374,18 @@
     color: var(--on-accent);
     font-weight: 600;
     font-size: 0.9rem;
-    transition: filter 160ms ease, transform 160ms ease;
+    transition:
+      filter var(--dur-fast) var(--ease-out),
+      scale var(--dur-press) var(--ease-out);
   }
-  .btn-primary:hover {
-    filter: brightness(1.08);
+  @media (hover: hover) {
+    .btn-primary:hover {
+      filter: brightness(1.08);
+    }
   }
-  .btn-primary:active {
-    transform: translateY(1px);
+  .btn-primary:active:not(:disabled),
+  .btn-ghost:active {
+    scale: 0.98;
   }
   .btn-primary:disabled {
     opacity: 0.6;
@@ -348,11 +402,18 @@
     color: var(--ink);
     font-size: 0.82rem;
     background: var(--panel);
-    transition: border-color 160ms ease, background-color 160ms ease;
+    transition:
+      border-color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out),
+      scale var(--dur-press) var(--ease-out);
   }
-  .btn-ghost:hover,
   .btn-ghost:focus-visible {
     border-color: var(--blue);
+  }
+  @media (hover: hover) {
+    .btn-ghost:hover {
+      border-color: var(--blue);
+    }
   }
 
   .panel {
@@ -473,7 +534,7 @@
     color: var(--on-accent);
     background: var(--blue);
     transform: translateY(-160%);
-    transition: transform 180ms ease;
+    transition: transform var(--dur-base) var(--ease-out);
   }
   .skip-link:focus {
     transform: translateY(0);
@@ -539,14 +600,354 @@
   }
 }
 
+/* ------------------------------------------------------------------------
+ * Motion (docs/design/MOTION.md). Everything here is progressive: without
+ * view transitions, @starting-style or allow-discrete, things just swap.
+ * ---------------------------------------------------------------------- */
+
+/* Page changes: the new page rises in while the old one fades on an
+   accelerating curve. The old page's fade is --dur-slow rather than
+   --dur-exit because React keeps a loading skeleton up for at least 300ms
+   (and skeletons stay invisible that long): a 120ms exit would leave the
+   page blank for most of a fast navigation. */
+::view-transition {
+  pointer-events: none; /* clicks during the transition aren't lost */
+}
+::view-transition-old(.page-out) {
+  animation: var(--dur-slow) var(--ease-in) both vt-fade-out;
+}
+::view-transition-old(.sk-out),
+::view-transition-old(.swap) {
+  animation: var(--dur-exit) var(--ease-in) both vt-fade-out;
+}
+::view-transition-new(.page-in) {
+  animation: var(--dur-slow) var(--ease-out) both vt-rise-in;
+}
+/* Skeleton → content: the skeleton leaves first, then the content arrives. */
+::view-transition-new(.sk-in) {
+  animation: var(--dur-base) var(--ease-out) var(--dur-exit) both vt-rise-in;
+}
+/* Same place, different content (report tabs, search progress → results). */
+::view-transition-group(.swap) {
+  animation-duration: var(--dur-base);
+  animation-timing-function: var(--ease-out);
+}
+::view-transition-new(.swap) {
+  animation: var(--dur-base) var(--ease-out) both vt-fade-in;
+}
+/* The header stays put while the content under it changes. */
+::view-transition-group(site-header) {
+  z-index: 100;
+  animation: none;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-rise-in {
+  from {
+    opacity: 0;
+    translate: 0 var(--shift);
+  }
+}
+
+@layer components {
+  /* Menus: native popovers (top layer, click-outside and Escape for free),
+     animated in and out with @starting-style and discrete transitions. */
+  .menu[popover],
+  .sheet[popover] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 4px;
+    overflow: auto;
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+    background: var(--panel);
+    box-shadow: var(--shadow);
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition:
+      opacity var(--dur-exit) var(--ease-in),
+      transform var(--dur-exit) var(--ease-in),
+      overlay var(--dur-exit) var(--ease-in) allow-discrete,
+      display var(--dur-exit) var(--ease-in) allow-discrete;
+  }
+  .menu[popover] {
+    top: 64px;
+    right: max(16px, calc((100vw - 1120px) / 2));
+    transform-origin: top right;
+  }
+  .menu[popover]:not(:popover-open) {
+    opacity: 0;
+    transform: translateY(calc(var(--shift) * -2 / 3)) scale(var(--pop-scale));
+  }
+  .menu[popover]:popover-open {
+    transition-duration: var(--dur-base);
+    transition-timing-function: var(--ease-out);
+  }
+  @starting-style {
+    .menu[popover]:popover-open {
+      opacity: 0;
+      transform: translateY(calc(var(--shift) * -2 / 3)) scale(var(--pop-scale));
+    }
+  }
+
+  /* The phone menu: a full-width sheet under the header. */
+  .sheet[popover] {
+    top: 64px;
+    left: 0;
+    width: 100%;
+    max-height: calc(100dvh - 64px);
+    border-inline: 0;
+    transform-origin: top center;
+  }
+  .sheet[popover]:not(:popover-open) {
+    opacity: 0;
+    transform: translateY(calc(var(--shift) * -4 / 3));
+  }
+  .sheet[popover]:popover-open {
+    transition-duration: var(--dur-slow);
+    transition-timing-function: var(--ease-out);
+  }
+  @starting-style {
+    .sheet[popover]:popover-open {
+      opacity: 0;
+      transform: translateY(calc(var(--shift) * -4 / 3));
+    }
+  }
+  .sheet[popover]::backdrop {
+    background: rgb(0 0 0 / 0);
+    transition:
+      background-color var(--dur-exit) var(--ease-in),
+      overlay var(--dur-exit) allow-discrete,
+      display var(--dur-exit) allow-discrete;
+  }
+  .sheet[popover]:popover-open::backdrop {
+    background: rgb(0 0 0 / 0.2);
+    transition-duration: var(--dur-slow);
+    transition-timing-function: var(--ease-out);
+  }
+  @starting-style {
+    .sheet[popover]:popover-open::backdrop {
+      background: rgb(0 0 0 / 0);
+    }
+  }
+  /* Tie the menus to their buttons where anchor positioning exists. */
+  @supports (anchor-name: --a) {
+    .site-header {
+      anchor-name: --site-header;
+    }
+    #account-button {
+      anchor-name: --account;
+    }
+    .menu[popover] {
+      position-anchor: --account;
+      top: calc(anchor(bottom) + 4px);
+      right: anchor(right);
+    }
+    .sheet[popover] {
+      position-anchor: --site-header;
+      top: anchor(bottom);
+      max-height: calc(100dvh - anchor-size(height));
+    }
+  }
+  .menu-chevron {
+    transition: rotate var(--dur-fast) var(--ease-out);
+  }
+  .site-header:has(#account-menu:popover-open) .menu-chevron {
+    rotate: 180deg;
+  }
+  .site-header .icon-close,
+  .site-header:has(#mobile-nav:popover-open) .icon-open {
+    display: none;
+  }
+  .site-header:has(#mobile-nav:popover-open) .icon-close {
+    display: block;
+  }
+
+  /* Skeletons: one flat block colour and a single slow sweep. */
+  .sk {
+    position: relative;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--panel-2);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .sk::after {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--ink) 6%, transparent), transparent);
+      translate: -100% 0;
+      animation: sk-sweep 1.8s var(--ease-move) infinite; /* a 1.2s sweep, then a 0.6s rest */
+      content: "";
+    }
+  }
+  /* Rendered at once, faded in only after --sk-delay, so fast loads never
+     show it. Once React has shown a fallback it holds it for 300ms
+     (FALLBACK_THROTTLE_MS), so a shorter delay would flash the skeleton on
+     every navigation, however fast the server answered. */
+  .sk-region {
+    animation: sk-appear var(--dur-fast) var(--ease-out) var(--sk-delay) both;
+  }
+  /* No footer under a page skeleton: it would jump (layout shift) when the
+     real page, a different height, replaces the skeleton. */
+  body:has(main [data-route-loading]) > footer {
+    display: none;
+  }
+  /* The report shape under a running analysis: dimmed and still. */
+  .sk-still {
+    opacity: 0.4;
+  }
+  .sk-still .sk::after {
+    display: none;
+  }
+
+  /* Things that arrive on the client (a finished analysis, search results):
+     fade and rise, stepped by --i, never waiting past the 6th item. */
+  .reveal {
+    animation: reveal var(--dur-slow) var(--ease-out) both;
+    animation-delay: calc(var(--d0, 0ms) + min(var(--i, 0), 6) * var(--stagger));
+  }
+  /* The verdict headline is the largest paint: never start it at opacity 0.
+     Desktop gets a small rise; phones get nothing. */
+  @media (min-width: 1024px) {
+    .reveal-lcp {
+      animation: reveal-move var(--dur-slow) var(--ease-out) both;
+    }
+  }
+
+  /* Pending hint under a clicked link that doesn't prefetch (report tabs). */
+  .link-hint {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: currentColor;
+    opacity: 0;
+    transform: scaleX(0);
+    transform-origin: left center;
+    pointer-events: none;
+  }
+  .link-hint.is-pending {
+    animation: link-hint 900ms var(--ease-move) 100ms infinite;
+  }
+
+  /* Cards: a blue border and a slightly deeper shadow on hover. */
+  .card-hover {
+    transition:
+      border-color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .card-hover:hover {
+      border-color: var(--blue);
+      box-shadow: var(--card-shadow), 0 1px 0 0 var(--blue);
+    }
+  }
+
+  /* The report tab pill slides between the two tabs. */
+  .tab-pill {
+    transition:
+      translate 200ms var(--ease-move),
+      background-color 200ms var(--ease-move);
+  }
+}
+
+@keyframes sk-sweep {
+  66%,
+  100% {
+    translate: 100% 0;
+  }
+}
+@keyframes sk-appear {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes reveal {
+  from {
+    opacity: 0;
+    translate: 0 var(--shift);
+  }
+}
+@keyframes reveal-move {
+  from {
+    translate: 0 var(--shift);
+  }
+}
+@keyframes link-hint {
+  0% {
+    opacity: 1;
+    transform: scaleX(0);
+  }
+  60% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: movement goes, short fades and colour changes stay. */
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+  }
+  ::view-transition-new(*),
+  ::view-transition-old(*) {
+    animation-duration: var(--dur-fast) !important;
+    translate: none !important;
+  }
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .headline-line > span,
+  .meter > span,
+  .cat-face .cat-eye,
+  .scan::after {
+    animation: none !important;
+  }
+  .fade-up {
+    animation-name: fade-in;
+  }
+  .menu-chevron,
+  .tab-pill,
+  .link-hint {
+    transition: none;
+  }
+  .link-hint.is-pending {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 1023px) {
+  .fade-up {
+    animation: none;
   }
 }
 

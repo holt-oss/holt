@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState, ViewTransition } from "react";
 import type { ApiError, FindResult } from "@/lib/types";
 import { AnalysisProgress } from "../analysis-progress";
 import { ErrorPanel } from "../error-panel";
@@ -18,7 +18,8 @@ export function FindRunner({ jobId, days, retryHref = "/find" }: { jobId: string
     src.addEventListener("done", (e) => {
       src.close();
       const d = JSON.parse((e as MessageEvent).data);
-      setResults(d.results ?? d.report?.results ?? []);
+      // A transition, so the progress panel crossfades into the list.
+      startTransition(() => setResults(d.results ?? d.report?.results ?? []));
     });
     src.addEventListener("error", (e) => {
       src.close();
@@ -29,6 +30,19 @@ export function FindRunner({ jobId, days, retryHref = "/find" }: { jobId: string
   }, [jobId]);
 
   if (error) return <ErrorPanel error={error} retryHref={retryHref} />;
-  if (results) return <FindResults results={results} days={days} />;
-  return <AnalysisProgress repo="" kicker="searching · welcoming projects" note="Holt is checking which projects reply to newcomers and have issues you could take. This can take a minute." mode="rules" stage={stage.stage} progress={stage.progress} />;
+  if (results)
+    return (
+      <ViewTransition enter="sk-in" default="none">
+        <div>
+          <FindResults results={results} days={days} />
+        </div>
+      </ViewTransition>
+    );
+  return (
+    <ViewTransition exit="sk-out" default="none">
+      <div>
+        <AnalysisProgress repo="" kicker="searching · welcoming projects" note="Holt is checking which projects reply to newcomers and have issues you could take. This can take a minute." mode="rules" stage={stage.stage} progress={stage.progress} />
+      </div>
+    </ViewTransition>
+  );
 }

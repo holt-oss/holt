@@ -61,10 +61,6 @@ export async function LiveSample() {
   return <SampleFigure sample={await load()} />;
 }
 
-export function ExampleSample() {
-  return <SampleFigure sample={EXAMPLE} />;
-}
-
 function SampleFigure({ sample }: { sample: Sample }) {
   const t = TONE[VERDICT_TONE[sample.verdict]];
   const max = Math.max(1, ...sample.lands.map(([, , a]) => a));
