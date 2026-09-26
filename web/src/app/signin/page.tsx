@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { devSignInEnabled, oauthProviders, signIn } from "@/auth";
 import { CatFace } from "@/components/cat-face";
@@ -66,6 +67,11 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
               ),
             )}
           </div>
+
+          <p className="mt-4 font-sans text-[0.8rem] leading-relaxed text-muted">
+            By signing in you agree to the <Link href="/terms" className="text-link">Terms</Link> and{" "}
+            <Link href="/privacy#google" className="text-link">Privacy Policy</Link>.
+          </p>
 
           {devSignInEnabled && (
             <form action="/api/dev-signin" method="post" className="mt-8 border border-amber/50 bg-amber/10 p-4">

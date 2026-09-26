@@ -52,3 +52,31 @@ test("/pricing links the refund policy", async () => {
   assert.equal(status, 200);
   assert.match(html, /href="\/refunds"/);
 });
+
+// Google's OAuth verification crawls /privacy for a contact address, and
+// Cloudflare's Email Address Obfuscation would otherwise replace it with
+// "[email protected]". The address must sit inside <!--email_off--> ... <!--email_on-->.
+test("/privacy shows the contact address where Cloudflare leaves it alone", async () => {
+  const { html } = await page("/privacy");
+  const email = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
+  if (!email) {
+    assert.match(html, /CONTACT_EMAIL/, "without the env the placeholder is visible, not blank");
+    return;
+  }
+  const fragment = `<!--email_off--><a href="mailto:${email}" class="text-link">${email}</a><!--email_on-->`;
+  assert.ok(html.includes(fragment), `the page contains ${fragment}`);
+});
+
+test("/privacy has the Google sign-in section and how it is protected", async () => {
+  const { html } = await page("/privacy");
+  assert.match(html, /<h2[^>]*id="google"/);
+  assert.match(html, /<h3[^>]*id="protection"/);
+});
+
+test("/signin links the terms and the privacy policy under the buttons", async () => {
+  const { status, html } = await page("/signin");
+  assert.equal(status, 200);
+  assert.match(html, /By signing in you agree to the/);
+  assert.match(html, /href="\/terms"/);
+  assert.match(html, /href="\/privacy#google"/);
+});
