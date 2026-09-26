@@ -103,6 +103,17 @@ export default function PrivacyPage() {
         record of your Google account ID and the sign-in token Google returned. They are kept <strong>until you delete your account</strong> (see below) and are not
         copied anywhere else. Holt doesn&rsquo;t use the token to fetch anything further from Google.
       </p>
+      <h3 id="protection">How we protect it</h3>
+      <p>These are the actual measures in place today, not aspirations. We don&rsquo;t hold any security certification and don&rsquo;t claim one.</p>
+      <ul>
+        <li><strong>Encrypted in transit.</strong> githolt.com is served only over HTTPS through Cloudflare, and the connection from Cloudflare to our server is an encrypted Cloudflare tunnel. Your details are encrypted the whole way from your browser to our server.</li>
+        <li><strong>The database isn&rsquo;t reachable from the internet.</strong> It runs in a container on a private network on the server, with no public port. Only the app can talk to it, and the app itself is reachable only through the tunnel.</li>
+        <li><strong>Access is limited to one person.</strong> The person running Holt is the only one with access to the server, the database and the backups. There is no team, and no third party has an account on the server.</li>
+        <li><strong>Secrets are kept out of the code.</strong> Sign-in credentials, database passwords and encryption keys live in files on the server that are outside the source code and readable only by the operator. Holt&rsquo;s code is open source, and no secret is in it.</li>
+        <li><strong>Your own AI key is encrypted</strong> with AES-256-GCM before it&rsquo;s stored, under a key that exists only on the server (see section 2).</li>
+        <li><strong>Backups are nightly and restricted.</strong> A copy of the database is taken every night, stored on the server with permissions that allow only the operator to read it, and deleted after 14 days. So after you delete your account, your details can remain in a backup for up to 14 days and are then gone.</li>
+        <li><strong>What we don&rsquo;t claim:</strong> the database files themselves are not separately encrypted at rest beyond the protections above, and we don&rsquo;t promise that no system can ever fail. If you find a weakness, section 11 says how to tell us.</li>
+      </ul>
       <h3>How to take it back</h3>
       <ul>
         <li>
@@ -191,7 +202,9 @@ export default function PrivacyPage() {
 
       <h2>11. Security</h2>
       <p>
-        Everything travels over HTTPS. Stored AI keys are encrypted. Access to the server and database is limited to the person running Holt.
+        Everything travels over HTTPS. The database has no public port and is reached only through the app. Stored AI keys are encrypted.
+        Access to the server, database and backups is limited to the person running Holt. The full list of measures is under{" "}
+        <a href="#protection" className="text-link">how we protect it</a> in section 3; it applies to everything we store, not only Google data.
         No system is perfect, so if you find a weakness, please email us before posting it publicly and we&rsquo;ll fix it fast.
       </p>
 

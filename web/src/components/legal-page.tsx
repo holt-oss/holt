@@ -43,8 +43,21 @@ export function LegalPage({
   );
 }
 
-/** The contact address as a mailto link. Renders the placeholder verbatim until the env is set. */
+const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * The contact address as a mailto link. Renders the placeholder verbatim until
+ * the env is set.
+ *
+ * Cloudflare's Email Address Obfuscation rewrites every address in the HTML
+ * to "[email protected]" plus a JS decoder, so crawlers (Google's OAuth
+ * verification included) would see no contact address on the policy pages.
+ * Cloudflare skips whatever sits between <!--email_off--> and <!--email_on-->,
+ * and JSX can't emit HTML comments, so this one static fragment is written
+ * as raw HTML. The address comes from the build env, not from a user.
+ */
 export function ContactEmail() {
-  const placeholder = CONTACT_EMAIL === "CONTACT_EMAIL";
-  return placeholder ? <span className="text-ink">{CONTACT_EMAIL}</span> : <a href={`mailto:${CONTACT_EMAIL}`} className="text-link">{CONTACT_EMAIL}</a>;
+  if (CONTACT_EMAIL === "CONTACT_EMAIL") return <span className="text-ink">{CONTACT_EMAIL}</span>;
+  const addr = escapeHtml(CONTACT_EMAIL);
+  return <span dangerouslySetInnerHTML={{ __html: `<!--email_off--><a href="mailto:${addr}" class="text-link">${addr}</a><!--email_on-->` }} />;
 }
