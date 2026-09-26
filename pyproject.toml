@@ -39,7 +39,7 @@ dependencies = [
 holt = "holt.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/holt-oss/holt"
+Homepage = "https://githolt.com"
 Documentation = "https://github.com/holt-oss/holt/tree/main/docs"
 Repository = "https://github.com/holt-oss/holt.git"
 Issues = "https://github.com/holt-oss/holt/issues"

@@ -49,7 +49,7 @@ describe("ensureChip", () => {
     document.body.innerHTML = repoHeader();
     const chip = ensureChip(document, flask, { state: "found", data: report() })!;
     expect(chip.parentElement!.id).toBe("repo-title-component");
-    expect(chip.href).toBe("https://holt.aahil-khan.xyz/pallets/flask");
+    expect(chip.href).toBe("https://githolt.com/pallets/flask");
     expect(chip.target).toBe("_blank");
     expect(chip.rel).toContain("noopener");
     expect(chip.textContent).toBe("Holt: Worth your time15 of 100 newcomer PRs merged");

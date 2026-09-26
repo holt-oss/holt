@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     siteName: "Holt",
     type: "website",
     title: "Holt — find an open-source project that will actually merge your first PR",
-    description: "See how a project treats outside contributors before you spend your week on it.",
+    description: "See how a project treats outside contributors before you spend your week on it. Swap hub for holt in any GitHub link.",
   },
   twitter: { card: "summary_large_image" },
   // Staging and previews: keep search engines out (robots.txt disallows too).

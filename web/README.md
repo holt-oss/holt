@@ -28,7 +28,7 @@ npm run dev -- -p $PORT
   with neither set, `/signin` offers a dev-only sign-in that creates a real
   database session.
 - **Site host**: `NEXT_PUBLIC_SITE_HOST` is the domain used in the
-  "replace github.com with …" trick, badges, share links and OG images.
+  "swap hub for holt" URL trick (github.com → githolt.com), badges, share links and OG images.
 
 ## Routes
 

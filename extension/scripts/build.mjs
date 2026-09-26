@@ -1,4 +1,4 @@
-// Builds dist/chrome and dist/firefox. HOLT_HOST (default holt.aahil-khan.xyz)
+// Builds dist/chrome and dist/firefox. HOLT_HOST (default githolt.com)
 // sets where reports come from, e.g. HOLT_HOST=localhost:20080 npm run build.
 import { build } from "esbuild";
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const host = process.env.HOLT_HOST || "holt.aahil-khan.xyz";
+const host = process.env.HOLT_HOST || "githolt.com";
 if (!/^[a-z0-9.-]+(:\d{1,5})?$/i.test(host)) {
   console.error(`HOLT_HOST must be a bare host name like holt.example.com, got "${host}"`);
   process.exit(1);
@@ -37,7 +37,7 @@ function manifest(browser) {
     m.background = { scripts: ["background.js"] };
     m.browser_specific_settings = {
       gecko: {
-        id: "holt@aahil-khan.xyz",
+        id: "holt@githolt.com",
         strict_min_version: "121.0",
         // The owner/repo of GitHub pages you visit is sent to the Holt host.
         data_collection_permissions: { required: ["browsingActivity"] },

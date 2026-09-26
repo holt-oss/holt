@@ -34,7 +34,7 @@ describe("isIssueListPath", () => {
 
 describe("urls", () => {
   it("points at the configured host", () => {
-    expect(reportPageUrl("pallets", "flask")).toBe("https://holt.aahil-khan.xyz/pallets/flask");
+    expect(reportPageUrl("pallets", "flask")).toBe("https://githolt.com/pallets/flask");
     expect(publicApiUrl("report", "pallets", "flask", "example.test")).toBe(
       "https://example.test/api/public/report/pallets/flask",
     );

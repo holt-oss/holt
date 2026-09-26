@@ -2,7 +2,7 @@
 declare const __HOLT_HOST__: string;
 
 export const HOLT_HOST: string =
-  typeof __HOLT_HOST__ === "string" ? __HOLT_HOST__ : "holt.aahil-khan.xyz";
+  typeof __HOLT_HOST__ === "string" ? __HOLT_HOST__ : "githolt.com";
 
 const seg = (s: string) => encodeURIComponent(s);
 

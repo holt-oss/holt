@@ -25,7 +25,7 @@ export default async function Image() {
             <span style={{ color: "#ee925d" }}>your first PR.</span>
           </div>
           <div style={{ display: "flex", marginTop: "auto", justifyContent: "space-between", fontSize: 26, color: "#a3a39b" }}>
-            <span>Paste any GitHub repo. Get a verdict with evidence.</span>
+            <span>Paste a repo, or swap hub for holt in any GitHub link.</span>
             <span style={{ color: "#69c7a6" }}>{SITE_HOST}</span>
           </div>
         </div>

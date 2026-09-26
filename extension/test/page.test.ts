@@ -38,7 +38,7 @@ describe("page controller", () => {
     const chips = document.querySelectorAll<HTMLAnchorElement>(".holt-chip");
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toBe("Check with Holt");
-    expect(chips[0].href).toBe("https://holt.aahil-khan.xyz/NixOS/nixpkgs");
+    expect(chips[0].href).toBe("https://githolt.com/NixOS/nixpkgs");
 
     await page.sync("/settings/profile");
     expect(document.querySelector(".holt-chip")).toBeNull();

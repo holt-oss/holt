@@ -9,7 +9,7 @@ import { UrlTrick } from "@/components/url-trick";
 import { LiveSample } from "@/components/sample-report";
 import { SampleReportSkeleton } from "@/components/sample-report-skeleton";
 import { SkeletonReveal } from "@/components/motion/reveal";
-import { GITHUB_REPO_URL, hacktoberfest } from "@/lib/site";
+import { GITHUB_REPO_URL, SITE_HOST, hacktoberfest } from "@/lib/site";
 import { PageTransition } from "@/components/motion/page-transition";
 
 function Rail({ n, label, className = "" }: { n: string; label: string; className?: string }) {
@@ -53,6 +53,10 @@ export default function Home() {
               <div className="fade-up max-w-[760px]" style={{ ["--d" as string]: ".38s" }}>
                 <PasteBox />
               </div>
+              <p className="fade-up mt-3 font-sans text-[0.85rem] text-faint" style={{ ["--d" as string]: ".42s" }}>
+                Already on GitHub? Swap <strong className="text-muted">hub</strong> for <strong className="text-muted">holt</strong>:{" "}
+                <code className="font-mono">github.com</code> → <code className="font-mono text-muted">{SITE_HOST}</code>
+              </p>
               <div className="fade-up mt-5 flex flex-wrap items-center gap-x-5 gap-y-3" style={{ ["--d" as string]: ".45s" }}>
                 <span className="font-sans text-[0.95rem] text-muted">No repo in mind yet?</span>
                 <Link href="/find" className="bracket-link bracket-link--orange min-h-12 px-5 text-[0.9rem]">
@@ -93,10 +97,11 @@ export default function Home() {
           <Grid>
             <Rail n="03" label="the url trick" />
             <div>
-              <h2 className="h2 mb-6 max-w-[770px]" data-reveal>Already on GitHub? Change one word.</h2>
+              <h2 className="h2 mb-6 max-w-[770px]" data-reveal>Already on GitHub? Swap hub for holt.</h2>
               <p className="prose-sans mb-10 max-w-[740px] text-[1.05rem]" data-reveal>
-                In any repository URL, replace <code className="font-mono text-ink">github.com</code> with our address and
-                press enter. You&apos;ll land on that repo&apos;s Holt report. Works on phones too.
+                In any repository URL, change <code className="font-mono text-ink">github.com</code> to{" "}
+                <code className="font-mono text-ink">{SITE_HOST}</code> and press enter. You&apos;ll land on that
+                repo&apos;s Holt report. Works on phones too.
               </p>
               <UrlTrick />
             </div>

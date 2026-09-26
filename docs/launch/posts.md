@@ -1,8 +1,8 @@
 # Launch posts (drafts)
 
-Plain-language drafts for the Hacktoberfest launch. Replace `HOLT_URL` with the
-real domain before posting. Lines in `[brackets]` are for you to fill in with
-your own words. Please don't post a guessed version of them.
+Plain-language drafts for the Hacktoberfest launch. The site is
+https://githolt.com. Lines in `[brackets]` are for you to fill in with your
+own words. Please don't post a guessed version of them.
 
 **Numbers used below** are from live Holt reports on 25 September 2026
 (staging). Re-check them on the day you post, because reports refresh:
@@ -43,7 +43,7 @@ Things to keep true in every post:
 >
 > Holt started as my entry to micro1's Frontier Engineering Challenge, where it won "Most useful real-world workflow". In testing, its verdicts matched what actually happened to contributors far better than asking a model to judge from the README.
 >
-> Hacktoberfest starts on 1 October. If you're taking part, or you run a college coding club, there's a page of welcoming projects with starter issues by language: HOLT_URL/hacktoberfest
+> Hacktoberfest starts on 1 October. If you're taking part, or you run a college coding club, there's a page of welcoming projects with starter issues by language: https://githolt.com/hacktoberfest
 >
 > It's open source (Apache-2.0). Feedback and contributions are very welcome.
 
@@ -56,7 +56,7 @@ Before you spend a week on your first open-source PR, check whether the project 
 
 I built Holt to answer that. Paste a GitHub repo, get a plain-English verdict with evidence. Free.
 
-HOLT_URL
+https://githolt.com
 
 2/
 It reads the repo's recent pull requests from outside contributors:
@@ -78,13 +78,13 @@ The verdict is decided by fixed, written rules, not by a model. AI can write an 
 It's read-only: it never comments or opens PRs for you.
 
 5/
-The trick I use most: on any GitHub repo page, replace "github.com" in the address bar with our domain.
+The trick I use most: on any GitHub repo page, swap hub for holt in the address bar.
 
-github.com/pallets/flask → HOLT_URL/pallets/flask
+github.com/pallets/flask → githolt.com/pallets/flask
 
 6/
 Doing Hacktoberfest? Welcoming projects with starter issues, by language:
-HOLT_URL/hacktoberfest
+https://githolt.com/hacktoberfest
 
 Open source, Apache-2.0. It won "Most useful real-world workflow" in micro1's Frontier Engineering Challenge. Feedback welcome.
 
@@ -109,7 +109,7 @@ Open source, Apache-2.0. It won "Most useful real-world workflow" in micro1's Fr
 >
 > The verdict comes from fixed rules, not an LLM. There's an optional AI explanation, but it can't change the verdict. The tool only reads public data and never posts anything.
 >
-> It's free and open source (Apache-2.0): HOLT_URL. There's also a Hacktoberfest page with welcoming repos by language: HOLT_URL/hacktoberfest.
+> It's free and open source (Apache-2.0): https://githolt.com. There's also a Hacktoberfest page with welcoming repos by language: https://githolt.com/hacktoberfest.
 >
 > I'd really like feedback, especially cases where you think the verdict is wrong for a repo you know well.
 
@@ -120,8 +120,8 @@ Open source, Apache-2.0. It won "Most useful real-world workflow" in micro1's Fr
 ## WhatsApp / college group (~60 words)
 
 > Doing Hacktoberfest this year? Before you pick a repo, check it on Holt. It tells you if the project actually merges newcomers' PRs, how fast they reply, and gives you real starter issues to pick. Free, no sign-up for the basic report.
-> Welcoming repos by language: HOLT_URL/hacktoberfest
-> Tip: replace github.com with HOLT_URL in any repo link.
+> Welcoming repos by language: https://githolt.com/hacktoberfest
+> Tip: swap hub for holt in any repo link: github.com → githolt.com.
 
 ---
 
@@ -140,7 +140,7 @@ Open source, Apache-2.0. It won "Most useful real-world workflow" in micro1's Fr
 > - It is read-only toward GitHub.
 > - We evaluated it against contributor outcomes it hadn't seen: Matthews correlation 0.63 vs 0.21 for a README-plus-metadata prompt, and 55/55 verdicts stable across three runs. Details and a reproduction guide are in the repo.
 >
-> It started as an entry to micro1's Frontier Engineering Challenge ("Most useful real-world workflow") and is now Apache-2.0. There's a CLI (`uv tool install holt-cli`) and a web app: HOLT_URL. On any GitHub URL you can replace github.com with our host.
+> It started as an entry to micro1's Frontier Engineering Challenge ("Most useful real-world workflow") and is now Apache-2.0. There's a CLI (`uv tool install holt-cli`) and a web app: https://githolt.com. On any GitHub URL, swap hub for holt: github.com → githolt.com.
 >
 > I'd especially like to hear about repos where you think it gets the answer wrong.
 
@@ -157,7 +157,7 @@ Open source, Apache-2.0. It won "Most useful real-world workflow" in micro1's Fr
 > With Hacktoberfest starting on 1 October, would your club be up for a 30-minute session on making a first open-source PR? A rough plan:
 >
 > - 5 min: why first PRs get ignored, and how to spot a welcoming project
-> - 15 min: everyone picks a repo in a language they know and a real starter issue (using HOLT_URL/hacktoberfest)
+> - 15 min: everyone picks a repo in a language they know and a real starter issue (using https://githolt.com/hacktoberfest)
 > - 10 min: how to write the comment, the PR description and the follow-up so a maintainer actually replies
 >
 > No sign-up or payment is needed for students; the basic reports are free. I can run it online or [in person], at a time that suits you.
@@ -166,4 +166,4 @@ Open source, Apache-2.0. It won "Most useful real-world workflow" in micro1's Fr
 >
 > Thanks,
 > [your name]
-> HOLT_URL
+> https://githolt.com

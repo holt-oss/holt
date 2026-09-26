@@ -43,7 +43,7 @@ The Holt host is fixed at build time:
 HOLT_HOST=holt.example.com npm run build
 ```
 
-It defaults to `holt.aahil-khan.xyz` and is always reached over HTTPS.
+It defaults to `githolt.com` and is always reached over HTTPS.
 
 ## Load it unpacked
 
