@@ -78,6 +78,10 @@ export function updateChip(a: HTMLAnchorElement, r: Repo, s: ChipState): void {
   const v = chipView(s, r);
   a.dataset.holtTone = v.tone;
   a.dataset.holtState = s.state;
+  // While loading the chip is a skeleton (content.css): the words are still
+  // there for assistive tech, drawn as blocks with a shimmer for everyone else.
+  if (s.state === "loading") a.setAttribute("aria-busy", "true");
+  else a.removeAttribute("aria-busy");
   a.title = v.title;
   a.setAttribute("aria-label", v.stat ? `${v.label}. ${v.stat}.` : v.label);
   a.querySelector(".holt-chip__label")!.textContent = v.label;

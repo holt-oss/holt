@@ -65,7 +65,7 @@ make sure both sites are allowed.
 | `src/chip.ts`, `src/issues.ts` | The DOM work. Text goes in via `textContent` only. |
 | `src/background.ts` | Fetches `GET /api/public/report/…` and `/api/public/starter-issues/…` (see "Public proxy" in `/API.md`). Content scripts can't make cross-origin requests under the extension's host permission, so fetching lives here. |
 | `src/repo.ts` | Which github.com paths are repos. |
-| `fixtures/` | A trimmed GitHub repo page for screenshots: `npm run fixture`, then open `fixtures/github-repo.html` (add `?state=missing`, `not_viable` or `insufficient_evidence`). |
+| `fixtures/` | A trimmed GitHub repo page for screenshots: `npm run fixture`, then open `fixtures/github-repo.html` (add `?state=missing`, `not_viable`, `insufficient_evidence`, or `loading` for the skeleton chip). |
 
 If GitHub changes its markup and the chip disappears, the selectors to update
 are `ANCHORS` in `src/chip.ts` and `isTitleLink` in `src/issues.ts`.

@@ -1,6 +1,15 @@
 /* Uses GitHub's own Primer colour variables, so the chip follows whichever
    light or dark theme the user picked on GitHub. Fallbacks are Primer light. */
 a.holt-chip {
+  /* Motion tokens, the same values as web/src/app/globals.css (the chip sits
+     inside GitHub's page, so it cannot read Holt's own variables). */
+  --holt-dur-fast: 120ms;
+  --holt-dur-base: 180ms; /* skeleton → verdict crossfade */
+  --holt-sk-delay: 300ms; /* the skeleton stays invisible this long */
+  --holt-sk-sweep: 1.8s; /* a 1.2s sweep, then a 0.6s rest */
+  --holt-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --holt-ease-move: cubic-bezier(0.4, 0, 0.2, 1);
+  --holt-sk-bg: var(--bgColor-neutral-muted, var(--color-neutral-muted, rgba(175, 184, 193, 0.2)));
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -64,6 +73,70 @@ a.holt-chip[data-holt-state="loading"] .holt-chip__dot {
 .holt-chip__stat::before {
   content: "·";
   margin-right: 6px;
+}
+
+/* Loading: a skeleton chip (docs/design/MOTION.md §4). The label and stat keep
+   their real text ("Holt · checking…") but show as flat blocks, so the pill has
+   the width and height of a real chip, and the swap to the verdict never moves
+   the title row. Text stays readable to assistive tech. */
+.holt-chip__label,
+.holt-chip__stat {
+  border-radius: 2px;
+  transition:
+    color var(--holt-dur-base) var(--holt-ease-out),
+    background-color var(--holt-dur-base) var(--holt-ease-out);
+}
+a.holt-chip[data-holt-state="loading"] .holt-chip__label,
+a.holt-chip[data-holt-state="loading"] .holt-chip__stat {
+  color: transparent;
+  background: var(--holt-sk-bg);
+}
+a.holt-chip[data-holt-state="loading"] .holt-chip__stat::before {
+  color: transparent;
+}
+/* Rendered at once, visible only after --holt-sk-delay, so a lookup answered
+   from the cache never flashes a skeleton. The space is taken from the start.
+   When the verdict lands, this rule stops matching: the animation is dropped
+   and the chip is fully visible while the blocks above crossfade into text. */
+a.holt-chip[data-holt-state="loading"] {
+  position: relative;
+  animation: holt-chip-appear var(--holt-dur-fast) var(--holt-ease-out) var(--holt-sk-delay) both;
+}
+@keyframes holt-chip-appear {
+  from {
+    opacity: 0;
+  }
+}
+/* The shimmer: one faint sweep across the pill, the same timing as web's .sk
+   (a 1.8s cycle: 1.2s sweep, 0.6s rest). Faint (4%) because it sits inside
+   GitHub's page; it takes the chip's text colour, so it follows the theme.
+   Only `transform` animates, so no layout or paint per frame. */
+@media (prefers-reduced-motion: no-preference) {
+  a.holt-chip[data-holt-state="loading"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, currentColor, transparent);
+    opacity: 0.04;
+    transform: translateX(-100%);
+    animation: holt-sk-sweep var(--holt-sk-sweep) var(--holt-ease-move) infinite;
+    pointer-events: none;
+  }
+}
+@keyframes holt-sk-sweep {
+  66%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+/* Reduced motion: a flat, static block that swaps to the verdict at once. */
+@media (prefers-reduced-motion: reduce) {
+  a.holt-chip,
+  .holt-chip__label,
+  .holt-chip__stat {
+    animation-duration: 0s;
+    transition: none;
+  }
 }
 
 .holt-starter {
