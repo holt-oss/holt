@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import type { ApiError, Mode, Report } from "@/lib/types";
 
 export type AnalysisState =
@@ -39,7 +39,7 @@ export function useAnalysis(repo: string, mode: Mode, days: number, enabled = tr
         return;
       }
       if (body.status === "done") {
-        setState({ phase: "done", report: body.report });
+        startTransition(() => setState({ phase: "done", report: body.report }));
         return;
       }
       setState({ phase: "running", stage: "Getting in line", progress: 0.02 });
@@ -51,7 +51,10 @@ export function useAnalysis(repo: string, mode: Mode, days: number, enabled = tr
       });
       src.addEventListener("done", (e) => {
         src.close();
-        setState({ phase: "done", report: JSON.parse((e as MessageEvent).data).report });
+        const report = JSON.parse((e as MessageEvent).data).report;
+        // A transition, so the <ViewTransition>s around the progress and the
+        // report crossfade them (a plain setState swaps instantly).
+        startTransition(() => setState({ phase: "done", report }));
       });
       src.addEventListener("error", (e) => {
         const data = (e as MessageEvent).data;
