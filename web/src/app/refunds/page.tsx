@@ -18,7 +18,7 @@ export default function RefundsPage() {
       <div className="summary">
         <p><strong>The short version.</strong></p>
         <ul>
-          <li>Cancel a subscription anytime. You keep access until the end of the period you paid for.</li>
+          <li>Cancel a subscription anytime, from your account settings or by email. You keep access until the end of the period you paid for.</li>
           <li>No refunds for the unused part of a month you&rsquo;ve started, except where the law requires it or a charge was failed or duplicated.</li>
           <li>Credit packs: full refund within 7 days if you haven&rsquo;t used any credit. Non-refundable once used.</li>
           <li>Approved refunds go back to the original payment method within 5 to 7 business days.</li>
@@ -35,7 +35,7 @@ export default function RefundsPage() {
 
       <h2>2. Subscriptions</h2>
       <ul>
-        <li><strong>Cancel at any time.</strong> Email <ContactEmail /> from the address on your account and say you want to cancel. We&rsquo;ll confirm the cancellation and the date your access ends. Cancelling stops all future charges.</li>
+        <li><strong>Cancel at any time.</strong> Cancel from your account settings, or email <ContactEmail /> from the address on your account and say you want to cancel. Either way we&rsquo;ll confirm the cancellation and the date your access ends. Cancelling stops all future charges.</li>
         <li><strong>You keep what you paid for.</strong> Your access continues until the end of the current billing period. You won&rsquo;t be charged again after that.</li>
         <li><strong>No refunds for a partly used period.</strong> If you cancel part-way through a month or year, we don&rsquo;t refund the remainder. The exceptions are where the law requires a refund, and failed or duplicate charges (see section 4).</li>
         <li><strong>Price changes.</strong> If we raise the price of your plan, we&rsquo;ll tell you before it applies to your next renewal, so you can cancel first.</li>

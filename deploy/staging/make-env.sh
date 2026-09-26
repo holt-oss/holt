@@ -24,6 +24,8 @@ HOLT_DB_PASSWORD=$(hex)
 GITHUB_TOKENS=$token
 # No model key yet: AI reports answer needs_key.
 OPENROUTER_API_KEY=
+# The policy pages' contact details are not here: preview.sh reads
+# CONTACT_EMAIL / CONTACT_CITY from ~/.config/holt/secrets.env on every run.
 HOLT_JOB_CONCURRENCY=1
 ENV
 echo "wrote $(pwd)/.env"

@@ -79,7 +79,7 @@ export default function TermsPage() {
         <li>The price, currency and what you get are shown before you pay. Prices may include tax where the law requires it.</li>
         <li>Payments in Indian rupees are processed by <strong>Razorpay</strong>. Payments in US dollars are processed by <strong>Dodo Payments</strong>, which acts as the merchant of record for those purchases: Dodo Payments is the seller on your receipt and its terms also apply to the transaction.</li>
         <li>We never see or store your card, UPI or bank details. The payment processor handles them.</li>
-        <li>Subscriptions renew automatically at the end of each period until you cancel. You can cancel at any time and keep access until the end of the period you paid for.</li>
+        <li>Subscriptions renew automatically at the end of each period until you cancel. You can cancel at any time, from your account settings or by email, and keep access until the end of the period you paid for.</li>
         <li>Cancellations and refunds follow our <Link href="/refunds" className="text-link">Refund and Cancellation Policy</Link>, which is part of these terms.</li>
         <li>We may change prices or what a plan includes. Changes apply from your next renewal, and we&rsquo;ll tell you before they do.</li>
       </ul>

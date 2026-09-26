@@ -50,8 +50,10 @@ npm run dev -- -p $PORT
 Required env: `AUTH_URL` (public URL, for OAuth callbacks), `AUTH_SECRET`,
 `DATABASE_URL`, `HOLT_API_URL`, `HOLT_INTERNAL_KEY`, OAuth app ids/secrets,
 and, at build time, `NEXT_PUBLIC_SITE_HOST` plus `NEXT_PUBLIC_CONTACT_EMAIL`
-and `NEXT_PUBLIC_CONTACT_CITY` (the policy pages show the literal placeholders
-`CONTACT_EMAIL` / `CONTACT_CITY` when these are unset). Run `npm run db:migrate` on deploy.
+and `NEXT_PUBLIC_CONTACT_CITY`. A production build (`next build`) refuses to
+run when either is unset or still the placeholder `CONTACT_EMAIL` /
+`CONTACT_CITY`, so the policy pages can never ship them; a local build without
+the real values needs `HOLT_ALLOW_PLACEHOLDER_CONTACT=1`. Run `npm run db:migrate` on deploy.
 
 - `TRUST_PROXY_HEADERS=1` only when the app is reachable solely through our
   proxy (Cloudflare tunnel). The standalone server should listen on
@@ -66,7 +68,7 @@ and `NEXT_PUBLIC_CONTACT_CITY` (the policy pages show the literal placeholders
 npm run lint
 npm run typecheck
 npm test          # node --test, no network
-npm run build
+HOLT_ALLOW_PLACEHOLDER_CONTACT=1 npm run build   # or set NEXT_PUBLIC_CONTACT_EMAIL / _CITY
 E2E_BASE_URL=http://localhost:3000 npm run e2e   # smoke: policy pages exist and are in the footer (needs a running app)
 ```
 

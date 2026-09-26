@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 const REASONS = [
-  { what: "Refund or cancellation", how: "Include the payment ID from your Razorpay or Dodo Payments receipt and the email on your account.", href: "/refunds", label: "refund policy" },
+  { what: "Refund or cancellation", how: "You can cancel from your account settings, or by email. For a refund, include the payment ID from your Razorpay or Dodo Payments receipt and the email on your account.", href: "/refunds", label: "refund policy" },
   { what: "Delete your account", how: "Email from the address on your account. We remove the account, your history and any stored AI key.", href: "/privacy", label: "privacy policy" },
   { what: "A question about your data", how: "Ask what we hold, or ask for a correction. We'll answer in plain English." },
   { what: "A report looks wrong", how: "Send the repository link. Every finding links to its source, so tell us which one doesn't hold up." },

@@ -14,10 +14,16 @@ COPY . .
 # NEXT_PUBLIC_* values are inlined into the client bundle at build time.
 ARG NEXT_PUBLIC_SITE_HOST=localhost:3000
 ARG NEXT_PUBLIC_FREE_AI_QUOTA=3
+# Contact details on /terms, /privacy, /refunds and /contact. Required: with
+# NODE_ENV=production the build refuses to bake in the placeholders.
+ARG NEXT_PUBLIC_CONTACT_EMAIL
+ARG NEXT_PUBLIC_CONTACT_CITY
 # "1" on staging: statically prerendered pages bake their robots metadata in.
 ARG ROBOTS_NOINDEX=
 ENV NEXT_PUBLIC_SITE_HOST=$NEXT_PUBLIC_SITE_HOST \
     NEXT_PUBLIC_FREE_AI_QUOTA=$NEXT_PUBLIC_FREE_AI_QUOTA \
+    NEXT_PUBLIC_CONTACT_EMAIL=$NEXT_PUBLIC_CONTACT_EMAIL \
+    NEXT_PUBLIC_CONTACT_CITY=$NEXT_PUBLIC_CONTACT_CITY \
     ROBOTS_NOINDEX=$ROBOTS_NOINDEX \
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build && rm -rf .next/cache

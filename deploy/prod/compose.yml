@@ -91,6 +91,10 @@ services:
       args:
         NEXT_PUBLIC_SITE_HOST: githolt.com
         NEXT_PUBLIC_FREE_AI_QUOTA: ${NEXT_PUBLIC_FREE_AI_QUOTA:-3}
+        # The policy pages. Required, so a missing value fails the build
+        # instead of shipping the literal CONTACT_EMAIL / CONTACT_CITY.
+        NEXT_PUBLIC_CONTACT_EMAIL: ${NEXT_PUBLIC_CONTACT_EMAIL:?CONTACT_EMAIL in ~/.config/holt/secrets.env (deploy.sh maps it)}
+        NEXT_PUBLIC_CONTACT_CITY: ${NEXT_PUBLIC_CONTACT_CITY:?CONTACT_CITY in ~/.config/holt/secrets.env (deploy.sh maps it)}
         # Production is indexable: no ROBOTS_NOINDEX, at build or run time.
     image: ${HOLT_PROD_PROJECT:-holt-prod}-web:${HOLT_TAG:?set by deploy.sh}
     labels: *prod-label
@@ -108,6 +112,8 @@ services:
       AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
       NEXT_PUBLIC_SITE_HOST: githolt.com
       AUTH_URL: https://githolt.com
+      NEXT_PUBLIC_CONTACT_EMAIL: ${NEXT_PUBLIC_CONTACT_EMAIL}
+      NEXT_PUBLIC_CONTACT_CITY: ${NEXT_PUBLIC_CONTACT_CITY}
       # Read the visitor IP from CF-Connecting-IP / X-Forwarded-For. Safe only
       # because web publishes no port: the one way in is tunnel -> edge
       # (127.0.0.1) -> web.

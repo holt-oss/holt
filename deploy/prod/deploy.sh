@@ -57,8 +57,11 @@ port="$(sed -n 's/^HOLT_PROD_PORT=//p' "$STATE/.env")"; port="${port:-8310}"
 #   GITHUB_OAUTH_ID / GITHUB_OAUTH_SECRET  -> AUTH_GITHUB_ID / AUTH_GITHUB_SECRET
 #   GOOGLE_OAUTH_ID / GOOGLE_OAUTH_SECRET  -> AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET
 #   OPENROUTER_API_KEY, GITHUB_TOKENS      -> the same names
+#   CONTACT_EMAIL / CONTACT_CITY           -> NEXT_PUBLIC_CONTACT_EMAIL / _CITY (required)
 # Exported here, so they win over .env for compose. An unset key stays empty
-# and the feature stays off (sign-in hidden, AI reports answer needs_key).
+# and the feature stays off (sign-in hidden, AI reports answer needs_key),
+# except the contact details: the policy pages must never show placeholders,
+# so a deploy without them stops here.
 if [[ -f "$SECRETS" ]]; then
     while IFS= read -r line || [[ -n "$line" ]]; do
         line="${line%%#*}"; line="${line#"${line%%[![:space:]]*}"}"
@@ -86,6 +89,13 @@ export GITHUB_TOKENS
 [[ -n "$AUTH_GITHUB_ID" ]] && log "GitHub sign-in: on" || log "GitHub sign-in: off (no GITHUB_OAUTH_ID)"
 [[ -n "$AUTH_GOOGLE_ID" ]] && log "Google sign-in: on" || log "Google sign-in: off (no GOOGLE_OAUTH_ID)"
 [[ -n "$OPENROUTER_API_KEY" ]] && log "server AI key: on" || log "server AI key: off (AI reports need BYOK)"
+export NEXT_PUBLIC_CONTACT_EMAIL="${NEXT_PUBLIC_CONTACT_EMAIL:-${CONTACT_EMAIL:-}}"
+export NEXT_PUBLIC_CONTACT_CITY="${NEXT_PUBLIC_CONTACT_CITY:-${CONTACT_CITY:-}}"
+for k in CONTACT_EMAIL CONTACT_CITY; do
+    v="NEXT_PUBLIC_$k"
+    [[ -n "${!v}" && "${!v}" != "$k" ]] || die "$k is not set in $SECRETS; the policy pages (/terms, /privacy, /refunds, /contact) would show the placeholder"
+done
+log "contact: $NEXT_PUBLIC_CONTACT_EMAIL, $NEXT_PUBLIC_CONTACT_CITY"
 
 # --- the commit ----------------------------------------------------------------
 if [[ ! -d "$SRC/.git" ]]; then
