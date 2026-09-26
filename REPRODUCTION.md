@@ -18,7 +18,7 @@ verify the published measurements without making live API calls.
 |---|---|
 | Python | 3.12 (pinned in `.python-version`; `uv` installs it for you) |
 | Package manager | [`uv`](https://docs.astral.sh/uv/) — `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| Disk | ~120 MB for the clone (evidence fixtures are the bulk) |
+| Disk | ~400 MB for a full clone; `fixtures/` is about 315 MB of it |
 | Network | to clone and to install dependencies; **not** to reproduce the result |
 
 Nothing else. No API key for the headline number.
@@ -34,6 +34,23 @@ uv sync
 ```
 
 `uv sync` installs the pinned Python and dependencies from `uv.lock`.
+
+### Not reproducing the benchmark? Skip the evidence
+
+Everything in this file needs the full clone. If you only want to work on the
+docs, the web app, the server or the extension, a partial clone without
+`fixtures/` is about 11 MB instead of 400:
+
+```sh
+git clone --filter=blob:none --sparse https://github.com/holt-oss/holt.git
+cd holt
+git sparse-checkout set --no-cone '/*' '!/fixtures/'
+```
+
+`--filter=blob:none` downloads file contents only when a checkout needs them,
+and the sparse checkout never needs anything under `fixtures/`. The engine's
+tests read `fixtures/`, so for engine work either use a full clone or bring the
+evidence back later with `git sparse-checkout disable`.
 
 ## 2. Run the tests
 

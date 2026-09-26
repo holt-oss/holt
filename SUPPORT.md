@@ -12,6 +12,6 @@ feature form for a new capability.
 Please remove credentials and private repository data from logs before posting.
 Security concerns use the private process in [SECURITY.md](SECURITY.md).
 
-Support is provided by the community on a best-effort basis. There is currently
-no guaranteed response time or private support channel for ordinary usage
-questions.
+Holt has one maintainer, who answers issues on a best-effort basis. There is
+no guaranteed response time and no private support channel for ordinary usage
+questions. A clear, reproducible report is the fastest way to an answer.
