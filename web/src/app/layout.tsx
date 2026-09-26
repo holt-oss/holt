@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import { Footer } from "@/components/footer";
 import { Header } from "@/components/header";
+import { RouteFallback } from "@/components/motion/route-fallback";
 import { themeScript } from "@/components/theme-toggle";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Header />
         <main id="content" className="flex-1">
           {children}
+          <RouteFallback />
         </main>
         <Footer />
       </body>
