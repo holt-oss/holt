@@ -345,6 +345,10 @@
     line-height: 1.2;
     color: var(--ink);
   }
+  /* Linkable sections (/privacy#google): clear the sticky header when targeted. */
+  .legal h2[id] {
+    scroll-margin-top: 5rem;
+  }
   .legal h2:first-child {
     margin-top: 0;
     padding-top: 0;
