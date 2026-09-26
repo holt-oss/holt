@@ -14,8 +14,8 @@ or **Not enough evidence**, with links to the pull requests behind it.
 
 ![Holt answering for pallets/flask, then finding starter issues](https://raw.githubusercontent.com/holt-oss/holt/main/assets/demo.gif)
 
-<!-- HOLT_SITE_URL: the orchestrator replaces this URL once the domain is final. -->
-**[Try it in your browser](https://holt.aahil-khan.xyz)** · no install, no
+<!-- HOLT_SITE_URL: the product lives at https://githolt.com -->
+**[Try it in your browser](https://githolt.com)** · no install, no
 account · [Install the CLI](#2-the-command-line) ·
 [Get the browser extension](#3-the-browser-extension)
 
@@ -27,13 +27,13 @@ maintainers, on any surface.
 ### 1. The web app
 
 <!-- HOLT_SITE_URL -->
-Open **<https://holt.aahil-khan.xyz>** and paste a repository. Or change one
-word in any GitHub link, `github.com` to `holt.aahil-khan.xyz`, and you land on
-the report:
+Open **<https://githolt.com>** and paste a repository. Or take any GitHub
+link and **swap hub for holt**: `github.com` becomes `githolt.com`, and you
+land on the report.
 
 ```text
 https://github.com/pallets/flask
-https://holt.aahil-khan.xyz/pallets/flask
+https://githolt.com/pallets/flask
 ```
 
 No repository in mind? **Find a project** asks which languages you read and how
@@ -111,7 +111,7 @@ unpacked in Chrome, Edge, Brave or Firefox:
 
 ## Hacktoberfest
 
-Every October the site has a seasonal page, **[/hacktoberfest](https://holt.aahil-khan.xyz/hacktoberfest)**:
+Every October the site has a seasonal page, **[/hacktoberfest](https://githolt.com/hacktoberfest)**:
 repositories taking part that actually merge newcomers' work, with starter
 issues by language, and a few tips so your pull request doesn't get ignored.
 From the command line:
@@ -126,7 +126,7 @@ Show newcomers they are welcome. Paste this into your README, with your own
 `owner/repo`:
 
 ```markdown
-[![Holt](https://holt.aahil-khan.xyz/badge/owner/repo.svg)](https://holt.aahil-khan.xyz/owner/repo)
+[![Holt](https://githolt.com/badge/owner/repo.svg)](https://githolt.com/owner/repo)
 ```
 
 The badge shows Holt's current answer for your repository and links to the
