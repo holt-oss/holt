@@ -14,10 +14,6 @@ export default defineConfig({
   reporter: process.env.CI ? "list" : [["list"]],
   use: {
     baseURL: process.env.BASE_URL || "https://holt-new.aahil-khan.xyz",
-    // HOST_HEADER=githolt.com: test a stack on a local port as if it were
-    // the public host (before the tunnel is up). Sent on API requests; the
-    // browser's own navigations keep the URL's host.
-    extraHTTPHeaders: process.env.HOST_HEADER ? { Host: process.env.HOST_HEADER } : {},
     launchOptions: executablePath ? { executablePath } : {},
     trace: "off",
     screenshot: "only-on-failure",

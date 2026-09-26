@@ -162,7 +162,7 @@ curl -s $H/sitemap.xml | head -5
 curl -sI $H/hacktoberfest | head -1
 curl -sI -H 'Host: www.githolt.com' $H/ | grep -i location     # https://githolt.com/
 curl -s -XPOST $H/api/analyses -H 'content-type: application/json' -d '{"repo":"pallets/flask"}'
-cd e2e && BASE_URL=$H HOST_HEADER=githolt.com npx playwright test --workers=1
+cd e2e && BASE_URL=$H npx playwright test --workers=1     # plain http on the port; Chromium refuses a Host override
 cd e2e && BASE_URL=https://githolt.com npx playwright test --workers=1   # once the tunnel is up
 ```
 
