@@ -61,10 +61,6 @@ export async function LiveSample() {
   return <SampleFigure sample={await load()} />;
 }
 
-export function ExampleSample() {
-  return <SampleFigure sample={EXAMPLE} />;
-}
-
 function SampleFigure({ sample }: { sample: Sample }) {
   const t = TONE[VERDICT_TONE[sample.verdict]];
   const max = Math.max(1, ...sample.lands.map(([, , a]) => a));
@@ -130,7 +126,7 @@ function SampleFigure({ sample }: { sample: Sample }) {
         <span>
           <em className="not-italic text-muted">Fig. 01</em> — {sample.caption}
         </span>
-        <Link href={`/${sample.repo}`} className="text-green hover:underline">
+        <Link href={`/${sample.repo}`} className="inline-flex min-h-11 items-center text-green hover:underline sm:min-h-0">
           {sample.caption === "an example report" ? "see the live report →" : "open the full report →"}
         </Link>
       </figcaption>

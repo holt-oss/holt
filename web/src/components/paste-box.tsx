@@ -83,7 +83,7 @@ export function PasteBox({ autoFocus = false, examples = true, size = "lg" }: { 
               key={ex}
               type="button"
               onClick={() => go(ex)}
-              className="min-h-8 border-b border-dashed border-line-strong text-muted transition-colors hover:border-blue hover:text-ink"
+              className="min-h-11 border-b border-dashed border-line-strong text-muted transition-colors hover:border-blue hover:text-ink"
             >
               {ex}
             </button>

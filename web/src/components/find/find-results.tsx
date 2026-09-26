@@ -24,12 +24,12 @@ export function FindResults({ results, days }: { results: FindResult[]; days: nu
       {results.map((r, i) => {
         const s = r.stats;
         return (
-          <li key={r.repo} className="fade-up border border-line-strong bg-panel" style={{ ["--d" as string]: `${i * 0.06}s` }}>
+          <li key={r.repo} className="reveal border border-line-strong bg-panel shadow-soft" style={{ ["--i" as string]: i }}>
             <div className="flex flex-wrap items-start gap-4 border-b border-line p-5 sm:p-6">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`https://github.com/${r.repo.split("/")[0]}.png?size=80`} alt="" width={40} height={40} loading="lazy" className="size-10 rounded-md border border-line-strong bg-panel-2" />
               <div className="min-w-0 flex-1">
-                <h2 className="text-[1.15rem] font-semibold tracking-tight">
+                <h2 className="text-[1.15rem] font-semibold tracking-tight [overflow-wrap:anywhere]">
                   <Link href={`/${r.repo}${days !== 7 ? `?days=${days}` : ""}`} className="hover:text-blue">
                     <span className="text-muted">{r.repo.split("/")[0]}/</span>
                     {r.repo.split("/")[1]}

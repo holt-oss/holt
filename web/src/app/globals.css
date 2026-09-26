@@ -8,24 +8,59 @@
  * Every text colour below is >= 4.5:1 on --bg and --panel in its theme.
  */
 :root {
-  --bg: #f3f0e7;
-  --header: #ece8dd;
-  --panel: #faf8f2;
-  --panel-2: #e9e5d9;
+  --bg: #f2ecdf;
+  --header: #eae2d0;
+  --panel: #fbf7ee;
+  --panel-2: #e9e0cd;
   --ink: #1b1c1a;
-  --muted: #4f4f4a;
-  --faint: #66665f;
-  --line: #dcd7ca;
-  --line-strong: #c4bfb1;
+  --muted: #4c4a44;
+  --faint: #5f5d56;
+  --line: #ddd3bf;
+  --line-strong: #c6baa2;
   --blue: #2f5bd0;
   --blue-soft: #3d6be0;
-  --green: #15755a;
+  --green: #136d53;
   --orange: #b1470f;
   --amber: #875600;
   --on-accent: #ffffff;
-  --noise-opacity: 0.05;
-  --shadow: 0 1px 0 rgb(0 0 0 / 0.04), 0 12px 32px -18px rgb(60 50 20 / 0.35);
+  --noise-opacity: 0.07;
+  --shadow: 0 1px 2px rgb(70 50 20 / 0.08), 0 16px 36px -16px rgb(90 60 20 / 0.32);
+  --card-shadow: 0 1px 2px rgb(70 50 20 / 0.06), 0 10px 26px -18px rgb(90 60 20 / 0.28);
+  --section-alt: #ebe3d1;
+  --marker: rgb(238 146 93 / 0.3);
+  --dot: rgb(90 65 25 / 0.16);
+  --glow: rgb(238 146 93 / 0.2);
+  --glow-2: rgb(47 91 208 / 0.08);
+  /* Hacktoberfest: a seasonal violet, used only for the event. */
+  --hf: #6a3dd1;
+  --hf-bg: #ece3fb;
+  --hf-line: #c9b5f2;
   color-scheme: light;
+
+  /* Motion (docs/design/MOTION.md). Short, decelerating, tiny distances;
+     exits about two thirds of entrances. */
+  --dur-press: 80ms; /* :active scale */
+  --dur-fast: 120ms; /* hover, colour, small exits */
+  --dur-base: 180ms; /* menus open, tabs, skeleton → content */
+  --dur-slow: 240ms; /* page enter, report sections, mobile sheet */
+  --dur-exit: 120ms;
+  --stagger: 50ms; /* list and report reveal step; stops after 6 items */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1); /* everything that enters */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1); /* exits */
+  --ease-move: cubic-bezier(0.4, 0, 0.2, 1); /* things that move and stay */
+  --ease-expressive: cubic-bezier(0.16, 1, 0.3, 1); /* landing hero only */
+  --shift: 6px; /* enter translate */
+  --pop-scale: 0.97; /* menu enter scale */
+  --sk-delay: 300ms; /* skeletons stay invisible this long (see .sk-region) */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --shift: 0px;
+    --pop-scale: 1;
+    --stagger: 0ms;
+    --dur-slow: var(--dur-fast);
+  }
 }
 
 :root[data-theme="dark"] {
@@ -46,6 +81,15 @@
   --on-accent: #0d0e0e;
   --noise-opacity: 0.035;
   --shadow: 0 12px 30px rgb(0 0 0 / 0.24);
+  --card-shadow: none;
+  --section-alt: #101211;
+  --marker: rgb(238 146 93 / 0.16);
+  --dot: rgb(131 169 255 / 0.11);
+  --glow: rgb(131 169 255 / 0.1);
+  --glow-2: rgb(238 146 93 / 0.07);
+  --hf: #c6a8ff;
+  --hf-bg: #1c1628;
+  --hf-line: #4a3a6e;
   color-scheme: dark;
 }
 
@@ -68,6 +112,15 @@
     --amber: #ffb331;
     --on-accent: #0d0e0e;
     --noise-opacity: 0.035;
+    --card-shadow: none;
+    --section-alt: #101211;
+    --marker: rgb(238 146 93 / 0.16);
+    --dot: rgb(131 169 255 / 0.11);
+    --glow: rgb(131 169 255 / 0.1);
+    --glow-2: rgb(238 146 93 / 0.07);
+    --hf: #c6a8ff;
+    --hf-bg: #1c1628;
+    --hf-line: #4a3a6e;
     color-scheme: dark;
   }
 }
@@ -91,6 +144,14 @@
   --font-mono: var(--font-jetbrains), "SFMono-Regular", "Cascadia Code", "Liberation Mono", Consolas, monospace;
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --shadow-card: var(--shadow);
+  --shadow-soft: var(--card-shadow);
+  --color-section-alt: var(--section-alt);
+  --color-hf: var(--hf);
+  --color-hf-bg: var(--hf-bg);
+  --color-hf-line: var(--hf-line);
+  /* Every Tailwind `transition-*` utility uses the motion tokens. */
+  --default-transition-duration: var(--dur-fast);
+  --default-transition-timing-function: var(--ease-out);
 }
 
 @layer base {
@@ -194,11 +255,15 @@
   .text-link {
     color: var(--green);
     border-bottom: 1px solid color-mix(in oklab, var(--green) 40%, transparent);
-    transition: border-color 160ms ease;
+    transition: border-color var(--dur-fast) var(--ease-out);
   }
-  .text-link:hover,
   .text-link:focus-visible {
     border-color: currentColor;
+  }
+  @media (hover: hover) {
+    .text-link:hover {
+      border-color: currentColor;
+    }
   }
 
   /* "[ start contributing → ]" */
@@ -212,12 +277,90 @@
     border: 1px solid var(--green);
     color: var(--green);
     font-size: 0.82rem;
-    transition: color 160ms ease, background-color 160ms ease;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out),
+      scale var(--dur-press) var(--ease-out);
   }
-  .bracket-link:hover,
+  .bracket-link:active {
+    scale: 0.98;
+  }
   .bracket-link:focus-visible {
     color: var(--on-accent);
     background: var(--green);
+  }
+  @media (hover: hover) {
+    .bracket-link:hover {
+      color: var(--on-accent);
+      background: var(--green);
+    }
+    .bracket-link--orange:hover {
+      color: var(--on-accent);
+      background: var(--orange);
+    }
+    .bracket-link--hf:hover {
+      color: var(--bg);
+      background: var(--hf);
+    }
+  }
+
+  /* Orange outline: fills on hover with dark-on-orange text. */
+  .bracket-link--orange {
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+  .bracket-link--orange:focus-visible {
+    color: var(--on-accent);
+    background: var(--orange);
+  }
+
+  .bracket-link--hf {
+    border-color: var(--hf);
+    color: var(--hf);
+  }
+  .bracket-link--hf:focus-visible {
+    color: var(--bg);
+    background: var(--hf);
+  }
+
+  .panel {
+    box-shadow: var(--card-shadow);
+  }
+
+  /* A full-width tinted band from inside a centred column: section rhythm
+     without restructuring the page. */
+  .band-alt {
+    background: var(--section-alt);
+    box-shadow: 0 0 0 100vmax var(--section-alt);
+    clip-path: inset(0 -100vmax);
+  }
+
+  /* Highlighter stroke behind a phrase. */
+  .marker {
+    background: linear-gradient(transparent 62%, var(--marker) 62%, var(--marker) 92%, transparent 92%);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  /* Hero backdrop: a faint dot grid fading out, and a soft glow. Static
+     gradients only, so it's cheap to paint on phones too. */
+  .hero-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(640px 320px at 78% 8%, var(--glow), transparent 70%),
+      radial-gradient(520px 280px at 8% 92%, var(--glow-2), transparent 70%);
+  }
+  .hero-backdrop::before {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(var(--dot) 1px, transparent 1.3px);
+    background-size: 22px 22px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 80% at 60% 30%, #000 20%, transparent 75%);
+    mask-image: radial-gradient(ellipse 70% 80% at 60% 30%, #000 20%, transparent 75%);
+    content: "";
   }
 
   .btn-primary {
@@ -231,13 +374,18 @@
     color: var(--on-accent);
     font-weight: 600;
     font-size: 0.9rem;
-    transition: filter 160ms ease, transform 160ms ease;
+    transition:
+      filter var(--dur-fast) var(--ease-out),
+      scale var(--dur-press) var(--ease-out);
   }
-  .btn-primary:hover {
-    filter: brightness(1.08);
+  @media (hover: hover) {
+    .btn-primary:hover {
+      filter: brightness(1.08);
+    }
   }
-  .btn-primary:active {
-    transform: translateY(1px);
+  .btn-primary:active:not(:disabled),
+  .btn-ghost:active {
+    scale: 0.98;
   }
   .btn-primary:disabled {
     opacity: 0.6;
@@ -254,11 +402,18 @@
     color: var(--ink);
     font-size: 0.82rem;
     background: var(--panel);
-    transition: border-color 160ms ease, background-color 160ms ease;
+    transition:
+      border-color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out),
+      scale var(--dur-press) var(--ease-out);
   }
-  .btn-ghost:hover,
   .btn-ghost:focus-visible {
     border-color: var(--blue);
+  }
+  @media (hover: hover) {
+    .btn-ghost:hover {
+      border-color: var(--blue);
+    }
   }
 
   .panel {
@@ -281,18 +436,21 @@
   .award-badge {
     display: inline-flex;
     align-items: stretch;
+    max-width: 100%;
     overflow: hidden;
     border: 1px solid color-mix(in oklab, var(--orange) 55%, transparent);
     border-radius: 3px;
     font-size: 0.68rem;
-    line-height: 1;
+    line-height: 1.25;
+  }
+  .award-badge > span:first-child {
     white-space: nowrap;
   }
   .award-badge > span {
     display: inline-flex;
     align-items: center;
     min-height: 25px;
-    padding-inline: 9px;
+    padding: 3px 9px;
   }
   .award-badge > span:first-child {
     color: var(--on-accent);
@@ -347,6 +505,13 @@
     animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
     animation-delay: var(--d, 0s);
   }
+  /* Phones: slide without the fade. Text that starts at opacity 0 can't count
+     as the largest paint, so the hero's fade held LCP back ~0.4-0.6s. */
+  @media (max-width: 1023px) {
+    .fade-up {
+      animation-name: slide-up;
+    }
+  }
 
   .meter {
     height: 6px;
@@ -369,7 +534,7 @@
     color: var(--on-accent);
     background: var(--blue);
     transform: translateY(-160%);
-    transition: transform 180ms ease;
+    transition: transform var(--dur-base) var(--ease-out);
   }
   .skip-link:focus {
     transform: translateY(0);
@@ -403,6 +568,11 @@
     transform: translateY(14px);
   }
 }
+@keyframes slide-up {
+  from {
+    transform: translateY(14px);
+  }
+}
 @keyframes grow {
   from {
     transform: scaleX(0);
@@ -430,13 +600,378 @@
   }
 }
 
+/* ------------------------------------------------------------------------
+ * Motion (docs/design/MOTION.md). Everything here is progressive: without
+ * view transitions, @starting-style or allow-discrete, things just swap.
+ * ---------------------------------------------------------------------- */
+
+/* Page changes: the new page rises in while the old one fades on an
+   accelerating curve. The old page's fade is --dur-slow rather than
+   --dur-exit because React keeps a loading skeleton up for at least 300ms
+   (and skeletons stay invisible that long): a 120ms exit would leave the
+   page blank for most of a fast navigation. */
+::view-transition {
+  pointer-events: none; /* clicks during the transition aren't lost */
+}
+::view-transition-old(.page-out) {
+  animation: var(--dur-slow) var(--ease-in) both vt-fade-out;
+}
+::view-transition-old(.sk-out),
+::view-transition-old(.swap) {
+  animation: var(--dur-exit) var(--ease-in) both vt-fade-out;
+}
+::view-transition-new(.page-in) {
+  animation: var(--dur-slow) var(--ease-out) both vt-rise-in;
+}
+/* Skeleton → content: the skeleton leaves first, then the content arrives. */
+::view-transition-new(.sk-in) {
+  animation: var(--dur-base) var(--ease-out) var(--dur-exit) both vt-rise-in;
+}
+/* Same place, different content (report tabs, search progress → results). */
+::view-transition-group(.swap) {
+  animation-duration: var(--dur-base);
+  animation-timing-function: var(--ease-out);
+}
+::view-transition-new(.swap) {
+  animation: var(--dur-base) var(--ease-out) both vt-fade-in;
+}
+/* The header stays put while the content under it changes. */
+::view-transition-group(site-header) {
+  z-index: 100;
+  animation: none;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-rise-in {
+  from {
+    opacity: 0;
+    translate: 0 var(--shift);
+  }
+}
+
+@layer components {
+  /* Menus: native popovers (top layer, click-outside and Escape for free),
+     animated in and out with @starting-style and discrete transitions. */
+  .menu[popover],
+  .sheet[popover] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 4px;
+    overflow: auto;
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+    background: var(--panel);
+    box-shadow: var(--shadow);
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition:
+      opacity var(--dur-exit) var(--ease-in),
+      transform var(--dur-exit) var(--ease-in),
+      overlay var(--dur-exit) var(--ease-in) allow-discrete,
+      display var(--dur-exit) var(--ease-in) allow-discrete;
+  }
+  .menu[popover] {
+    top: 64px;
+    right: max(16px, calc((100vw - 1120px) / 2));
+    transform-origin: top right;
+  }
+  .menu[popover]:not(:popover-open) {
+    opacity: 0;
+    transform: translateY(calc(var(--shift) * -2 / 3)) scale(var(--pop-scale));
+  }
+  .menu[popover]:popover-open {
+    transition-duration: var(--dur-base);
+    transition-timing-function: var(--ease-out);
+  }
+  @starting-style {
+    .menu[popover]:popover-open {
+      opacity: 0;
+      transform: translateY(calc(var(--shift) * -2 / 3)) scale(var(--pop-scale));
+    }
+  }
+
+  /* The phone menu: a full-width sheet under the header. */
+  .sheet[popover] {
+    top: 64px;
+    left: 0;
+    width: 100%;
+    max-height: calc(100dvh - 64px);
+    border-inline: 0;
+    transform-origin: top center;
+  }
+  .sheet[popover]:not(:popover-open) {
+    opacity: 0;
+    transform: translateY(calc(var(--shift) * -4 / 3));
+  }
+  .sheet[popover]:popover-open {
+    transition-duration: var(--dur-slow);
+    transition-timing-function: var(--ease-out);
+  }
+  @starting-style {
+    .sheet[popover]:popover-open {
+      opacity: 0;
+      transform: translateY(calc(var(--shift) * -4 / 3));
+    }
+  }
+  .sheet[popover]::backdrop {
+    background: rgb(0 0 0 / 0);
+    transition:
+      background-color var(--dur-exit) var(--ease-in),
+      overlay var(--dur-exit) allow-discrete,
+      display var(--dur-exit) allow-discrete;
+  }
+  .sheet[popover]:popover-open::backdrop {
+    background: rgb(0 0 0 / 0.2);
+    transition-duration: var(--dur-slow);
+    transition-timing-function: var(--ease-out);
+  }
+  @starting-style {
+    .sheet[popover]:popover-open::backdrop {
+      background: rgb(0 0 0 / 0);
+    }
+  }
+  /* Tie the menus to their buttons where anchor positioning exists. */
+  @supports (anchor-name: --a) {
+    .site-header {
+      anchor-name: --site-header;
+    }
+    #account-button {
+      anchor-name: --account;
+    }
+    .menu[popover] {
+      position-anchor: --account;
+      top: calc(anchor(bottom) + 4px);
+      right: anchor(right);
+    }
+    .sheet[popover] {
+      position-anchor: --site-header;
+      top: anchor(bottom);
+      max-height: calc(100dvh - anchor-size(height));
+    }
+  }
+  .menu-chevron {
+    transition: rotate var(--dur-fast) var(--ease-out);
+  }
+  .site-header:has(#account-menu:popover-open) .menu-chevron {
+    rotate: 180deg;
+  }
+  .site-header .icon-close,
+  .site-header:has(#mobile-nav:popover-open) .icon-open {
+    display: none;
+  }
+  .site-header:has(#mobile-nav:popover-open) .icon-close {
+    display: block;
+  }
+
+  /* Skeletons: one flat block colour and a single slow sweep. */
+  .sk {
+    position: relative;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--panel-2);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .sk::after {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--ink) 6%, transparent), transparent);
+      translate: -100% 0;
+      animation: sk-sweep 1.8s var(--ease-move) infinite; /* a 1.2s sweep, then a 0.6s rest */
+      content: "";
+    }
+  }
+  /* Rendered at once, faded in only after --sk-delay, so fast loads never
+     show it. Once React has shown a fallback it holds it for 300ms
+     (FALLBACK_THROTTLE_MS), so a shorter delay would flash the skeleton on
+     every navigation, however fast the server answered. */
+  .sk-region {
+    animation: sk-appear var(--dur-fast) var(--ease-out) var(--sk-delay) both;
+  }
+  /* No footer under a page skeleton: it would jump (layout shift) when the
+     real page, a different height, replaces the skeleton. */
+  body:has(main [data-route-loading]) > footer {
+    display: none;
+  }
+  /* The report shape under a running analysis: dimmed and still. */
+  .sk-still {
+    opacity: 0.4;
+  }
+  .sk-still .sk::after {
+    display: none;
+  }
+
+  /* Things that arrive on the client (a finished analysis, search results):
+     fade and rise, stepped by --i, never waiting past the 6th item. */
+  .reveal {
+    animation: reveal var(--dur-slow) var(--ease-out) both;
+    animation-delay: calc(var(--d0, 0ms) + min(var(--i, 0), 6) * var(--stagger));
+  }
+  /* The verdict headline is the largest paint: never start it at opacity 0.
+     Desktop gets a small rise; phones get nothing. */
+  @media (min-width: 1024px) {
+    .reveal-lcp {
+      animation: reveal-move var(--dur-slow) var(--ease-out) both;
+    }
+  }
+
+  /* Pending hint under a clicked link that doesn't prefetch (report tabs). */
+  .link-hint {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: currentColor;
+    opacity: 0;
+    transform: scaleX(0);
+    transform-origin: left center;
+    pointer-events: none;
+  }
+  .link-hint.is-pending {
+    animation: link-hint 900ms var(--ease-move) 100ms infinite;
+  }
+
+  /* Cards: a blue border and a slightly deeper shadow on hover. */
+  .card-hover {
+    transition:
+      border-color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .card-hover:hover {
+      border-color: var(--blue);
+      box-shadow: var(--card-shadow), 0 1px 0 0 var(--blue);
+    }
+  }
+
+  /* The report tab pill slides between the two tabs. */
+  .tab-pill {
+    transition:
+      translate 200ms var(--ease-move),
+      background-color 200ms var(--ease-move);
+  }
+}
+
+@keyframes sk-sweep {
+  66%,
+  100% {
+    translate: 100% 0;
+  }
+}
+@keyframes sk-appear {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes reveal {
+  from {
+    opacity: 0;
+    translate: 0 var(--shift);
+  }
+}
+@keyframes reveal-move {
+  from {
+    translate: 0 var(--shift);
+  }
+}
+@keyframes link-hint {
+  0% {
+    opacity: 1;
+    transform: scaleX(0);
+  }
+  60% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: movement goes, short fades and colour changes stay. */
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+  }
+  ::view-transition-new(*),
+  ::view-transition-old(*) {
+    animation-duration: var(--dur-fast) !important;
+    translate: none !important;
+  }
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .headline-line > span,
+  .meter > span,
+  .cat-face .cat-eye,
+  .scan::after {
+    animation: none !important;
+  }
+  .fade-up {
+    animation-name: fade-in;
+  }
+  .menu-chevron,
+  .tab-pill,
+  .link-hint {
+    transition: none;
+  }
+  .link-hint.is-pending {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 1023px) {
+  .fade-up {
+    animation: none;
+  }
+}
+
+/* Hacktoberfest pill: hidden once dismissed (the head script sets the
+   attribute before paint). Deliberately outside @layer: unlayered rules beat
+   layered ones, so the pill's own `inline-flex` utility can't override it. */
+:root[data-hf-dismissed] .hf-pill {
+  display: none;
+}
+
+/* Scroll-driven slide for the OPEN / SOURCE band (see scroll-marquee.tsx).
+   Only when the component opted in, so other engines never overlap. */
+@keyframes marquee-slide {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-18%, 0, 0);
+  }
+}
+@supports (animation-timeline: view()) {
+  .marquee[data-engine="css"] {
+    animation: marquee-slide linear both;
+    animation-timeline: view();
+    animation-range: entry 0% exit 100%;
   }
 }

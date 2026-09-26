@@ -64,7 +64,15 @@ class JobRunner:
         self.services = services
         self.concurrency = max(1, concurrency)
         # Never all workers: a user request always has a worker badges can't take.
-        self.badge_concurrency = max(0, min(badge_concurrency, self.concurrency - 1))
+        # Badge work (badge refreshes, warm passes) runs at most this many at
+        # once, and never on every worker when there are several. With a
+        # single worker it still gets that worker, but only when no user job
+        # is waiting: claims take the lowest priority number first. 0 turns
+        # badge work off entirely.
+        self.badge_concurrency = (
+            max(1, min(badge_concurrency, self.concurrency - 1)) if badge_concurrency > 0
+            else 0
+        )
         self.hub = Hub()
         self.worker_id = uuid.uuid4().hex
         self._wake = asyncio.Event()

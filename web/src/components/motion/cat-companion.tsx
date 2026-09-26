@@ -35,9 +35,10 @@ export function CatCompanion() {
       type="button"
       aria-label="Play with Holt, the site cat"
       data-cat-companion
-      className="pointer-events-auto absolute right-0 top-0 z-0 hidden lg:block h-[84px] w-[150px] origin-top-left text-blue opacity-45 [touch-action:manipulation] lg:fixed lg:right-auto lg:left-[calc(50%+380px)] lg:top-[160px] lg:h-[172px] lg:w-[250px] lg:opacity-85"
+      // One hover target sized to the whole face, above the hero text layer.
+      className="pointer-events-auto absolute z-20 hidden origin-top-left p-5 text-blue [touch-action:manipulation] lg:fixed lg:left-[calc(50%+360px)] lg:top-[130px] lg:inline-block lg:opacity-85"
     >
-      <span className="cat-character grid size-full place-items-center">
+      <span className="cat-character inline-block">
         <span
           className="cat-face text-[1.5rem] lg:text-[clamp(2.4rem,3.4vw,3.4rem)]"
           data-cat-face

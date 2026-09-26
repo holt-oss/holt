@@ -50,6 +50,24 @@ test("find: Python + Hacktoberfest lists a repo with an issue link", async ({ pa
   await expect(results.locator('a[href^="/"]').first()).toBeVisible();
 });
 
+test("Hacktoberfest pill: × hides it, and it stays hidden after a reload", async ({ page }, testInfo) => {
+  await page.goto("/");
+  const pill = page.locator(".hf-pill");
+  test.skip((await pill.count()) === 0, "no Hacktoberfest pill outside the season");
+  await expect(pill).toBeVisible();
+  const close = page.getByRole("button", { name: "Hide the Hacktoberfest notice" });
+  if (testInfo.project.name === "phone") {
+    const box = await close.boundingBox();
+    // 43.5: layout can land a hair under 44px at fractional device pixel ratios.
+    expect(box?.height ?? 0, "the × is a comfortable tap target").toBeGreaterThanOrEqual(43.5);
+  }
+  await close.click();
+  await expect(page).toHaveURL(/\/$/); // dismissing must not navigate
+  await expect(pill).toBeHidden();
+  await page.reload();
+  await expect(pill).toBeHidden();
+});
+
 test("theme toggle persists across a reload", async ({ page }) => {
   await page.goto("/");
   const html = page.locator("html");

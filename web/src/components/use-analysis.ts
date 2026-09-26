@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import type { ApiError, Mode, Report } from "@/lib/types";
 
 export type AnalysisState =
@@ -12,7 +12,7 @@ export type AnalysisState =
 const LOST: ApiError = { code: "upstream", message: "We lost the connection while the report was running. It may have finished; try again." };
 
 /** Start (or reuse) an analysis and follow its progress over SSE. */
-export function useAnalysis(repo: string, mode: Mode, days: number, enabled = true) {
+export function useAnalysis(repo: string, mode: Mode, days: number, enabled = true, model?: string) {
   const [state, setState] = useState<AnalysisState>({ phase: "starting" });
   const [attempt, setAttempt] = useState(0);
   const es = useRef<EventSource | null>(null);
@@ -26,7 +26,7 @@ export function useAnalysis(repo: string, mode: Mode, days: number, enabled = tr
         res = await fetch("/api/analyses", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ repo, mode, days }),
+          body: JSON.stringify({ repo, mode, days, ...(mode === "ai" && model ? { model } : {}) }),
         });
       } catch {
         if (!cancelled) setState({ phase: "error", error: LOST });
@@ -39,7 +39,7 @@ export function useAnalysis(repo: string, mode: Mode, days: number, enabled = tr
         return;
       }
       if (body.status === "done") {
-        setState({ phase: "done", report: body.report });
+        startTransition(() => setState({ phase: "done", report: body.report }));
         return;
       }
       setState({ phase: "running", stage: "Getting in line", progress: 0.02 });
@@ -51,7 +51,10 @@ export function useAnalysis(repo: string, mode: Mode, days: number, enabled = tr
       });
       src.addEventListener("done", (e) => {
         src.close();
-        setState({ phase: "done", report: JSON.parse((e as MessageEvent).data).report });
+        const report = JSON.parse((e as MessageEvent).data).report;
+        // A transition, so the <ViewTransition>s around the progress and the
+        // report crossfade them (a plain setState swaps instantly).
+        startTransition(() => setState({ phase: "done", report }));
       });
       src.addEventListener("error", (e) => {
         const data = (e as MessageEvent).data;
@@ -69,7 +72,7 @@ export function useAnalysis(repo: string, mode: Mode, days: number, enabled = tr
       cancelled = true;
       es.current?.close();
     };
-  }, [repo, mode, days, attempt, enabled]);
+  }, [repo, mode, days, attempt, enabled, model]);
 
   const retry = useCallback(() => {
     setState({ phase: "starting" });

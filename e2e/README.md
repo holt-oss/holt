@@ -26,11 +26,21 @@ What they check:
   redirects to the report.
 - `/find` with Python + Hacktoberfest lists at least one repo with a GitHub
   issue link. If the site is rate limiting us, the test is skipped, not failed.
+- The Hacktoberfest pill's × hides it, and it stays hidden after a reload (skipped outside the season).
 - The theme toggle survives a reload.
 - `/pricing` shows the plans.
 - The extension's `/api/public/*` endpoints answer JSON with CORS headers.
 - `/__build` is valid JSON.
+- Phones (`tests/mobile.spec.ts`): no page scrolls sideways at 360px (the
+  failure names the elements that stick out), the viewport meta is
+  device-width, and on desktop the OPEN / SOURCE band moves as you scroll.
 - `/`, `/pallets/flask`, `/find`, `/pricing` and `/how-it-works` log no console errors.
+- Motion (`tests/motion.spec.ts`, see `docs/design/MOTION.md`): no layout
+  shift on `/`, `/pallets/flask`, `/find?go=1…` and `/pricing`, cold and
+  after a client navigation; a slow page (its response held 600ms) shows the
+  loading skeleton and keeps it at least 300ms; a fast one (server under
+  100ms, else skipped) never shows it; the phone menu opens and closes on
+  Escape, a click outside and a link; with reduced motion, nothing moves.
 
 Staging runs this suite after every rebuild (`deploy/staging/preview.sh`)
 and shows the result on `/__build` under `"smoke"`. A failure doesn't roll

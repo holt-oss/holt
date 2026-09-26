@@ -697,6 +697,19 @@ def friendly_error(exc: BaseException, repo: str | None = None,
             f"Please report it at {ISSUES_URL} (run again with HOLT_DEBUG=1 for details).")
 
 
+def _installed_version() -> str:
+    """The installed package version, or a fallback for source trees."""
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+
+        try:
+            return version("holt-cli")
+        except PackageNotFoundError:
+            return version("holt")
+    except Exception:
+        return "dev"
+
+
 def main(argv: list[str] | None = None) -> int:
     # The one place the user's model configuration takes effect. Library and
     # eval code resolve against the pinned defaults, always.
@@ -712,6 +725,11 @@ def main(argv: list[str] | None = None) -> int:
             "\nNo AI model is needed. Add one for a written explanation: holt models"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {_installed_version()}",
     )
     # Not required: bare `holt` opens the interface. Every existing invocation
     # keeps working unchanged, and the eval harness calls `holt analyze`
