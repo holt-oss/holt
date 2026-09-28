@@ -9,13 +9,14 @@ enforced rather than remembered.
 from __future__ import annotations
 
 import json
+import re
 from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
 from holt.evidence.fixtures import FixtureProvider, redact_records, write_fixture
-from holt.evidence.redact import MARKER, redact_payload
+from holt.evidence.redact import CREDENTIAL_PATTERNS, MARKER, redact_payload
 from holt.types import T_CUTOFF, EvidenceRecord, Window
 
 BEFORE = T_CUTOFF - timedelta(days=1)
@@ -81,12 +82,35 @@ def test_redaction_preserves_evidence_identity():
     assert scrubbed[0].timestamp == BEFORE
 
 
-@pytest.mark.parametrize("root", ["fixtures"])
-def test_no_committed_fixture_carries_a_credential(root):
+# The scan is split so pytest-xdist can spread it over workers: the fixtures
+# are ~300 MB and one test reading all of them was the slowest in the suite.
+SHARDS = 8
+FIXTURES = sorted(Path("fixtures").rglob("*.json"))
+# Every tier-1 pattern matches only ASCII letters, digits, `_` and `-`, which
+# JSON never escapes, so a credential in any decoded string also matches the
+# raw file. A file with no raw match needs no parsing; one with a match (a
+# possible false alarm, say inside a key) gets the full check below.
+RAW = [re.compile(p.pattern.encode()) for p in CREDENTIAL_PATTERNS]
+
+
+def test_the_raw_prefilter_sees_every_credential_json_can_hold():
+    """The shortcut above is only safe if it never hides a hit from the full check."""
+    for text in (f"é\n{LIVE_LOOKING_PAT}\t\"x\"", f"\\{LIVE_LOOKING_PAT}", f"<{LIVE_LOOKING_PAT}>"):
+        for ascii_only in (True, False):
+            raw = json.dumps({"payload": {"body": text}}, ensure_ascii=ascii_only).encode()
+            assert any(p.search(raw) for p in RAW), (text, ascii_only)
+
+
+@pytest.mark.parametrize("shard", range(SHARDS))
+def test_no_committed_fixture_carries_a_credential(shard):
     """The guard that would have caught this before it was ever committed."""
+    assert len(FIXTURES) > 50
     offenders = []
-    for path in sorted(Path(root).rglob("*.json")):
-        data = json.loads(path.read_text())
+    for path in FIXTURES[shard::SHARDS]:
+        raw = path.read_bytes()
+        if not any(p.search(raw) for p in RAW):
+            continue
+        data = json.loads(raw)
         if "records" not in data:
             continue
         _, hits = redact_records(

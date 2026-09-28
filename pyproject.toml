@@ -50,7 +50,8 @@ Security = "https://github.com/holt-oss/holt/security/policy"
 # holt-server is the web API in server/. It rides in the dev group so one
 # `uv sync` gives a working tree for both, and its tests run with the rest.
 # Dependency groups are never published, so the PyPI package is unaffected.
-dev = ["pytest>=8.0", "holt-server"]
+# pytest-xdist runs the suite across cores: `uv run pytest -n auto` (CI does).
+dev = ["pytest>=8.0", "pytest-xdist>=3.8", "holt-server"]
 
 [tool.uv.workspace]
 members = ["server"]

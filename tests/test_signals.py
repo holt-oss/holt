@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import pytest
+
 from holt.agent import people
 from holt.agent.signals import build_threads, compute, first_timer_threads, outsider_threads
 from holt.evidence.fixtures import FixtureProvider, fixture_root
@@ -251,11 +253,16 @@ def _pre_ticket_outsiders(threads):
     ]
 
 
-def test_every_committed_fixture_counts_outsiders_exactly_as_before():
+# Split so pytest-xdist can spread the committed fixtures over workers.
+SHARDS = 4
+
+
+@pytest.mark.parametrize("shard", range(SHARDS))
+def test_every_committed_fixture_counts_outsiders_exactly_as_before(shard):
     paths = sorted((fixture_root() / Window.PRE_T.value).glob("*.json"))
     assert len(paths) > 50
     provider = FixtureProvider(Window.PRE_T)
-    for path in paths:
+    for path in paths[shard::SHARDS]:
         threads = build_threads(provider.fetch(path.stem.replace("__", "/")))
         assert keys(outsider_threads(threads)) == keys(_pre_ticket_outsiders(threads)), path.name
 

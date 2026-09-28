@@ -10,14 +10,64 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
 jobs:
+  # On a pull request the Python jobs run unless every changed file is in the
+  # web app, the extension, the e2e tests, the legacy site or the docs. The
+  # exceptions are files a Python test reads (the docs whose numbers
+  # test_docs_claims checks, the example report test_example_report compares,
+  # the e2e files test_staging_preview scans). On main everything always runs.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      python: ${{ steps.code.outputs.python == 'true' || steps.read.outputs.read == 'true' }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dorny/paths-filter@v4.0.3
+        id: code
+        with:
+          # A file counts only if it matches every pattern: anything outside those folders.
+          predicate-quantifier: every
+          filters: |
+            python:
+              - '**'
+              - '!web/**'
+              - '!extension/**'
+              - '!e2e/**'
+              - '!website/**'
+              - '!docs/**'
+      - uses: dorny/paths-filter@v4.0.3
+        id: read
+        with:
+          filters: |
+            read:
+              - 'docs/research/**'
+              - 'docs/USAGE.md'
+              - 'web/src/lib/example-ai-report.json'
+              - 'e2e/playwright.config.ts'
+              - 'e2e/lighthouse.mjs'
+
   package:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Build distributions
         run: uv build
@@ -33,6 +83,8 @@ jobs:
           .release-venv/bin/holt --help
 
   tests:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -41,12 +93,14 @@ jobs:
         uses: astral-sh/setup-uv@v10.1.0
         with:
           enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Install
-        run: uv sync
+        run: uv sync --locked
 
+      # One worker per core (pytest-xdist).
       - name: Tests
-        run: uv run pytest -rs
+        run: uv run pytest -rs -n auto --durations=15
 
       # The no-key paths remain part of the product contract even though PyPI
       # installs are aimed at live use.
@@ -62,8 +116,11 @@ jobs:
         run: uv run python -m golden check
 
   # The server's tests again, on the database production runs. The app's
-  # startup migrates it from empty, so the migrations are exercised too.
+  # startup migrates it from empty, so the migrations are exercised too. Each
+  # xdist worker gets its own database, made by server/tests/conftest.py.
   server-postgres:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -89,9 +146,10 @@ jobs:
         uses: astral-sh/setup-uv@v10.1.0
         with:
           enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Install
-        run: uv sync
+        run: uv sync --locked
 
       - name: Migrate an empty database and compare it with the models
         working-directory: server
@@ -100,4 +158,4 @@ jobs:
           uv run python -m holt_server.migrate check
 
       - name: Server tests
-        run: uv run pytest -rs server/tests
+        run: uv run pytest -rs -n auto --durations=15 server/tests

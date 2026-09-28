@@ -84,6 +84,41 @@ class FakeDetails:
         return {r: self.known.get(r.lower()) for r in repos}
 
 
+def _database_per_xdist_worker() -> None:
+    """Under pytest-xdist every harness would drop the tables another worker is
+    using, so each worker gets its own database next to the one in
+    HOLT_TEST_DATABASE_URL (`holt` -> `holt_gw0`, ...), created on first use."""
+    url = os.environ.get("HOLT_TEST_DATABASE_URL")
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    if not url or not worker or not url.startswith("postgresql"):
+        return
+    import asyncio
+
+    import asyncpg
+    from sqlalchemy.engine import make_url
+
+    base = make_url(url)
+    name = f"{base.database}_{worker}"
+
+    async def create() -> None:
+        conn = await asyncpg.connect(
+            user=base.username, password=base.password, host=base.host,
+            port=base.port or 5432, database=base.database,
+        )
+        try:
+            if not await conn.fetchval("SELECT 1 FROM pg_database WHERE datname = $1", name):
+                await conn.execute(f'CREATE DATABASE "{name}"')
+        finally:
+            await conn.close()
+
+    asyncio.run(create())
+    os.environ["HOLT_TEST_DATABASE_URL"] = base.set(database=name).render_as_string(
+        hide_password=False)
+
+
+_database_per_xdist_worker()
+
+
 def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
     values = {
         # Set HOLT_TEST_DATABASE_URL to run against a real Postgres (e.g. the

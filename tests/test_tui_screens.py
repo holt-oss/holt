@@ -102,7 +102,9 @@ def drive(body, store_root: Path, size=(100, 44)):
     async def main():
         app = HoltApp(None, assessments=store.Store(root=store_root))
         async with app.run_test(size=size) as pilot:
-            await pilot.pause(0.2)
+            # run_test returns once the home screen is mounted; this lets
+            # what mounting queued (the recent list, focus) finish.
+            await pilot.pause()
             await body(app, pilot)
 
     asyncio.run(main())
@@ -137,7 +139,7 @@ async def show_report(app, pilot, **kw):
 
     app.session = fake_run.finished(**kw)
     await app.push_screen(AssessmentScreen())
-    await pilot.pause(0.3)
+    await pilot.pause()
     return app.screen
 
 
