@@ -11,6 +11,7 @@ import type { FeedbackInput } from "./feedback";
 import { isJobId } from "./ids";
 import * as mock from "./mock/server";
 import { isValidRepo } from "./repo";
+import { retryDropped } from "./upstream-retry";
 
 export const MOCK = process.env.MOCK_API === "1";
 const BASE = (process.env.HOLT_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
@@ -39,12 +40,13 @@ async function call<T>(path: string, init: RequestInit & { caller?: Caller } = {
   const { caller, ...rest } = init;
   let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`, {
+    const signal = rest.signal ?? AbortSignal.timeout(20_000);
+    res = await retryDropped(() => fetch(`${BASE}${path}`, {
       ...rest,
       cache: "no-store",
       headers: { ...headers(caller), ...(rest.body ? { "Content-Type": "application/json" } : {}) },
-      signal: rest.signal ?? AbortSignal.timeout(20_000),
-    });
+      signal,
+    }));
   } catch {
     return { ok: false, status: 502, error: UNREACHABLE };
   }
@@ -99,11 +101,11 @@ export async function jobEvents(kind: JobKind, jobId: string, signal: AbortSigna
   }
   if (MOCK) return mock.jobEvents(kind, jobId, signal);
   try {
-    return await fetch(`${BASE}/v1/${kind}/${enc(jobId)}/events`, {
+    return await retryDropped(() => fetch(`${BASE}/v1/${kind}/${enc(jobId)}/events`, {
       headers: { ...headers(), Accept: "text/event-stream" },
       cache: "no-store",
       signal,
-    });
+    }));
   } catch {
     const body = `event: error\ndata: ${JSON.stringify({ error: UNREACHABLE })}\n\n`;
     return new Response(body, { headers: { "Content-Type": "text/event-stream" } });
@@ -298,7 +300,7 @@ export async function badge(owner: string, repo: string): Promise<Response> {
   if (!isValidRepo(owner, repo)) return new Response("Not found", { status: 404 });
   if (MOCK) return mock.badge(`${owner}/${repo}`);
   try {
-    const res = await fetch(`${BASE}/badge/${enc(owner)}/${enc(repo)}.svg`, { next: { revalidate: 3600 } });
+    const res = await retryDropped(() => fetch(`${BASE}/badge/${enc(owner)}/${enc(repo)}.svg`, { next: { revalidate: 3600 } }));
     return new Response(res.body, {
       status: res.status,
       // The server's cache policy, so a badge that turns neutral isn't held for a day.
