@@ -18,7 +18,8 @@
 # or exits, it is removed and the old one keeps serving: returns 1 and
 # SWAP_MSG says why, with the new container's last log lines. On success
 # SWAP_MSG says how long it took. A service with no container yet is just
-# started (and waited for).
+# started (and waited for); one whose container already runs the current
+# config and image is left alone.
 #
 # Needs a healthcheck on <svc> (compose.yml); a service without one counts
 # as ready once it is running. The service must not publish a host port or
@@ -39,11 +40,25 @@ _swap_state() {   # healthy | starting | unhealthy | running (no healthcheck) | 
     if [[ "${out%% *}" != 0 ]]; then echo "crashing (restarted ${out%% *}x)"; else echo "${out#* }"; fi
 }
 
+_swap_current() {   # svc id: the one container already runs this config and image
+    local want have ref
+    want="$(compose config --hash "$1" 2>/dev/null | awk '{print $2}')"
+    have="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.config-hash"}} {{.Image}} {{.State.Status}} {{.Config.Image}}' "$2" 2>/dev/null)" || return 1
+    ref="${have##* }"
+    [[ -n "$want" && "$have" == "$want $(docker image inspect -f '{{.Id}}' "$ref" 2>/dev/null) running $ref" ]]
+}
+
 swap_service() {
     local svc="$1" timeout="${2:-180}" old new n state started=$SECONDS
     SWAP_MSG=
     old="$(_swap_ids "$svc")"
     n="$(printf '%s' "$old" | grep -c . || true)"
+    # Nothing new for it (same config, same image): leave it running, as
+    # `compose up -d` would. A server restart would interrupt its jobs.
+    if (( n == 1 )) && _swap_current "$svc" "$old"; then
+        SWAP_MSG="$svc: unchanged, left running"
+        return 0
+    fi
     # --no-recreate keeps the old container as it is; the extra one is
     # created from the config as it is now.
     if ! compose up -d --no-deps --no-recreate --scale "$svc=$((n + 1))" "$svc" >/dev/null 2>&1; then

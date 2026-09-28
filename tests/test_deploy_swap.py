@@ -102,6 +102,7 @@ case "$1" in
     compose)
         case " $* " in
             *" ps "*) cut -d' ' -f1 "$db" ;;
+            *" config --hash "*) echo "web hash1" ;;
             *" up "*)
                 all="$*"; want="${all##*--scale }"; want="${want%% *}"; want="${want#*=}"
                 have=$(grep -c . "$db")
@@ -109,7 +110,12 @@ case "$1" in
                     have=$((have + 1)); echo "new$have ${STUB_NEW_STATE:-healthy}" >> "$db"
                 done ;;
         esac ;;
+    image) echo "sha256:img" ;;   # image inspect: the tag's current image
     inspect) id="${@: -1}"; state=$(grep "^$id " "$db" | cut -d' ' -f2)
+        if [[ "$*" == *config-hash* ]]; then   # swap.sh's "already current?" check
+            [[ -n "$STUB_CURRENT" ]] && echo "hash1 sha256:img $state web:tag" || echo "hash0 sha256:old $state web:tag"
+            exit 0
+        fi
         restarts=0; [[ "$state" == crashing ]] && { restarts=2; state=restarting; }
         echo "$restarts $state" ;;
     logs) echo "boom: port in use" ;;
@@ -179,7 +185,7 @@ def test_a_crashing_new_container_fails_at_once(stub: Path) -> None:
     assert done.returncode == 1
     assert left == "old1 healthy\n"
     assert "crashing (restarted 2x)" in done.stdout
-    assert (stub / "calls").read_text(encoding="utf-8").count("inspect") == 1
+    assert (stub / "calls").read_text(encoding="utf-8").count("RestartCount") == 1
 
 
 def test_a_first_run_just_starts_the_service(stub: Path) -> None:
@@ -187,3 +193,14 @@ def test_a_first_run_just_starts_the_service(stub: Path) -> None:
     assert done.returncode == 0, done.stdout + done.stderr
     assert left == "new1 healthy\n"
     assert "retired" not in done.stdout
+
+
+def test_an_unchanged_service_is_left_running(stub: Path) -> None:
+    # Same config and image as the running container: no new one, no restart
+    # (a server restart would interrupt its jobs).
+    done, left = swap(stub, "old1 running\n", STUB_CURRENT="1")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert left == "old1 running\n"
+    assert "unchanged, left running" in done.stdout
+    calls = (stub / "calls").read_text(encoding="utf-8")
+    assert "--scale" not in calls and "stop" not in calls

@@ -190,6 +190,10 @@ are sized for it. Participation is governed by the
 security reports follow
 [SECURITY.md](https://github.com/holt-oss/holt/blob/main/SECURITY.md).
 
+Working on Holt regularly? [docs/DEV-WORKFLOW.md](https://github.com/holt-oss/holt/blob/main/docs/DEV-WORKFLOW.md)
+is the one-page guide: run the web app locally, preview a branch on staging,
+and what CI and deploys expect.
+
 > Holt started as the winner of **Most useful real-world workflow** at the
 > micro1 Frontier Engineering Challenge.
 

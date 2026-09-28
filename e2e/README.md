@@ -81,6 +81,9 @@ What they check:
   nothing; the phone menu opens and closes on
   Escape, a click outside and a link; with reduced motion, nothing moves.
 
-Staging runs this suite after every rebuild (`deploy/staging/preview.sh`)
-and shows the result on `/__build` under `"smoke"`. A failure doesn't roll
-the build back.
+Staging runs this suite after every rebuild goes live
+(`deploy/staging/preview.sh`, three browsers at once) and shows the result
+on `/__build` under `"smoke"`. A failure doesn't roll the build back. The
+tests don't sign in or change anything another test reads, so they can run
+in parallel; keep it that way. `[skip smoke]` in a commit message skips the
+run for the build that commit is new in.

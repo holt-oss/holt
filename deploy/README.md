@@ -5,11 +5,11 @@ app and API server.
 
 | Path | What |
 |---|---|
-| `server/Dockerfile` | API server (`server/`) plus the engine (`src/holt`). uv, slim Python, non-root. Build context: repo root. |
-| `web/Dockerfile` | Web app (`web/`). Next.js standalone output when `web/next.config` sets `output: "standalone"`, otherwise `next start` with production `node_modules`. Build context: `web/`. |
+| `server/Dockerfile` | API server (`server/`) plus the engine (`src/holt`). uv, slim Python, non-root. Build context: repo root. uv's cache is a BuildKit cache mount. |
+| `web/Dockerfile` | Web app (`web/`). Next.js standalone output when `web/next.config` sets `output: "standalone"`, otherwise `next start` with production `node_modules`. Build context: `web/`. npm's cache and `.next/cache` (Turbopack's incremental build cache) are BuildKit cache mounts, so a small change rebuilds only what it touches. |
 | `staging/compose.yml` | The staging stack, compose project `stage-holt-new`: Postgres, one-shot web and server migrations, server, web, and a small nginx `edge` that serves `/__build` and proxies everything else to web. Only `edge` publishes a port, on `127.0.0.1:9110`. Every URL in it comes from `STAGING_HOST`. |
-| `staging/preview.sh` | One update: build `origin/main` + every open PR labelled `staging` + `staging/extra-branches`, run the migrations, swap server and web with no gap (`swap.sh`). |
-| `staging/install.sh` | One-time setup: the timer's copy of `preview.sh` (and `edge.sh`, `swap.sh`) and the systemd `--user` timer (every 3 minutes). It does not touch the public route. |
+| `staging/preview.sh` | One update: build `origin/main` + every open PR labelled `staging` + `staging/extra-branches`, rebuild only the images whose inputs changed, run the migrations, swap server and web with no gap (`swap.sh`), then start the smoke tests. |
+| `staging/install.sh` | One-time setup: the timer's copy of `preview.sh` (and `edge.sh`, `swap.sh`), the systemd `--user` timer (1 minute after the last run ends) and the smoke-test unit. It does not touch the public route. |
 | `edge.sh` | Sourced by `prod/deploy.sh` and `staging/preview.sh`: when `edge.conf` changed, checks it with `nginx -t` in the running edge and reloads it (the port stays open); a rejected config is put back and the run fails. |
 | `swap.sh` | Sourced by `prod/deploy.sh` and `staging/preview.sh`: `swap_service` replaces a service's container with no gap (the new one starts beside the old one; the old one goes once the new one is healthy). The edges also show a "Holt is updating" page (503, never cached) if web can't be reached; see [`prod/README.md`](prod/README.md#the-updating-page). |
 | `staging/compose.pro.yml` | The optional paid-features service beside staging, compose project `stage-holt-pro`, joined to the staging network as `pro`, no published port. `preview.sh` runs it; see "Paid features". |
@@ -19,7 +19,8 @@ app and API server.
 ## Staging: https://staging.githolt.com
 
 It shows **origin/main merged with every open PR that has the `staging`
-label**, rebuilt automatically within a few minutes of a push. To put a PR
+label**, rebuilt automatically within a couple of minutes of a push (a
+web-only change rebuilds only the web image). To put a PR
 on staging, add the label; to take it off, remove it. A branch with no PR
 yet can go in `staging/extra-branches` (on main or in a labelled PR).
 A PR that conflicts is left out and the reason is shown on `/__build`.
@@ -27,8 +28,22 @@ A PR that conflicts is left out and the reason is shown on `/__build`.
 **What's live:** https://staging.githolt.com/__build lists the main
 commit, each included PR and its commit, skipped ones with the reason, the
 build time, the smoke-test result for that build (`"smoke"`: passed or
-failed, with each failing test), and the last attempt (building / waiting /
-failed + why).
+failed, with each failing test), the last attempt (building / waiting /
+failed + why), and **`"now"`**: what is happening right now, so you know
+when to refresh:
+
+| `now.state` | Means |
+|---|---|
+| `waiting` | A change is queued; the server is too busy to build yet. |
+| `building` | Building; `now.message` names the image (`building web (abc1234)`). |
+| `starting` | Images built; new containers start beside the old ones and take over once healthy (no gap). |
+| `live` | The latest build is up. Refresh. |
+| `smoke` | The latest build is up (refresh) and the smoke tests are running on it. |
+| `failed` | The last build failed (`last_attempt` says why); the site shows the build before it. |
+
+```sh
+curl -s https://staging.githolt.com/__build | jq .now
+```
 
 Staging is never indexed (`ROBOTS_NOINDEX=1` at build and run time), and it
 shares nothing with production: its own database, keys, images and builder.
@@ -215,7 +230,9 @@ To take it away: remove `STAGING_HOLT_PRO_KEY`, run `preview.sh` with
 - Everything lives in `~/.local/share/holt-staging/`: `src/` is a dedicated
   clone checked out at the preview commit, `src/deploy/staging/.env` holds
   the secrets and `STAGING_HOST`, `logs/` keeps the last 10 build logs,
-  `fingerprint` is what was last built.
+  `fingerprint` is what was last built, `images/` what each image was built
+  from, and `live.json`, `attempt.json`, `smoke.json` and `now.json` are
+  the parts `/__build` is made from.
 - The timer runs `~/.local/share/holt-staging/bin/preview.sh` (a copy, so a
   PR can't change the loop; re-run `install.sh` after editing it or
   `deploy/edge.sh`).
@@ -228,9 +245,22 @@ To take it away: remove `STAGING_HOLT_PRO_KEY`, run `preview.sh` with
   deploy/staging/install.sh", leaving the running stack as it was.
 - A run does nothing unless main, a labelled PR, an extra branch or
   `STAGING_HOST` moved.
-- Builds never overlap (`flock`), and wait until the 1-minute load is under
-  6 and MemAvailable is over 3 GB (for up to 30 minutes; then the next tick
-  tries again).
+- Only what changed is rebuilt. Each image's inputs are hashed: the git
+  trees of what its build context sends (for the server, the `!` lines of
+  `server/Dockerfile.dockerignore` plus `deploy/server/`; for web, `web/`
+  plus `deploy/web/`; for paid features, its commit), and its build section
+  from compose with the build args resolved (the host, the contact
+  details). An image is rebuilt when that hash differs from the one it was
+  last built from (`images/<service>` in the state directory), or when the
+  image is gone or was replaced. A web-only change never rebuilds the
+  server, and a change to neither (docs, `edge.conf`) just restarts the
+  stack. `FORCE=1` rebuilds everything.
+- Builds never overlap (`flock`), and wait until MemAvailable is over 3 GB
+  and the 1-minute load is under 6 when the server image rebuilds, or under
+  10 when only web or paid features do (the run is niced), for up to 30
+  minutes; then the next tick tries again. A run with nothing to build
+  doesn't wait. (`HOLT_STAGE_MAX_LOAD`, `HOLT_STAGE_MAX_LOAD_LIGHT` and
+  `HOLT_STAGE_MIN_AVAIL_MB` change the limits.)
 - Images build on a buildx builder of its own (`holt-stage`, 3 GB memory
   cap), so after each build it prunes only its own cache and only images
   labelled `holt.stage=holt-new` (the label comes from `compose.yml`, so
@@ -239,10 +269,18 @@ To take it away: remove `STAGING_HOLT_PRO_KEY`, run `preview.sh` with
 - The names `stage-holt-new` and `holt.stage=holt-new` come from the site's
   first address. They are only names, and they stay: renaming the compose
   project would start a second stack with an empty database.
-- After each build goes live it runs the `e2e/` smoke suite once against the
-  public URL (one browser, `--workers=1`). A failure does not roll back; it
-  shows on `/__build`. Set `HOLT_STAGE_SMOKE=0` in the environment of the
-  service to skip it.
+- The smoke tests come strictly after the site is live and never delay it.
+  Each build that goes live starts `holt-stage-smoke.service`, which runs
+  the `e2e/` suite from the live commit against the public URL, three
+  browsers at once (`HOLT_STAGE_SMOKE_WORKERS`). It runs on its own, so the
+  next change is picked up while it runs; that build stops it first (it
+  would be testing a site about to change; `/__build` then shows it as
+  `cancelled`). A failure does not roll back; it shows on `/__build`.
+- To skip the smoke tests for one build, put `[skip smoke]` in the message
+  of a commit in it (handy while iterating on layout), or run
+  `preview.sh --no-smoke`. `touch ~/.local/share/holt-staging/no-smoke`
+  skips them for every build until the file is removed;
+  `HOLT_STAGE_SMOKE=0` in the service's environment does the same.
 - Memory limits: web 512m, server 512m, db 256m, edge 32m, and the
   paid-features service 256m when it runs.
 - The policy pages' contact details (`CONTACT_EMAIL`, `CONTACT_CITY`) are
@@ -273,8 +311,18 @@ journalctl --user -u holt-stage -f                 # the update loop
 ls -t ~/.local/share/holt-staging/logs | head -2   # latest build and smoke logs
 dc logs -f --tail 100 server web
 
-# rebuild now (skips the load check)
+# what's happening now (refresh when it says live or smoke)
+curl -s https://staging.githolt.com/__build | jq .now
+
+# what the next run would rebuild, and why (fetches and merges; builds and starts nothing)
+~/.local/share/holt-staging/bin/preview.sh --dry-run
+
+# rebuild everything now (skips the load check)
 FORCE=1 ~/.local/share/holt-staging/bin/preview.sh
+
+# smoke tests: run them again on what's live, or watch them
+systemctl --user start holt-stage-smoke.service
+journalctl --user -u holt-stage-smoke -f
 
 # turn auto-update off / on
 systemctl --user disable --now holt-stage.timer

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # One-time setup of the auto-updating Holt staging preview on this box.
-#   deploy/staging/install.sh           install + start the 3-minute timer
+#   deploy/staging/install.sh           install + start the 1-minute timer
 #   deploy/staging/install.sh --no-timer  install only (run preview.sh by hand)
 #
 # - copies preview.sh, ../edge.sh and ../swap.sh to ~/.local/share/holt-staging/bin/ (the
 #   timer runs that copy, so a PR can't change the loop; re-run install.sh to
 #   update it)
-# - writes the systemd --user units holt-stage.service / holt-stage.timer
+# - writes the systemd --user units holt-stage.service / holt-stage.timer,
+#   and holt-stage-smoke.service, the smoke run that holt-stage.service
+#   starts once a build is live (it has no timer of its own)
 # It does not route the site: https://$STAGING_HOST (default
 # staging.githolt.com) reaches the stack's port through a Cloudflare tunnel,
 # and that config is hand-managed (deploy/README.md, "The public route").
@@ -31,18 +33,30 @@ After=network-online.target docker.service
 [Service]
 Type=oneshot
 ExecStart=$STATE/bin/preview.sh
+Environment=HOLT_STAGE_SMOKE_UNIT=holt-stage-smoke.service
 Nice=10
 IOSchedulingClass=idle
 TimeoutStartSec=2h
 UNIT
 
+cat > "$UNITS/holt-stage-smoke.service" <<UNIT
+[Unit]
+Description=Holt staging preview: smoke tests against the live build
+
+[Service]
+Type=oneshot
+ExecStart=$STATE/bin/preview.sh --smoke
+Nice=10
+TimeoutStartSec=30min
+UNIT
+
 cat > "$UNITS/holt-stage.timer" <<UNIT
 [Unit]
-Description=Check for Holt staging changes every 3 minutes
+Description=Check for Holt staging changes every minute
 
 [Timer]
 OnBootSec=2min
-OnUnitInactiveSec=3min
+OnUnitInactiveSec=1min
 AccuracySec=15s
 
 [Install]

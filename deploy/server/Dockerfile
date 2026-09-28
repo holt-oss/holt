@@ -1,20 +1,23 @@
 # Holt API server (server/) plus the engine it wraps (src/holt).
 # Build context: the repository root.
 #   docker build -f deploy/server/Dockerfile .
+# The files it reads are the `!` lines of Dockerfile.dockerignore; staging's
+# preview.sh hashes the same list to decide whether to rebuild this image.
 FROM python:3.12-slim AS build
 # The venv must sit at the same path in both stages: its scripts' shebangs are absolute.
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
 
-# Dependencies first, so source edits don't reinstall them.
+# Dependencies first, so source edits don't reinstall them. uv's cache is a
+# BuildKit cache mount: kept by the builder between builds, never in the image.
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
 COPY server/pyproject.toml server/pyproject.toml
-RUN uv sync --frozen --no-dev --package holt-server --no-install-workspace
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --package holt-server --no-install-workspace
 
 COPY src/ src/
 COPY server/ server/
-RUN uv sync --frozen --no-dev --package holt-server --no-editable
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --package holt-server --no-editable
 
 FROM python:3.12-slim
 RUN useradd --create-home --uid 10001 holt

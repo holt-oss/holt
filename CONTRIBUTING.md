@@ -76,6 +76,10 @@ it. Link the issue with `Fixes #123`.
 
 ## Full development setup
 
+Day-to-day work on the web app or the pipeline (mock data, the full local
+stack, the staging preview, CI, deploys) is in
+[docs/DEV-WORKFLOW.md](docs/DEV-WORKFLOW.md). What follows is the engine setup.
+
 Holt requires Python 3.11 or newer. The repository pins its working Python
 version and dependencies through [`uv`](https://docs.astral.sh/uv/).
 

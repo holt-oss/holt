@@ -16,6 +16,7 @@ Start with the [README](../README.md). Everything else is here.
 | Page | What it is for |
 |---|---|
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | Your first pull request in 15 minutes, then the full setup |
+| [DEV-WORKFLOW.md](DEV-WORKFLOW.md) | Working on Holt every day: local web with mock or real data, engine changes, branch to staging to production, the rules that bite |
 | [../web/README.md](../web/README.md) | The web app (Next.js): run it locally, routes, mock API |
 | [../server/README.md](../server/README.md) | The HTTP API server (FastAPI): run it, environment |
 | [../API.md](../API.md) | The contract between the server and the web app |

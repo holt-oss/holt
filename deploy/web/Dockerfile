@@ -4,10 +4,15 @@
 # Uses Next.js standalone output when web/next.config sets
 # `output: "standalone"` (small image); otherwise falls back to
 # `next start` with production node_modules, so it works either way.
+#
+# npm's download cache and Next's build cache (.next/cache, which holds
+# Turbopack's incremental build cache) are BuildKit cache mounts: the builder
+# keeps them between builds, so a small change rebuilds only what it touches.
+# They never end up in the image.
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 
 FROM deps AS build
 COPY . .
@@ -26,7 +31,7 @@ ENV NEXT_PUBLIC_SITE_HOST=$NEXT_PUBLIC_SITE_HOST \
     NEXT_PUBLIC_CONTACT_CITY=$NEXT_PUBLIC_CONTACT_CITY \
     ROBOTS_NOINDEX=$ROBOTS_NOINDEX \
     NEXT_TELEMETRY_DISABLED=1
-RUN npm run build && rm -rf .next/cache
+RUN --mount=type=cache,target=/app/.next/cache,sharing=locked npm run build
 RUN mkdir /out && \
     if [ -d .next/standalone ]; then \
       cp -a .next/standalone/. /out/ && \
