@@ -36,11 +36,18 @@ pytestmark = pytest.mark.skipif(
 )
 
 STUBS = {
-    # What compose was given when the stack was started.
+    # What compose was given when the stack was started. deploy/swap.sh
+    # starts each new container with `up --scale` and waits for it to be
+    # healthy: every scale-up adds one container id to what `ps` lists.
     "docker": """#!/bin/sh
 echo "docker $*" >> "$STUB_DIR/calls"
+n=$(cat "$STUB_DIR/containers" 2>/dev/null || echo 0)
 case " $* " in
-    *" up "*) env | grep -E '^(STAGING_HOST|HOLT_WEB_URL|AUTH_|NEXT_PUBLIC_|GITHUB_TOKENS=)' | sort > "$STUB_DIR/compose.env" ;;
+    *" up "*)
+        case " $* " in *" --scale "*) echo $((n + 1)) > "$STUB_DIR/containers" ;; esac
+        env | grep -E '^(STAGING_HOST|HOLT_WEB_URL|AUTH_|NEXT_PUBLIC_|GITHUB_TOKENS=)' | sort > "$STUB_DIR/compose.env" ;;
+    *" ps "*) i=1; while [ "$i" -le "$n" ]; do echo "c$i"; i=$((i + 1)); done ;;
+    *" inspect "*) echo healthy ;;
 esac
 exit 0
 """,
@@ -125,6 +132,7 @@ class Sandbox:
                 "HOLT_LOCAL_REPO": str(self.root / "no-local-repo"),
                 "STUB_DIR": str(self.stub_dir),
                 "FORCE": "1",   # don't wait for the machine running the tests to be quiet
+                "SWAP_SETTLE": "0",
                 **env,
             },
             capture_output=True, text=True, timeout=120,

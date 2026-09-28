@@ -74,5 +74,5 @@ swap_service() {
         docker stop -t "$SWAP_STOP_WAIT" $old >/dev/null 2>&1 || true
         docker rm -f $old >/dev/null 2>&1 || true
     fi
-    SWAP_MSG="$svc: new container healthy after $((SECONDS - started))s, old one retired"
+    SWAP_MSG="$svc: new container healthy after $((SECONDS - started))s${old:+, old one retired}"
 }
