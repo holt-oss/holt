@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
+from holt.evidence.github_graphql import GitHubGraphQL
 from holt_server import contributions
 from holt_server.db import Contribution, ContributionSync, RepoView, Report, now
 from sqlalchemy import select, update
@@ -58,7 +59,10 @@ class FakeGitHub:
 
 
 @pytest.fixture
-def gh(h):
+def gh(h, monkeypatch):
+    # GitHub trouble is retried with real backoff sleeps; the retries still
+    # happen here, without the minute of waiting between them.
+    monkeypatch.setattr(GitHubGraphQL, "_backoff", lambda self, attempt: None)
     fake = FakeGitHub()
     h.svc.http.close()
     h.svc.http = httpx.Client(transport=httpx.MockTransport(fake))
