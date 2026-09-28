@@ -5,7 +5,7 @@ import { useState } from "react";
 import { track } from "@/lib/analytics";
 import { parseRepoInput } from "@/lib/repo";
 
-const EXAMPLES = ["pallets/flask", "NixOS/nixpkgs", "pytorch/pytorch"];
+const EXAMPLES = ["home-assistant/core", "NixOS/nixpkgs", "pallets/flask"];
 
 export function PasteBox({ autoFocus = false, examples = true, size = "lg" }: { autoFocus?: boolean; examples?: boolean; size?: "lg" | "md" }) {
   const router = useRouter();

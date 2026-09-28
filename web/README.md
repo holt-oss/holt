@@ -20,8 +20,9 @@ npm run dev -- -p $PORT
 ```
 
 - **Mock API** (`MOCK_API=1`): realistic fixtures that follow API.md, including
-  queued jobs that stream stages over SSE. `pallets/flask`, `NixOS/nixpkgs`,
-  `psf/requests` and `pytorch/pytorch` are "cached" and load instantly; any
+  queued jobs that stream stages over SSE. `home-assistant/core`, `pallets/flask`,
+  `NixOS/nixpkgs`, `psf/requests` and `pytorch/pytorch` are "cached" and load
+  instantly, with the verdicts the real engine gave them (docs/DEV-WORKFLOW.md); any
   other repo runs a fake analysis (about 6 s, `MOCK_JOB_MS`). Repos named
   `*/private*` or `doesnotexist/*` return `not_found`. Keep it for demos.
 - **Sign-in**: set `AUTH_GITHUB_*` / `AUTH_GOOGLE_*` for OAuth. In development

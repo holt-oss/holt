@@ -27,17 +27,19 @@ second (checked). If it shows a stale page anyway, stop it and delete
 `web/.next`.
 
 `MOCK_API=1` swaps the API for made-up but realistic reports (`web/src/lib/mock/`,
-following [`API.md`](../API.md)). Which URL shows which state:
+following [`API.md`](../API.md)). The named repos below carry the verdict and
+counts the real engine gave them on 28 Sep 2026, so the mock never contradicts
+the live site; the rest of each page is illustrative. Which URL shows which state:
 
 | Open | You see |
 |---|---|
-| `/pallets/flask`, `/psf/requests`, `/NixOS/nixpkgs` | A finished report, **Worth your time**. Instant. |
-| `/pytorch/pytorch`, `/aden-hive/hive` | A finished report, **Not worth your time**. Instant. |
+| `/home-assistant/core`, `/NixOS/nixpkgs`, `/psf/requests`, `/pytorch/pytorch` | A finished report, **Worth your time**. Instant. |
+| `/pallets/flask`, `/aden-hive/hive` | A finished report, **Not worth your time**. Instant. |
 | `/anything/else` | The loading screen with live stages for about 6 seconds, then a report. The verdict is picked from the repo name, so it is stable. `MOCK_JOB_MS=20000` makes the wait longer. |
 | `/example/new-thing`, `/tiny/thing` | The same, ending in **Not enough evidence** (any name containing `tiny`, `empty` or `new-` does). |
 | `/mock/outdated` | The "we couldn't refresh this" fallback (an old report whose fresh check fails). |
 | `/doesnotexist/x`, `/private/x` | The repository-not-found page. |
-| `/discover`, `/find`, `/hacktoberfest`, `/compare?repos=pallets/flask,psf/requests` | The list pages, filled from the mock repos. |
+| `/discover`, `/find`, `/hacktoberfest`, `/compare?repos=home-assistant/core,pallets/flask` | The list pages, filled from the mock repos. |
 | `/signin`, `/settings`, `/me/history`, `/for-you` | Signed-out versions until you sign in (below). |
 
 Other switches: `MOCK_PLAN=pro` (every pick on `/for-you`), `MOCK_PRO=0` (hide
@@ -54,7 +56,6 @@ dev sign-in, which needs Postgres for the session. From `web/`:
 
 ```sh
 cp .env.example .env.local
-# edit .env.local: put any text after AUTH_SECRET=   (openssl rand -base64 32)
 docker compose up -d db
 npm run db:migrate
 npm run dev
@@ -64,11 +65,12 @@ Then open `/signin`, type a name under "development only" and press dev
 sign-in. Each name is a separate test user with 3 free AI credits and a small
 history. Stop the database with `docker compose down` (add `-v` to erase it).
 
+`AUTH_SECRET=` can stay empty: in development an empty or missing value falls
+back to a fixed dev-only secret (`web/src/lib/auth-secret.ts`). Anywhere else
+the app refuses to sign anyone in without a real one.
+
 Things that did not work as written:
 
-- **`AUTH_SECRET=` left empty breaks sign-in.** `.env.example` ships it empty,
-  and an empty value counts as set, so Auth.js answers "MissingSecret" and
-  every page thinks you are signed out. Fill it in, or delete the line.
 - **Port 5432 already taken** (a Postgres you already run)? Set
   `HOLT_DB_PORT=5433` in `.env.local` and in `.env` (`cp .env.local .env`; the
   compose file reads `.env`), and change the port in `DATABASE_URL` to match.
@@ -107,8 +109,14 @@ cd server && uv run holt-server
 cd web && npm run dev
 ```
 
+(Prefer a separate Postgres for the API? `docker compose -f server/compose.yml
+up -d` starts one on port 20131, and `server/.env.example` already points
+there. Its service, volume and port variable (`api-db`, `HOLT_API_DB_PORT`) are
+named apart from the web app's, so the two never share a data directory, even
+under one `COMPOSE_PROJECT_NAME`.)
+
 The server creates its tables on first start (it prints `migrating the schema
-from empty`). Open `/pallets/flask`: the loading screen now shows real stages,
+from empty`). Open `/home-assistant/core`: the loading screen now shows real stages,
 and a report takes about 10 to 30 seconds. One report costs about 10 GitHub
 points of the 5,000 an hour a token has. Sign-in works as in section 1.
 
@@ -122,7 +130,7 @@ points of the 5,000 an hour a token has. Sign-in works as in section 1.
   it, ask for a fresh run (`POST /api/analyses` with `"refresh": true` queues one):
   ```sh
   curl -X POST localhost:3000/api/analyses -H 'content-type: application/json' \
-    -d '{"repo":"pallets/flask","refresh":true}'
+    -d '{"repo":"home-assistant/core","refresh":true}'
   ```
   A new `ENGINE_VERSION` also makes every old report count as out of date.
 - Never point your local server at the production or staging database.

@@ -4,13 +4,15 @@ Plain-language drafts for the Hacktoberfest launch. The site is
 https://githolt.com. Lines in `[brackets]` are for you to fill in with your
 own words. Please don't post a guessed version of them.
 
-**Numbers used below** are from live Holt reports on 25 September 2026
-(staging). Re-check them on the day you post, because reports refresh:
+**Numbers used below** are from live Holt reports on 28 September 2026
+(`holt analyze <repo> --live --no-model`, the same engine as githolt.com).
+Re-check them on the day you post, because reports refresh:
 
-| Repo | Verdict | Outside PRs merged | No reply | Typical first reply |
+| Repo | Verdict | Outside PRs merged | Closed or left with no reply | Typical first reply |
 |---|---|---|---|---|
-| pallets/flask | Worth your time (long odds) | 5 of 189 | 100 of 189 | ~30 minutes |
-| psf/requests | Worth your time (long odds) | 13 of 151 | 100 of 151 | ~5 hours |
+| home-assistant/core | Worth your time | 43 of 58 | 8 got no reply | ~15 hours |
+| pallets/flask | Not worth your time | 5 of 171 | 99 closed without a word | ~40 minutes |
+| psf/requests | Worth your time | 14 of 120 | 13 got no reply, 68 closed without a word | ~3 hours |
 
 Holt's verdicts were identical across three runs on all 55 repositories tested
 (see `docs/research/EVALUATION.md` and `docs/research/REPRODUCTION.md` — that
@@ -34,7 +36,7 @@ Things to keep true in every post:
 >
 > Holt reads a repository's recent pull requests from outside contributors and answers one question: is this worth a newcomer's time? It shows how many outside PRs got merged, how many never got a reply, how fast maintainers respond, and which folders newcomer work actually lands in. Every claim links to the GitHub conversation it came from.
 >
-> Some of what it finds is humbling. Flask is a well-run project, and Holt still calls it worth your time, but the numbers are honest: 5 of the last 189 outside pull requests were merged, and 100 got no reply at all. That's the difference between "popular" and "a good place for your first PR", and it's why Holt points you at specific starter issues instead.
+> Some of what it finds is humbling. Flask is a well-run, much-loved project, and Holt says it's not worth a newcomer's time right now: only 5 of the last 171 outside pull requests were merged, and 99 were closed without a word. Home Assistant, a far bigger project, merged 43 of its last 58. That's the difference between "popular" and "a good place for your first PR".
 >
 > A few things I cared about:
 > - The verdict comes from fixed, written rules. An AI can explain the evidence, but it can't change the answer.
@@ -70,7 +72,9 @@ Every claim links to the GitHub thread it came from.
 3/
 Popular ≠ welcoming.
 
-Flask, right now: 5 of the last 189 outside PRs merged, 100 with no reply. Holt still says it's worth your time, but with long odds, so it points you at specific starter issues instead of "just open a PR".
+Flask, right now: 5 of the last 171 outside PRs merged, 99 closed without a word. Holt says not worth your time.
+
+Home Assistant, a much bigger project: 43 of the last 58 merged. Worth your time.
 
 4/
 The verdict is decided by fixed, written rules, not by a model. AI can write an explanation on top, but it can't change the answer.
@@ -80,7 +84,7 @@ It's read-only: it never comments or opens PRs for you.
 5/
 The trick I use most: on any GitHub repo page, swap hub for holt in the address bar.
 
-github.com/pallets/flask → githolt.com/pallets/flask
+github.com/home-assistant/core → githolt.com/home-assistant/core
 
 6/
 Doing Hacktoberfest? Welcoming projects with starter issues, by language:
@@ -105,7 +109,7 @@ Open source (Apache-2.0 engine/CLI, AGPL-3.0 web app). It won "Most useful real-
 >
 > Every number links back to the GitHub threads it came from, so you can check it yourself.
 >
-> An example that surprised me: Flask. 5 of the last 189 outside PRs were merged, and 100 got no reply at all. The median first reply is fast (around half an hour) when someone does reply. So the tool says it's worth your time, but with long odds, and suggests starting from a specific starter issue.
+> An example that surprised me: Flask. Only 5 of the last 171 outside PRs were merged, and 99 were closed without a word. When someone does reply, it's fast (around 40 minutes), but most outside work is never merged, so the tool says it's not worth a newcomer's time right now. Home Assistant, which you might expect to be harder, merged 43 of its last 58 outside PRs, and the tool says it's worth your time.
 >
 > The verdict comes from fixed rules, not an LLM. There's an optional AI explanation, but it can't change the verdict. The tool only reads public data and never posts anything.
 >

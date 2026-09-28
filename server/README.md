@@ -16,7 +16,7 @@ While a job waits, its event stream says its place in the queue.
 export PATH="$HOME/.local/bin:$PATH"
 uv sync                                   # from the repo root; installs holt-server too
 
-docker compose -f server/compose.yml up -d   # Postgres on 127.0.0.1:${HOLT_DB_PORT:-20131}
+docker compose -f server/compose.yml up -d   # Postgres on 127.0.0.1:${HOLT_API_DB_PORT:-20131}
 cp server/.env.example server/.env           # then fill it in (see below)
 
 cd server
@@ -28,7 +28,11 @@ curl localhost:20130/health
 environment (which wins). The schema is brought up to date on startup (see
 [Changing the schema](#changing-the-schema)).
 Stop Postgres with `docker compose -f server/compose.yml down` (add `-v` to
-drop the data).
+drop the data). Its service (`api-db`), volume and port variable
+(`HOLT_API_DB_PORT`) differ from `web/compose.yml`'s, so the two databases can
+run side by side under one `$COMPOSE_PROJECT_NAME`; or skip this one and give
+the API a second database in the web app's Postgres
+([`docs/DEV-WORKFLOW.md`](../docs/DEV-WORKFLOW.md#2-real-data-on-your-machine)).
 
 A quick check with a real repository:
 

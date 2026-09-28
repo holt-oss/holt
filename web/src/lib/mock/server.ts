@@ -467,7 +467,7 @@ function mockContributions(userId: string, login: string): Contributions {
     verdict: v, found_via_holt: found,
   });
   const prs = [
-    pr("pallets/flask", 5601, "Docs: explain how to run the test suite on Windows", "open", 2, verdict("viable"), true),
+    pr("home-assistant/core", 153340, "Add a battery sensor to the Roborock integration", "open", 2, verdict("viable"), true),
     pr("NixOS/nixpkgs", 339210, "python3Packages.rich: 13.7.1 -> 13.9.4", "merged", 12, verdict("viable"), true),
     pr("octo/one", 88, "Fix a typo in the contributing guide", "merged", 40, null),
     pr("octo/two", 14, "Add a --quiet flag", "closed", 95, verdict("not_viable")),

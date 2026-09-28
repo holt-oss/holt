@@ -5,6 +5,7 @@ import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/db";
 import { accounts, sessions, users, verificationTokens } from "@/db/schema";
+import { authSecret } from "@/lib/auth-secret";
 import { withoutTokens } from "@/lib/oauth-account";
 
 const providers: Provider[] = [];
@@ -29,7 +30,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   session: { strategy: "database" },
   trustHost: true,
-  secret: process.env.AUTH_SECRET ?? (process.env.NODE_ENV === "development" ? "holt-dev-only-secret" : undefined),
+  secret: authSecret(process.env),
   pages: { signIn: "/signin" },
   callbacks: {
     session({ session, user }) {

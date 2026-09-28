@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { getReport, MOCK, starterIssues } from "@/lib/api";
 import { humanHours, nextStep } from "@/lib/format";
+import { areaLabel } from "@/lib/landing";
 import { caller } from "@/lib/session";
 import type { Tone } from "@/lib/types";
 import { CatFace } from "./cat-face";
 import { TONE, TONE_MOOD } from "./report/tone";
 import { VerdictPill } from "./report/verdict-pill";
 
-const REPO = "pallets/flask";
+// A repo the current engine rates Worth your time. The example below is its
+// real report from githolt.com on 28 Sep 2026, trimmed; Holt listed no
+// starter issues for it that day, so the example shows none either.
+const REPO = "home-assistant/core";
 
 interface Sample {
   repo: string;
@@ -26,16 +30,16 @@ const EXAMPLE: Sample = {
   headline: "Worth your time",
   tone: "good",
   stats: [
-    ["17 of 64", "outside pull requests merged"],
-    ["3 hours", "typical wait for a first reply"],
-    ["12", "people's first PR merged here"],
+    ["43 of 58", "outside pull requests merged"],
+    ["15 hours", "typical wait for a first reply"],
+    ["30", "people's first PR merged here"],
   ],
   lands: [
-    ["docs/", 8, 14],
-    ["src/flask/", 6, 31],
-    ["tests/", 3, 9],
+    ["homeassistant/components/", 41, 55],
+    ["tests/components/", 27, 38],
+    ["(root)", 14, 18],
   ],
-  issue: { n: 1234, title: "Document how to test streaming responses", label: "good first issue", step: "Comment on the issue to ask if you can take it." },
+  issue: null,
   caption: "an example report",
 };
 
@@ -54,7 +58,7 @@ async function load(): Promise<Sample> {
       [s.median_first_response_hours == null ? "none" : humanHours(s.median_first_response_hours), "typical wait for a first reply"],
       [String(s.first_time_merged_authors), "people's first PR merged here"],
     ],
-    lands: r.data.landing.slice(0, 3).map((l) => [`${l.path}/`, l.merged, l.attempted]),
+    lands: r.data.landing.slice(0, 3).map((l) => [areaLabel(l), l.merged, l.attempted]),
     issue: issue ? { n: issue.number, title: issue.title, label: issue.labels[0] ?? "starter issue", step: nextStep(issue) } : null,
     caption: "a real report, trimmed",
   };

@@ -4,6 +4,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const VERDICT = /Worth your time|Not worth your time|Not enough evidence/;
+// The home page's sample report ("Fig. 01", web/src/components/sample-report.tsx) links here.
+const SAMPLE = "/home-assistant/core";
 
 /** Starts summing layout shifts (not caused by input) from the first paint. */
 async function watchShifts(page: Page) {
@@ -57,7 +59,7 @@ interface Timeline {
 }
 
 /**
- * Clicks the landing page's link to /pallets/flask after it has been
+ * Clicks the landing page's link to the sample report (SAMPLE) after it has been
  * prefetched (so the loading skeleton can show at once) and records, frame by
  * frame, when the skeleton appears and when the report replaces it.
  * `delay` holds the navigation's server response back by that many ms.
@@ -72,7 +74,7 @@ interface Timeline {
  */
 async function openReportFromLanding(page: Page, delay: number, { racePrefetch = false } = {}): Promise<Timeline> {
   let response: number | null = null;
-  await page.route((u) => u.pathname === "/pallets/flask" && u.searchParams.has("_rsc"), async (route) => {
+  await page.route((u) => u.pathname === SAMPLE && u.searchParams.has("_rsc"), async (route) => {
     const h = route.request().headers();
     if (h["next-router-prefetch"]) {
       if (racePrefetch) await new Promise((r) => setTimeout(r, 800));
@@ -84,8 +86,8 @@ async function openReportFromLanding(page: Page, delay: number, { racePrefetch =
     response = Date.now() - sent - delay;
     await route.fulfill({ response: res });
   });
-  const link = page.locator('main a[href="/pallets/flask"]').first();
-  const prefetched = page.waitForRequest((r) => r.url().includes("/pallets/flask?_rsc=") && Boolean(r.headers()["next-router-prefetch"]), { timeout: 15_000 }).catch(() => null);
+  const link = page.locator(`main a[href="${SAMPLE}"]`).first();
+  const prefetched = page.waitForRequest((r) => r.url().includes(`${SAMPLE}?_rsc=`) && Boolean(r.headers()["next-router-prefetch"]), { timeout: 15_000 }).catch(() => null);
   await link.scrollIntoViewIfNeeded();
   const prefetchRequest = await prefetched;
   test.skip(!prefetchRequest, "the report link was never prefetched");
@@ -118,7 +120,7 @@ async function openReportFromLanding(page: Page, delay: number, { racePrefetch =
   });
   // A script click: the link is below the fold on phones, and scrolling would move it.
   await link.evaluate((a: HTMLAnchorElement) => a.click());
-  await expect(page).toHaveURL(/\/pallets\/flask$/);
+  await expect(page).toHaveURL(new RegExp(`${SAMPLE}$`));
   await expect(page.locator("main h1").filter({ hasText: VERDICT })).toBeVisible();
   await page.waitForTimeout(300);
   const tl = await page.evaluate(() => (window as unknown as { __tl: Timeline }).__tl);

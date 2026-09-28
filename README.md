@@ -32,8 +32,8 @@ link and **swap hub for holt**: `github.com` becomes `githolt.com`, and you
 land on the report.
 
 ```text
-https://github.com/pallets/flask
-https://githolt.com/pallets/flask
+https://github.com/home-assistant/core
+https://githolt.com/home-assistant/core
 ```
 
 No repository in mind? **Find a project** asks which languages you read and how
@@ -41,7 +41,7 @@ much time you have, then lists welcoming repositories with open starter issues.
 
 <table>
   <tr>
-    <td><img src="https://raw.githubusercontent.com/holt-oss/holt/main/assets/web-report-light-desktop.jpg" alt="The report for pallets/flask: Worth your time, with the counts behind it and a first issue to try" width="640"></td>
+    <td><img src="https://raw.githubusercontent.com/holt-oss/holt/main/assets/web-report-light-desktop.jpg" alt="The report for home-assistant/core: Worth your time, with the counts behind it and where to start" width="640"></td>
     <td><img src="https://raw.githubusercontent.com/holt-oss/holt/main/assets/web-find-dark-phone.jpg" alt="Find a project on a phone: pick languages and time, get welcoming repositories" width="200"></td>
   </tr>
 </table>
@@ -64,7 +64,7 @@ CLI, Holt picks up `gh auth token` and you can skip this.
 
 ```sh
 holt start --lang python          # starter issues in repositories that merge newcomers
-holt analyze pallets/flask        # is this one worth your time?
+holt analyze home-assistant/core  # is this one worth your time?
 holt                              # the interactive terminal interface
 ```
 

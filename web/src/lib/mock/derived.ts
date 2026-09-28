@@ -39,7 +39,7 @@ function numbers(s: Stats): string {
   const n = s.outsider_attempts;
   if (!n) return "Nobody outside the project's team opened a pull request.";
   const out = [`Of ${n} pull requests from outside contributors, ${s.outsider_merged} were merged (${Math.round((100 * s.outsider_merged) / n)}%).`];
-  if (s.median_first_response_hours != null) out.push(`When a maintainer replied, it was typically within ${Math.max(1, Math.round(s.median_first_response_hours))} hours.`);
+  if (s.median_first_response_hours != null) out.push(`When a maintainer replied, it was typically within ${hoursPhrase(s.median_first_response_hours)}.`);
   if (s.no_reply) out.push(`${Math.round((100 * s.no_reply) / n)}% got no reply at all.`);
   return out.join(" ");
 }
@@ -77,4 +77,14 @@ export function withDerived(r: Stored): Report {
     ],
     odds: odds(r.verdict, s),
   };
+}
+
+// The engine's wording for a reply time (holt.agent.verdict.hours_phrase).
+function hoursPhrase(h: number): string {
+  if (h < 1) {
+    const m = Math.max(1, Math.round(h * 60));
+    return `${m} minute${m === 1 ? "" : "s"}`;
+  }
+  if (h < 48) return `${h} hour${h === 1 ? "" : "s"}`;
+  return `${(h / 24).toFixed(1)} days`;
 }

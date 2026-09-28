@@ -4,18 +4,20 @@
 #   docker compose -f server/compose.yml up -d
 #
 # The project name comes from $COMPOSE_PROJECT_NAME when set, so parallel
-# checkouts do not share a database.
+# checkouts do not share a database. The service, volume and port variable are
+# named apart from web/compose.yml's (`db`, `pgdata`, HOLT_DB_PORT), so both
+# can run under one project name without sharing a data directory.
 services:
-  db:
+  api-db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: holt
       POSTGRES_PASSWORD: ${HOLT_DB_PASSWORD:-holt}
       POSTGRES_DB: holt
     ports:
-      - "127.0.0.1:${HOLT_DB_PORT:-20131}:5432"
+      - "127.0.0.1:${HOLT_API_DB_PORT:-20131}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - api-pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U holt -d holt"]
       interval: 2s
@@ -26,4 +28,4 @@ services:
     command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=40"]
 
 volumes:
-  pgdata:
+  api-pgdata:
