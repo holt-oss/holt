@@ -17,6 +17,7 @@ is the public route ([TUNNEL.md](TUNNEL.md)). It is built **only from
 | `backup.sh` | `pg_dump` of both databases to `~/backups/holt/<stamp>/`, keeps 14 days. |
 | `warm.sh` | Runs `python -m holt_server.warm` detached in the server image (fills the caches), with the same secrets and token as a deploy. |
 | `edge.conf` | nginx: keeps the port across deploys, `/__build`, `www` → apex redirect, SSE-friendly proxy, the Umami paths. A deploy puts changes live with a reload ([Edge config](#edge-config)). |
+| `../swap.sh` | Sourced by `deploy.sh` (and staging's `preview.sh`): `swap_service` starts a service's new container beside the old one and retires the old one once the new one is healthy. |
 | `../edge.sh` | Sourced by `deploy.sh` (and staging's `preview.sh`): checks a changed `edge.conf` with `nginx -t` in the running edge and reloads it. |
 | `migrate-web.sh`, `initdb/` | Auth.js tables migration (one-shot `migrate-web` service) and the `holt_web` database. The API's own migrations run in the one-shot `migrate-server` service. |
 | `TUNNEL.md` | Steps for the user to route githolt.com here. |
@@ -85,12 +86,19 @@ What one run does, in order:
    the new server image; see `server/README.md`). Either failing stops the
    deploy before anything is swapped. A rollback does not undo a migration,
    which is why migrations must keep working with the previous release.
-6. `compose up -d`: server is recreated and waited for healthy, then web.
-   The edge keeps 127.0.0.1:8310 open throughout and re-resolves `web`, so
-   the gap is the few seconds web takes to start.
+6. The swap, with no gap ([`../swap.sh`](../swap.sh)): server, then web.
+   Each new container starts next to the old one (`compose up --scale 2
+   --no-recreate`); once its health check passes, the old one gets SIGTERM
+   and is removed. Meanwhile both answer to the service's name: the edge
+   re-resolves `web` every 2 s and tries the other address when one
+   refuses, and web retries a dropped connection to `server` once
+   (`web/src/lib/upstream-retry.ts`). A new container that never gets
+   healthy is removed and the old one keeps serving. Then `compose up -d`
+   for the rest (db, edge, umami). If web still can't be reached, the edge
+   shows the [updating page](#the-updating-page) instead of Cloudflare's 502.
 7. Health check: `/` answers 200 and `POST /api/analyses` for
    `pallets/flask` is accepted (200/202), within 5 minutes.
-8. On failure: `compose up -d` with the previous tag, checks again, records
+8. On failure: the same swap back to the previous tag, checks again, records
    the failure on `/__build`, exits 1. On success: records `current`/`previous`.
 9. Edge config: when the deployed commit's `edge.conf` differs from the
    edge's, installs it, runs `nginx -t` in the running edge and reloads
@@ -135,6 +143,22 @@ By hand (the same checks deploy.sh makes):
 ```sh
 docker exec holt-prod-edge-1 nginx -t
 docker exec holt-prod-edge-1 nginx -s reload
+```
+
+## The updating page
+
+When the edge can't reach web (nginx's own 502, 503 or 504; never the
+app's own error pages), it answers with a small "Holt is updating. Back in
+a few seconds." page instead: status 503, `Retry-After: 10`,
+`Cache-Control: no-store`, light and dark, and it reloads itself once the
+site answers (every 5 s; a meta refresh without JavaScript). Cloudflare
+shows an origin's 5xx page as it is, so visitors see this instead of
+Cloudflare's own error page. It lives in `edge.conf` (`location @updating`,
+the same in staging's) and goes live with the edge config reload. A deploy
+normally never shows it; it covers a web crash or a swap that goes wrong.
+
+```sh
+curl -sI -H 'Host: githolt.com' http://127.0.0.1:8310/  # 200 normally
 ```
 
 ## Status, logs, helpers
@@ -239,6 +263,12 @@ HOLT_PROD_PROJECT=$COMPOSE_PROJECT_NAME HOLT_PROD_HOME=/tmp/rehearsal HOLT_PROD_
 ```
 
 `cx done` takes that project down by name.
+
+To watch a swap under load, deploy once, then add an empty commit to the
+rehearsal's origin, tag the same images with its SHA (so nothing is
+built), and deploy again with a loop of requests running against
+`127.0.0.1:$PORT`: every answer should be a 200/202 (or a 429 from the rate
+limit), never a 502 or the updating page.
 
 The edge step alone needs no images: point `HOLT_PROD_HOME` at a scratch
 directory with a `.env` (the `:?` variables set to anything,
