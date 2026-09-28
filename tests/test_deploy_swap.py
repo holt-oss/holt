@@ -65,6 +65,7 @@ def test_only_the_web_proxy_falls_back_to_it(conf: Path) -> None:
     # Never the app's own error pages.
     assert "proxy_intercept_errors" not in text
     assert "proxy_connect_timeout 1s;" in web
+    assert "proxy_next_upstream error timeout non_idempotent;" in web
 
 
 @pytest.mark.parametrize("conf", EDGES, ids=lambda p: p.parent.name)
@@ -108,7 +109,9 @@ case "$1" in
                     have=$((have + 1)); echo "new$have ${STUB_NEW_STATE:-healthy}" >> "$db"
                 done ;;
         esac ;;
-    inspect) id="${@: -1}"; grep "^$id " "$db" | cut -d' ' -f2 ;;
+    inspect) id="${@: -1}"; state=$(grep "^$id " "$db" | cut -d' ' -f2)
+        restarts=0; [[ "$state" == crashing ]] && { restarts=2; state=restarting; }
+        echo "$restarts $state" ;;
     logs) echo "boom: port in use" ;;
     stop) ;;
     rm) for id in "$@"; do sed -i "/^$id /d" "$db"; done ;;
@@ -168,6 +171,15 @@ def test_a_new_container_that_never_gets_healthy_times_out(stub: Path) -> None:
     assert done.returncode == 1
     assert left == "old1 healthy\n"
     assert "not healthy after 5s" in done.stdout
+
+
+def test_a_crashing_new_container_fails_at_once(stub: Path) -> None:
+    # restart: unless-stopped keeps bringing it back; that is not "starting".
+    done, left = swap(stub, "old1 healthy\n", STUB_NEW_STATE="crashing")
+    assert done.returncode == 1
+    assert left == "old1 healthy\n"
+    assert "crashing (restarted 2x)" in done.stdout
+    assert (stub / "calls").read_text(encoding="utf-8").count("inspect") == 1
 
 
 def test_a_first_run_just_starts_the_service(stub: Path) -> None:

@@ -47,7 +47,7 @@ case " $* " in
         case " $* " in *" --scale "*) echo $((n + 1)) > "$STUB_DIR/containers" ;; esac
         env | grep -E '^(STAGING_HOST|HOLT_WEB_URL|AUTH_|NEXT_PUBLIC_|GITHUB_TOKENS=)' | sort > "$STUB_DIR/compose.env" ;;
     *" ps "*) i=1; while [ "$i" -le "$n" ]; do echo "c$i"; i=$((i + 1)); done ;;
-    *" inspect "*) echo healthy ;;
+    *" inspect "*) echo "0 healthy" ;;
 esac
 exit 0
 """,

@@ -30,8 +30,13 @@ SWAP_SETTLE="${SWAP_SETTLE:-3}"         # seconds both run once the new one is h
 
 _swap_ids() { compose ps -a -q "$1" 2>/dev/null | sort; }
 
-_swap_state() {   # healthy | starting | unhealthy | running (no healthcheck) | exited | ...
-    docker inspect -f '{{if .State.Health}}{{if eq .State.Status "running"}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}{{else}}{{.State.Status}}{{end}}' "$1" 2>/dev/null || echo gone
+_swap_state() {   # healthy | starting | unhealthy | running (no healthcheck) | exited | crashing | ...
+    local out
+    out="$(docker inspect -f '{{.RestartCount}} {{if .State.Health}}{{if eq .State.Status "running"}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}{{else}}{{.State.Status}}{{end}}' "$1" 2>/dev/null)" \
+        || { echo gone; return; }
+    # restart: unless-stopped brings a crashing container back up, again and
+    # again; once is enough to know it won't do.
+    if [[ "${out%% *}" != 0 ]]; then echo "crashing (restarted ${out%% *}x)"; else echo "${out#* }"; fi
 }
 
 swap_service() {
@@ -57,7 +62,7 @@ swap_service() {
         state="$(_swap_state "$new")"
         case "$state" in
             healthy|running) break ;;
-            starting|created|restarting) ;;
+            starting|created) ;;
             *) break ;;
         esac
         (( SECONDS - started >= timeout )) && { state="not healthy after ${timeout}s"; break; }
