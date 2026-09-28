@@ -9,9 +9,10 @@
 #
 # One run: fetch origin, check the commit is on main, wait until the box is
 # quiet, build the server and web images one at a time (tagged with the
-# commit SHA), run the one-shot web and server migrations, swap the containers behind the
-# edge (its port never moves), health-check on 127.0.0.1, and roll back to
-# the previous tag if that fails. Then, when the commit's edge.conf differs
+# commit SHA), run the one-shot web and server migrations, swap server then
+# web with no gap (each new container starts beside the old one and takes
+# over once healthy; ../swap.sh), health-check on 127.0.0.1, and swap back
+# to the previous tag if that fails. Then, when the commit's edge.conf differs
 # from the edge's, check it with nginx -t in the running edge and reload it
 # (never a restart); a rejected config is put back and the run fails. Then
 # prune only this stack's images.
@@ -34,6 +35,8 @@ die() { log "ERROR: $*"; exit 1; }
 . "$here/env.sh"   # STATE, PROJECT, SECRETS, load_prod_env
 # shellcheck source=../edge.sh
 . "$here/../edge.sh"   # edge_seed, edge_apply, edge_revert
+# shellcheck source=../swap.sh
+. "$here/../swap.sh"   # swap_service
 SRC="$STATE/src"
 REPO="${HOLT_REPO:-holt-oss/holt}"
 LABEL="holt.stack=$PROJECT"
@@ -184,11 +187,26 @@ compose --profile migrate run --rm migrate-server >>"$dlog" 2>&1 || die "server 
 edge_seed "$EDGE_CONF" "$STATE/edge" || die "$EDGE_MSG"
 [[ -n "$EDGE_MSG" ]] && log "$EDGE_MSG"
 
+# Server, then web: each new container starts next to the old one and takes
+# over once its health check passes, so the site never stops answering
+# (../swap.sh). A new container that never gets healthy is removed and the
+# old one keeps serving. Then `compose up` for the rest (db, edge, umami):
+# server and web already match the config, so it leaves them alone.
+swap_all() {   # log lines go to the deploy log and stdout
+    local svc
+    for svc in server web; do
+        if ! swap_service "$svc" "$HEALTH_WAIT"; then log "$SWAP_MSG"; return 1; fi
+        log "$SWAP_MSG"
+    done
+    compose up -d --remove-orphans >>"$dlog" 2>&1 || { log "compose up failed; see $dlog"; return 1; }
+}
+
 write_build_json deploying "starting $short"
 log "swapping containers to $short (previous: ${current:0:7})"
-compose up -d --remove-orphans >>"$dlog" 2>&1 || die "compose up failed; see $dlog"
+swapped=0
+swap_all && swapped=1
 
-if healthy; then
+if (( swapped )) && healthy; then
     [[ -n "$current" && "$current" != "$sha" ]] && echo "$current" > "$STATE/previous"
     echo "$sha" > "$STATE/current"
     write_build_json live "live"
@@ -197,7 +215,7 @@ else
     compose logs --tail 50 server web >>"$dlog" 2>&1 || true
     if [[ -n "$current" && "$current" != "$sha" ]]; then
         log "rolling back to ${current:0:7}"
-        HOLT_TAG="$current" compose up -d --remove-orphans >>"$dlog" 2>&1 || true
+        HOLT_TAG="$current" swap_all || true
         if healthy; then
             write_build_json failed "$short failed its health check; rolled back to ${current:0:7}"
             die "$short failed its health check; rolled back to ${current:0:7} (see $dlog)"

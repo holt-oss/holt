@@ -3,7 +3,7 @@
 #   deploy/staging/install.sh           install + start the 3-minute timer
 #   deploy/staging/install.sh --no-timer  install only (run preview.sh by hand)
 #
-# - copies preview.sh and ../edge.sh to ~/.local/share/holt-staging/bin/ (the
+# - copies preview.sh, ../edge.sh and ../swap.sh to ~/.local/share/holt-staging/bin/ (the
 #   timer runs that copy, so a PR can't change the loop; re-run install.sh to
 #   update it)
 # - writes the systemd --user units holt-stage.service / holt-stage.timer
@@ -21,6 +21,7 @@ UNITS="$HOME/.config/systemd/user"
 mkdir -p "$STATE/bin" "$UNITS"
 install -m 755 "$here/preview.sh" "$STATE/bin/preview.sh"
 install -m 644 "$here/../edge.sh" "$STATE/bin/edge.sh"
+install -m 644 "$here/../swap.sh" "$STATE/bin/swap.sh"
 
 cat > "$UNITS/holt-stage.service" <<UNIT
 [Unit]

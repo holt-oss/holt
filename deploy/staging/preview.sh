@@ -54,6 +54,8 @@ log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*"; }
 # edge_seed / edge_apply: next to the timer's copy (install.sh), or in the repo.
 here="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$here/edge.sh" ]]; then . "$here/edge.sh"; else . "$here/../edge.sh"; fi
+# swap_service (a new container beside the old one, no gap), found the same way.
+if [[ -f "$here/swap.sh" ]]; then . "$here/swap.sh"; else . "$here/../swap.sh"; fi
 EDGE_DIR="$STATE/edge"
 export HOLT_STAGE_EDGE_DIR="$EDGE_DIR"
 
@@ -418,6 +420,19 @@ fi
 # The edge's config directory must exist before a (re)created edge starts.
 edge_seed "$DEPLOY/edge.conf" "$EDGE_DIR" || fail "$EDGE_MSG"
 [[ -n "$EDGE_MSG" ]] && log "$EDGE_MSG"
+# Migrations first (they must work with the running release), then server
+# and web one at a time: the new container starts beside the old one and
+# takes over once healthy, so staging never shows an error page mid-update.
+# A new one that never gets healthy is removed and the old one stays.
+compose up -d db >>"$blog" 2>&1 || fail "db didn't start; see $blog"
+compose run --rm migrate-web >>"$blog" 2>&1 || fail "web migration failed; see $blog"
+compose run --rm migrate-server >>"$blog" 2>&1 || fail "server migration failed; see $blog"
+for svc in server web; do
+    swap_service "$svc" 300 || fail "$SWAP_MSG"
+    log "$SWAP_MSG"
+done
+# The rest (edge, and the one-shot migrations again, which are no-ops now);
+# server and web already match the config, so this leaves them alone.
 compose up -d --remove-orphans >>"$blog" 2>&1 || fail "compose up failed; see $blog"
 (( pro_on && ! pro_started )) && pro_up
 

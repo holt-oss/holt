@@ -98,6 +98,15 @@ services:
     depends_on:
       db: { condition: service_healthy }
       migrate-server: { condition: service_completed_successfully }
+    # The image's own check, polled every second while it starts so
+    # deploy/swap.sh can retire the old server as soon as this one is ready.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 90s
+      start_interval: 1s
     mem_limit: 512m
     restart: unless-stopped
 
@@ -141,6 +150,16 @@ services:
     depends_on:
       server: { condition: service_healthy }
       migrate-web: { condition: service_completed_successfully }
+    # deploy/swap.sh starts the new web beside the old one and waits for
+    # this before retiring the old one. robots.txt is rendered by Next.js
+    # but never calls the API.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/robots.txt').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+      start_interval: 1s
     mem_limit: 512m
     restart: unless-stopped
 
