@@ -105,6 +105,11 @@ The report opens with one of five headlines:
 | **Personal project** | someone's own project or a small team's, not set up for outside contributions |
 | **A list, not code** | a list or catalogue of entries: a merged entry isn't code work |
 
+In a live run, Holt gives each new pull request 48 hours before treating silence
+as a signal. A pull request opened more recently is reported as too new to have
+had a reply and is not counted as ignored, so work opened this morning does not
+lower a repository's score.
+
 Not enough evidence is a real answer, not a failure. Then:
 
 - **What the evidence shows** — what happened to people who tried before you.
