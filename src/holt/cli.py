@@ -856,6 +856,13 @@ def main(argv: list[str] | None = None) -> int:
     start_p = sub.add_parser(
         "start",
         help="find open starter issues in repositories that merge newcomers' work",
+        epilog=(
+            "Examples:\n"
+            "  holt start --lang python\n"
+            "  holt start --topic cli,web --hacktoberfest\n"
+            "  holt start pallets/flask"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     start_p.add_argument("repo", nargs="?",
                          help="owner/name or a github.com URL: list starter issues "

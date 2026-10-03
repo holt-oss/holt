@@ -234,12 +234,25 @@ def test_main_catches_what_a_command_raises(home, monkeypatch, capsys):
 
 def test_help_has_no_statistics_jargon(capsys):
     for argv in (["--help"], ["analyze", "--help"], ["compare", "--help"],
-                 ["next", "--help"], ["discover", "--help"], ["models", "--help"]):
+                 ["next", "--help"], ["discover", "--help"], ["start", "--help"],
+                 ["models", "--help"]):
         with pytest.raises(SystemExit):
             cli.main(argv)
         text = capsys.readouterr().out
         for jargon in ("MCC", "p-value", "hit@", "Stage D", "fixture"):
             assert jargon not in text, (argv, jargon)
+
+
+def test_start_help_shows_examples(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["start", "--help"])
+    text = capsys.readouterr().out
+    for example in (
+        "holt start --lang python",
+        "holt start --topic cli,web --hacktoberfest",
+        "holt start pallets/flask",
+    ):
+        assert example in text
 
 
 def test_version_prints_holt_and_exits_zero(capsys):
