@@ -887,13 +887,12 @@ def main(argv: list[str] | None = None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     models_p.add_argument("--provider",
-                          help="gemini, openrouter, anthropic, openai, ollama, "
-                               "or openai-compatible")
+                          help=", ".join(sorted(model.PROVIDER_PRESETS)))
     models_p.add_argument("--model", dest="model_id",
                           help="model id for every stage (e.g. claude-opus-5, "
                                "llama3.3)")
     models_p.add_argument("--base-url",
-                          help="endpoint for an openai-compatible server")
+                          help="endpoint for azure or an openai-compatible server")
     models_p.add_argument("--api-key-env",
                           help="environment variable holding the API key")
     models_p.add_argument("--stage", action="append",
