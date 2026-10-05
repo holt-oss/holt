@@ -56,6 +56,12 @@ reviews:
     auto_incremental_review: true
     auto_pause_after_reviewed_commits: 0
     drafts: false
+    # Maintainers' and the dependency bot's pull requests are not reviewed; outside contributors' are.
+    ignore_usernames:
+      - "aahil-khan"
+      - "anoushkawasthi"
+      - "ips610"
+      - "dependabot[bot]"
     # Empty means the default branch only (main).
     base_branches: []
 

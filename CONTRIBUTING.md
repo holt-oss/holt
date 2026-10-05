@@ -57,8 +57,8 @@ pull request, so you don't need to run it locally for a small change.
 
 **5. Open the pull request.** Say what changed for a user and how you checked
 it. Link the issue with `Fixes #123`. An automated reviewer (CodeRabbit)
-comments on every pull request first. Treat its comments as suggestions: a
-maintainer reviews and decides.
+comments first on pull requests from outside contributors. Treat its comments
+as suggestions: a maintainer reviews and decides.
 
 ## Before you start
 
