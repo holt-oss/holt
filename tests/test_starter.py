@@ -765,7 +765,9 @@ def test_cli_start_find_text_and_json(monkeypatch, capsys):
     assert "https://github.com/o/r/issues/7" in out
 
     assert cli.main(["start", "--lang", "python", "--json"]) == 0
-    body = json.loads(capsys.readouterr().out)
+    raw = capsys.readouterr().out
+    assert "“good first issue”" in raw  # non-ASCII text is not \\u-escaped
+    body = json.loads(raw)
     assert body["results"][0]["issues"][0]["number"] == 7
 
 

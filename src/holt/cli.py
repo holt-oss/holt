@@ -498,8 +498,10 @@ def cmd_start(args: argparse.Namespace) -> int:
                                         landing=landing,
                                         hacktoberfest=args.hacktoberfest,
                                         transport=transport)
-        print(json.dumps({"repo": repo, "issues": [i.as_dict() for i in issues]},
-                         indent=1) if args.json else starter.render_repo(repo, issues))
+        if args.json:
+            emit_json({"repo": repo, "issues": [i.as_dict() for i in issues]})
+        else:
+            print(starter.render_repo(repo, issues))
         return 0
     languages = [x for x in (args.lang or "").split(",") if x.strip()]
     topics = [x for x in (args.topic or "").split(",") if x.strip()]
@@ -511,7 +513,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     results = starter.find(languages, topics, args.hacktoberfest, token,
                            limit=args.limit, progress=progress, days=args.days)
     if args.json:
-        print(json.dumps({"results": [r.as_dict() for r in results]}, indent=1))
+        emit_json({"results": [r.as_dict() for r in results]})
     else:
         describe = ", ".join(languages + topics + (["Hacktoberfest"] if args.hacktoberfest else []))
         print(starter.render_find(results, describe))
