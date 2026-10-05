@@ -305,7 +305,7 @@ def _norm(label: str) -> str:
     return " ".join(label.split())
 
 
-_BEGINNER = re.compile(r"\b(good first (issue|bug|pr|contribution)|first timers? only|"
+_BEGINNER = re.compile(r"\b(good first (issue|bug|pr|contribution|task|feature)|first timers? only|"
                        r"beginners?( friendly)?|good for (beginners|newcomers)|"
                        r"newcomers?|starter|first contribution)\b")
 _EASY = re.compile(r"\b(easy|trivial|low hanging fruit|size (xs|s|small)|small)\b")

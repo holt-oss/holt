@@ -205,6 +205,7 @@ def scripted(responses, sleeps=None):
 @pytest.mark.parametrize("label,kind", [
     ("good first issue", "beginner"), ("Good First Issue", "beginner"),
     ("good-first-issue", "beginner"), ("good first issue :+1:", "beginner"),
+    ("good first task", "beginner"), ("good first feature", "beginner"),
     ("first-timers-only", "beginner"), ("Beginner Friendly", "beginner"),
     ("E-easy", "easy"), ("difficulty: easy", "easy"), ("help wanted", "help"),
     ("Hacktoberfest", "hacktoberfest"), ("wontfix", "not_ready"),
