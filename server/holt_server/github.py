@@ -27,8 +27,12 @@ from urllib.parse import quote
 import httpx
 
 from holt.about import help_links, language_shares, license_name, readme_excerpt, readme_line
-from holt.evidence.errors import AuthError, GitHubError, RateLimited
-from holt.evidence.github_graphql import GitHubGraphQL
+from holt.evidence.errors import AuthError, Forbidden, GitHubError, RateLimited
+from holt.evidence.github_graphql import (
+    MAX_ATTEMPTS,
+    MAX_RATE_LIMIT_WAIT_S,
+    GitHubGraphQL,
+)
 from holt_server import github_app
 from holt_server.errors import ApiError, github_rate_limited, upstream
 
@@ -94,12 +98,26 @@ LOW_POINTS = 250
 DEAD_SECONDS = 600.0
 # How long a rate-limited token is left out when GitHub gave no reset time.
 LIMITED_SECONDS = 300.0
+# A 403 that isn't a rate limit is about what was asked for. This many in a
+# row on one token, with no answer in between, and it is the token.
+FORBIDDEN_IN_A_ROW = 3
+# Tries per GraphQL query for background work (people's checks get the
+# engine's MAX_ATTEMPTS). A repository GitHub times out on answers 502 after
+# working on it for ten seconds, every try; a warm pass comes back to it later.
+BACKGROUND_ATTEMPTS = 2
 
 # Set by the jobs runner around a job's worker thread (asyncio.to_thread copies
 # it in). When the event is set the job has timed out, and the next GitHub
 # call in that thread gives up instead of spending more points.
 job_stop: contextvars.ContextVar[threading.Event | None] = contextvars.ContextVar(
     "holt_job_stop", default=None)
+
+
+# Set by the jobs runner for badge refreshes and warm reports: work nobody is
+# waiting on. It asks GitHub less insistently, and hands a "slow down" back at
+# once (so the warm pass slows down) instead of sitting it out in the job.
+background: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "holt_background_job", default=False)
 
 
 class JobStopped(Exception):
@@ -133,7 +151,17 @@ class TokenState:
     remaining: int | None = None
     reset_at: float | None = None  # epoch seconds, when `remaining` refills
     out_until: float = 0.0  # epoch seconds; refused or rate-limited until then
-    reason: str = ""
+    reason: str = ""  # "refused", "limited" (hourly budget) or "secondary"
+    forbidden: int = 0  # 403s in a row that weren't rate limits
+
+
+@dataclass(frozen=True)
+class Hold:
+    """GitHub has rate-limited every token: nothing can be read for `seconds`.
+    `secondary`: it asked us to slow down, with points to spare."""
+
+    seconds: float
+    secondary: bool
 
 
 @dataclass(frozen=True)
@@ -147,24 +175,31 @@ class TokenPool:
     """`GITHUB_TOKENS` (or the GitHub App), handed out round-robin, skipping the
     ones that can't work.
 
-    A token is skipped while GitHub is refusing it (bad or revoked token, or a
-    403), while it is rate-limited, and while its points-left (read from every
+    A token is skipped while GitHub is refusing it (a bad or revoked token),
+    while it is rate-limited, and while its points-left (read from every
     reply, see `PooledGraphQL`) are below `LOW_POINTS` and its reset time has
     not come. When every token is out, the caller gets a plain "try again"
     error instead of a GitHub failure halfway through a job.
+
+    Only GitHub saying so takes a token out. A 502 or 504 is the failure of
+    the one query (usually a repository too big to answer for), and so is a
+    403 that isn't a rate limit. A rate limit holds the token for as long as
+    GitHub asked, for every reader, the reports already in flight included:
+    asking again during a secondary limit is what makes GitHub extend it.
 
     The GitHub App renews its own token: when GitHub refuses one, the app gets
     a new one on the next lease, and is only left out when GitHub won't issue
     one at all.
     """
 
-    def __init__(self, tokens: list, clock=time.time) -> None:
+    def __init__(self, tokens: list, clock=time.time, sleep=time.sleep) -> None:
         self._tokens = [t if hasattr(t, "renews") else StaticToken(t, f"token #{i + 1}")
                         for i, t in enumerate(tokens)]
         self._state = [TokenState() for _ in self._tokens]
         self._cursor = 0
         self._lock = threading.Lock()
         self._clock = clock
+        self.sleep = sleep
         # GraphQL points this process has seen spent, for /metrics: each drop
         # in a token's points-left between two replies (other readers of the
         # same token included).
@@ -225,7 +260,7 @@ class TokenPool:
                       self.label(index), exc.detail, DEAD_SECONDS // 60)
             raise upstream() from None
         except RateLimited as exc:
-            self.note_rate_limited(index, exc.retry_after)
+            self.note_rate_limited(index, exc.retry_after, exc.secondary)
             raise github_rate_limited(round(exc.retry_after or LIMITED_SECONDS)) from None
         except GitHubError as exc:
             log.warning("couldn't get a token for %s: %s", self.label(index),
@@ -274,6 +309,24 @@ class TokenPool:
                                      usable=st.out_until <= now and not low))
             return out
 
+    def limited_for(self, index: int) -> tuple[float, bool]:
+        """(seconds token `index` is still held for a rate limit, whether it
+        is a secondary one); 0 seconds when it isn't held."""
+        with self._lock:
+            st = self._state[index]
+            left = st.out_until - self._clock()
+            if left <= 0 or st.reason not in ("limited", "secondary"):
+                return 0.0, False
+            return left, st.reason == "secondary"
+
+    def held(self) -> Hold | None:
+        """The rate limit keeping every token out, or None while one can read."""
+        waits = [self.limited_for(i) for i in range(len(self._tokens))]
+        if not waits or any(seconds <= 0 for seconds, _ in waits):
+            return None
+        seconds, secondary = min(waits)
+        return Hold(seconds, secondary)
+
     def transport(self, http: httpx.Client | None = None,
                   index: int | None = None) -> PooledGraphQL:
         """A GraphQL client on the next usable token (or on token `index`)."""
@@ -281,7 +334,8 @@ class TokenPool:
             index, token = self.lease()
         else:
             token = self.token(index)
-        return PooledGraphQL(self, index, token, client=http)
+        return PooledGraphQL(self, index, token, client=http,
+                             attempts=BACKGROUND_ATTEMPTS if background.get() else MAX_ATTEMPTS)
 
     # --- what GitHub said ----------------------------------------------------
 
@@ -314,10 +368,33 @@ class TokenPool:
         log.error("GitHub refused %s (%s); leaving it out for %d minutes",
                   source.label, detail, DEAD_SECONDS // 60)
 
-    def note_rate_limited(self, index: int, retry_after: float | None) -> None:
+    def note_rate_limited(self, index: int, retry_after: float | None,
+                          secondary: bool = False) -> None:
+        """GitHub rate-limited token `index`: nobody reads with it for as long
+        as GitHub asked."""
         wait = retry_after if retry_after else LIMITED_SECONDS
-        self._bench(index, "limited", wait)
-        log.warning("%s is rate-limited; leaving it out for %ds", self.label(index), round(wait))
+        if self.limited_for(index)[0] >= wait - 1:
+            return  # already held that long: another reader was told the same
+        self._bench(index, "secondary" if secondary else "limited", wait)
+        if secondary:
+            log.warning("GitHub asked %s to slow down (too much at once, not the hourly "
+                        "points); leaving it out for %ds", self.label(index), round(wait))
+        else:
+            log.warning("%s is rate-limited (hourly points used up); leaving it out for %ds",
+                        self.label(index), round(wait))
+
+    def note_forbidden(self, index: int, detail: str, token: str | None = None) -> None:
+        """GitHub answered 403 to a query on token `index`, and not for a rate
+        limit: the query's failure, until it is all the token ever gets."""
+        with self._lock:
+            self._state[index].forbidden += 1
+            count = self._state[index].forbidden
+        if count >= FORBIDDEN_IN_A_ROW:
+            self.note_ok(index)
+            self.note_refused(index, f"{count} refusals in a row: {detail}", token)
+
+    def note_ok(self, index: int) -> None:
+        self._state[index].forbidden = 0
 
     def _bench(self, index: int, reason: str, seconds: float) -> None:
         with self._lock:
@@ -343,14 +420,15 @@ class PooledGraphQL(GitHubGraphQL):
     """
 
     def __init__(self, pool: TokenPool, index: int, token: str,
-                 client: httpx.Client | None = None) -> None:
-        super().__init__(token=token, client=client)
+                 client: httpx.Client | None = None, attempts: int = MAX_ATTEMPTS) -> None:
+        super().__init__(token=token, client=client, sleep=pool.sleep, attempts=attempts)
         self.pool = pool
         self.index = index
 
     def query(self, document: str, *, timeout: float | None = None,
               **variables: object) -> dict[str, Any]:
         check_stop()
+        self._wait_out_the_limit()
         # The GitHub App's token is renewed while a long job runs.
         self.token = self.pool.token(self.index)
         try:
@@ -358,15 +436,36 @@ class PooledGraphQL(GitHubGraphQL):
         except AuthError as exc:
             self.pool.note_refused(self.index, str(exc)[:40], self.token)
             raise
-        except RateLimited as exc:
-            self.pool.note_rate_limited(self.index, exc.retry_after)
+        except Forbidden as exc:
+            self.pool.note_forbidden(self.index, exc.detail[:60], self.token)
             raise
+        except RateLimited as exc:
+            self.pool.note_rate_limited(self.index, exc.retry_after, exc.secondary)
+            raise
+
+    def _wait_out_the_limit(self) -> None:
+        """Send nothing while GitHub has this token rate-limited, whoever was
+        told: a person's check sits a short wait out, anything else gets the
+        wait back as `RateLimited`."""
+        wait, secondary = self.pool.limited_for(self.index)
+        if wait <= 0:
+            return
+        if background.get() or wait > MAX_RATE_LIMIT_WAIT_S:
+            raise RateLimited(wait, secondary)
+        self._sleep(wait)
+
+    def _limited(self, wait: float, secondary: bool) -> None:
+        self.pool.note_rate_limited(self.index, wait, secondary)
+        if background.get():
+            raise RateLimited(wait, secondary)
 
     def _data(self, body: dict[str, Any]) -> dict[str, Any]:
         limit = ((body or {}).get("data") or {}).get("rateLimit")
         if limit:
             self.pool.note_points(self.index, limit.get("remaining"), limit.get("resetAt"))
-        return super()._data(body)
+        data = super()._data(body)
+        self.pool.note_ok(self.index)
+        return data
 
 
 # GitHub shows ":books:" in a description as an emoji; the API sends the code.
@@ -734,13 +833,17 @@ class GitHubLookup:
         """The fewest GraphQL points left on any working token (checking is free).
 
         A token GitHub refuses is left out (and the pool skips it); if none
-        answer, 0.
+        answer, 0. A token held by a rate limit counts as 0 and is not asked:
+        `pool.held()` says how long for, and which kind.
         """
         return await asyncio.to_thread(self._remaining)
 
     def _remaining(self) -> int:
         counts = []
         for index in range(len(self.pool)):
+            if self.pool.limited_for(index)[0] > 0:
+                counts.append(0)  # held by a rate limit: don't ask during it
+                continue
             try:
                 data = self.pool.transport(self.http, index=index).query(
                     RATE_LIMIT, timeout=LOOKUP_TIMEOUT_S)

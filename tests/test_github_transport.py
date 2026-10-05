@@ -12,7 +12,13 @@ import httpx
 import pytest
 
 from holt.evidence import github_graphql as gql
-from holt.evidence.errors import AuthError, RateLimited, RepoNotFound, UpstreamError
+from holt.evidence.errors import (
+    AuthError,
+    Forbidden,
+    RateLimited,
+    RepoNotFound,
+    UpstreamError,
+)
 
 
 def transport(responses, sleeps=None):
@@ -100,11 +106,91 @@ def test_graphql_rate_limited_error_type_is_typed():
         t.query("q")
 
 
-@pytest.mark.parametrize("status", [401, 403])
-def test_bad_token_is_an_auth_error(status):
-    t, _ = transport([httpx.Response(status, text="Bad credentials")])
+def test_bad_token_is_an_auth_error():
+    t, _ = transport([httpx.Response(401, text="Bad credentials")])
     with pytest.raises(AuthError):
         t.query("q")
+
+
+# --- 403: the hourly budget, "slow down", or just "no" ---------------------------------
+
+SECONDARY = {"message": "You have exceeded a secondary rate limit. Please wait a few "
+                        "minutes before you try again.",
+             "documentation_url": "https://docs.github.com/"}
+
+
+def test_a_403_that_is_not_a_limit_is_that_requests_failure_not_the_tokens():
+    t, seen = transport([httpx.Response(
+        403, headers={"x-ratelimit-remaining": "4042"},
+        json={"message": "Resource not accessible by integration"})])
+    with pytest.raises(Forbidden) as exc:
+        t.query("q")
+    assert not isinstance(exc.value, AuthError | RateLimited)
+    assert "Resource not accessible by integration" in exc.value.detail
+    assert len(seen) == 1  # asking again gets the same answer
+
+
+def test_a_secondary_limit_is_told_apart_from_the_hourly_budget(monkeypatch):
+    # Points to spare, and GitHub still says wait: too much at once.
+    t, seen = transport([httpx.Response(
+        403, headers={"Retry-After": "300", "x-ratelimit-remaining": "4042"}, json=SECONDARY)])
+    with pytest.raises(RateLimited) as exc:
+        t.query("q")
+    assert (exc.value.retry_after, exc.value.secondary) == (300.0, True)
+    assert len(seen) == 1
+
+    monkeypatch.setattr(gql.time, "time", lambda: 1000.0)
+    t, _ = transport([httpx.Response(
+        403, headers={"x-ratelimit-remaining": "0", "x-ratelimit-reset": "1600"})])
+    with pytest.raises(RateLimited) as exc:
+        t.query("q")
+    assert (exc.value.retry_after, exc.value.secondary) == (600.0, False)
+
+
+@pytest.mark.parametrize("message", [
+    SECONDARY["message"],
+    "You have triggered an abuse detection mechanism. Please wait a few minutes.",
+])
+def test_a_secondary_limit_with_no_retry_after_waits_a_minute(message):
+    # GitHub's own advice when it sends no header.
+    sleeps: list[float] = []
+    t, seen = transport([httpx.Response(403, json={"message": message}), ok({"x": 1})], sleeps)
+    assert t.query("q") == {"x": 1}
+    assert sleeps == [60.0]
+
+
+def test_a_429_with_no_headers_is_a_limit_too():
+    t, _ = transport([httpx.Response(429)] * gql.MAX_ATTEMPTS)
+    with pytest.raises(RateLimited) as exc:
+        t.query("q")
+    assert (exc.value.retry_after, exc.value.secondary) == (60.0, True)
+
+
+def test_what_github_said_is_logged_without_the_token(caplog):
+    t, _ = transport([httpx.Response(
+        403, headers={"Retry-After": "300", "x-ratelimit-remaining": "4042"}, json=SECONDARY)])
+    with caplog.at_level("WARNING", logger=gql.__name__), pytest.raises(RateLimited):
+        t.query("q")
+    line = caplog.text
+    assert "403" in line and "retry-after=300" in line and "x-ratelimit-remaining=4042" in line
+    assert "secondary rate limit" in line
+
+
+def test_the_number_of_tries_can_be_lowered():
+    # Background work asks twice, not four times: a query GitHub times out
+    # on costs it the same again on every try.
+    queue = [httpx.Response(502)] * gql.MAX_ATTEMPTS
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return queue.pop(0)
+
+    t = gql.GitHubGraphQL(token="t", client=httpx.Client(transport=httpx.MockTransport(handler)),
+                          sleep=lambda s: None, attempts=2)
+    with pytest.raises(UpstreamError) as exc:
+        t.query("q")
+    assert len(seen) == 2 and "HTTP 502 after 2 tries" in str(exc.value)
 
 
 def test_missing_token_is_an_auth_error(monkeypatch):
@@ -115,7 +201,7 @@ def test_missing_token_is_an_auth_error(monkeypatch):
 
 def test_typed_errors_are_still_runtime_errors():
     # The CLI catches RuntimeError and prints the message; that must keep working.
-    for cls in (AuthError, RateLimited, RepoNotFound, UpstreamError):
+    for cls in (AuthError, Forbidden, RateLimited, RepoNotFound, UpstreamError):
         assert issubclass(cls, RuntimeError)
 
 

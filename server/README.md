@@ -420,6 +420,36 @@ GitHub's settings, or inactive, or `repo_meta` says archived or no push in 90
 days. A pass that runs out of budget has done the useful ones first. This
 reads only what Holt already has, never GitHub; the summary counts them.
 
+A seed whose report fails is remembered (`warm_failures`) and not asked for
+again for six hours, doubling with each failure in a row up to a week; when
+its wait is over it goes to the back of the queue, and a report made any
+other way forgets it. A repository GitHub says isn't there waits a month and
+is listed under the summary until the seed list is fixed. So a pass spends
+its time on seeds that can succeed. Five reports in a row failing on GitHub's
+side (502, 504, a timeout) pause the pass for five minutes.
+
+What GitHub's refusals mean (`holt_server/github.py`, `TokenPool`):
+
+| GitHub answers | It is | What happens |
+|---|---|---|
+| 502 / 504 | that repository's failure (`upstream`): usually a query GitHub times out on | asked twice for background work, four times for a person's check; the token stays in |
+| 403 with `x-ratelimit-remaining: 0` | the hourly points used up (`rate_limited`) | the token is left out until its reset |
+| 403 or 429 with `Retry-After`, or a "secondary rate limit" message | "slow down": too much at once, with points to spare (`rate_limited`) | nothing is sent with that token until GitHub's wait is over, not even by reports in flight |
+| any other 403 | that request's failure (`upstream`) | the token stays in, unless it gets three in a row and nothing else |
+| `NOT_FOUND` | no such repository (`not_found`) | the token stays in |
+
+A `rate_limited` report is never the repository's failure. With
+`--wait-for-budget` the pass waits as long as GitHub asked (longer each time
+it says so again), runs one report at a time for half an hour, and asks for
+the same seed again; it ends only after six such waits with no report made,
+and says so. Without the flag it ends at the first one and says when to run
+again. The log line `GitHub answered 403: retry-after=… x-ratelimit-remaining=…`
+records which kind it was.
+
+The pass prints a `progress:` line every 25 seeds and, in its summary, how
+many seeds were skipped as recently failed and how many are still without a
+current report; `deploy/prod/warm.sh --status` shows the last of each.
+
 ```sh
 uv run python -m holt_server.warm --dry-run           # what would run, and its GitHub points
 uv run python -m holt_server.warm                     # the whole thing

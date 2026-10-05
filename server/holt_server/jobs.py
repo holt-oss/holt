@@ -58,7 +58,7 @@ from holt_server.db import (
 )
 from holt_server.engine import RecordingProvider
 from holt_server.errors import ApiError
-from holt_server.github import JobStopped, job_stop
+from holt_server.github import JobStopped, background, job_stop
 from holt_server.meta_refresh import MetaRefresher
 
 if TYPE_CHECKING:
@@ -427,6 +427,8 @@ class JobRunner:
     def _analysis_sync(self, job: Job, spec, emit) -> tuple[dict[str, Any], Evidence]:
         """The report, and the evidence it read (for the evidence store)."""
         svc = self.services
+        # Nobody waits on a badge refresh or a warm report (github.background).
+        background.set(job.priority >= BADGE_PRIORITY)
         model = None
         if job.mode == "ai":
             model = budget.Capped(svc.model_factory(spec), spec.model,

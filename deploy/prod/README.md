@@ -398,6 +398,12 @@ seeds is about 120,000 points over about 42 hours. It stops by itself under
 left off next time; with `--wait-for-budget` it waits for the points to come
 back instead.
 
+A seed whose report fails waits before it is asked for again (six hours,
+doubling to a week) and then goes to the back, and a "slow down" from GitHub
+pauses a `--wait-for-budget` pass instead of ending it (`server/README.md`,
+"Warm cache"). `--status` says how many seeds were skipped as recently failed
+and how many are to go; the summary lists the seeds that aren't on GitHub.
+
 ```sh
 deploy/prod/warm.sh --dry-run
 deploy/prod/warm.sh --no-find --wait-for-budget   # then --status or --logs

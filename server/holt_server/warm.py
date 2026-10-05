@@ -46,6 +46,21 @@ How it stays out of the way:
   counting REPORT_POINTS for each report still in flight, so a warm pass can
   never starve the requests people make. `--wait-for-budget` waits for the
   points to come back instead of stopping (a long sweep, left alone).
+* A seed whose report fails is remembered (`warm_failures`) and not asked for
+  again for RETRY_HOURS, doubling with each failure in a row up to a week; a
+  repository that isn't on GitHub, for a month. When its wait is over it goes
+  to the back of the queue. So a pass spends its time on seeds that can
+  succeed, and a repository GitHub can't answer for (a 502 after ten seconds
+  of its time, every try) isn't asked for again every round.
+* BREAKER_FAILURES reports in a row failing on GitHub's side pause the pass
+  for BREAKER_PAUSE_S: a run of those is what makes GitHub rate-limit the
+  App, which people's checks read with too.
+* When GitHub says "slow down" (a rate limit: `rate_limited`), that is no
+  repository's failure. With `--wait-for-budget` the pass waits as long as
+  GitHub asked (longer each time it says so again), then runs one report at
+  a time for SLOW_S, and asks for the same seed again; it ends only after
+  MAX_LIMITS_IN_A_ROW waits with no report made. Without the flag it ends
+  there and says so.
 """
 
 from __future__ import annotations
@@ -55,12 +70,13 @@ import asyncio
 import contextlib
 import logging
 import sys
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from holt_server import evidence_store, repos, starter
 from holt_server.db import (
@@ -76,6 +92,7 @@ from holt_server.db import (
     Report,
     SavedRepo,
     StarterCache,
+    WarmFailure,
     dedupe_key,
     find_key,
     now,
@@ -108,6 +125,32 @@ QUIET_RULES = frozenset({"archived", "prs_closed", "inactive"})
 # A job that never finishes fails its repository and the pass goes on; this
 # many in a row means nothing is working the queue, and the pass stops.
 MAX_TIMEOUTS_IN_A_ROW = 3
+# A seed whose report failed isn't asked for again for this long, doubling
+# with each failure in a row up to RETRY_MAX_HOURS. One that isn't on GitHub
+# (renamed away or deleted) waits NOT_FOUND_RETRY_HOURS and is listed in the
+# summary until the seed list is fixed.
+RETRY_HOURS = 6
+RETRY_MAX_HOURS = 7 * 24
+NOT_FOUND_RETRY_HOURS = 30 * 24
+# This many reports in a row failing on GitHub's side (502, 504, a timeout)
+# pause the pass this long, however many seeds are left.
+BREAKER_FAILURES = 5
+BREAKER_PAUSE_S = 300
+# After GitHub says "slow down": wait what it asked (LIMIT_WAIT_S when it
+# named no time, never under LIMIT_WAIT_MIN_S), doubling each time it says so
+# again with no report made in between, up to LIMIT_WAIT_MAX_S; then one
+# report at a time for SLOW_S. After MAX_LIMITS_IN_A_ROW such waits in a row
+# (about three hours) the pass ends.
+LIMIT_WAIT_S = 300
+LIMIT_WAIT_MIN_S = 60
+LIMIT_WAIT_MAX_S = 3600
+SLOW_S = 30 * 60
+MAX_LIMITS_IN_A_ROW = 6
+# A "progress:" line every this many seeds (`warm.sh --status` shows the last).
+PROGRESS_EVERY = 25
+# The pauses' clock and sleep (the tests put their own in).
+clock = time.monotonic
+sleep = asyncio.sleep
 # Refresh a cached find or starter list once this share of its lifetime is gone.
 REFRESH_AFTER = 0.8
 FIND_LIMIT = 20
@@ -169,6 +212,24 @@ def load_seeds(path: Path | str | None = None) -> list[str]:
     return out
 
 
+def retry_delay(code: str, failures: int) -> timedelta:
+    """How long a seed waits after its `failures`-th failure in a row."""
+    if code == "not_found":
+        return timedelta(hours=NOT_FOUND_RETRY_HOURS)
+    return timedelta(hours=min(RETRY_HOURS * 2 ** (max(failures, 1) - 1), RETRY_MAX_HOURS))
+
+
+def limit_wait(retry_after: float | None, in_a_row: int) -> float:
+    """Seconds to wait after GitHub's `in_a_row`-th "slow down" in a row."""
+    asked = max(float(retry_after or LIMIT_WAIT_S), LIMIT_WAIT_MIN_S)
+    return min(asked * 2 ** (max(in_a_row, 1) - 1), LIMIT_WAIT_MAX_S)
+
+
+def minutes(seconds: float) -> str:
+    n = max(1, round(seconds / 60))
+    return f"{n} minute{'' if n == 1 else 's'}"
+
+
 @dataclass
 class Result:
     reports_run: int = 0
@@ -176,6 +237,17 @@ class Result:
     # Made again from kept evidence, with no GitHub call (--stale-only).
     reports_rederived: int = 0
     reports_failed: int = 0
+    # Failed lately and not due again yet (retry_delay): not asked for.
+    skipped_failed: int = 0
+    # Failed before and due again: asked for after everything else.
+    failed_last: int = 0
+    # Seeds this pass leaves without a current report (failed, skipped or
+    # not reached).
+    left: int = 0
+    # Seeds GitHub says aren't there, this pass or one before: fix the list.
+    not_found: list[str] = field(default_factory=list)
+    # Times the pass paused: GitHub said slow down, or reports kept failing.
+    pauses: int = 0
     # Closed to outside pull requests or dormant, so warmed last.
     quiet_last: int = 0
     starter_run: int = 0
@@ -191,6 +263,9 @@ class Result:
     def summary(self) -> str:
         parts = [f"reports {self.reports_run} run, {self.reports_fresh} fresh, "
                  f"{self.reports_failed} failed",
+                 f"{self.skipped_failed} skipped as recently failed",
+                 f"{self.left} still without a current report",
+                 f"{len(self.not_found)} not on GitHub",
                  f"{self.reports_rederived} made again from kept evidence",
                  f"{self.quiet_last} closed or dormant seeds last",
                  f"starter issues {self.starter_run} run, {self.starter_fresh} fresh",
@@ -221,6 +296,18 @@ class Warmer:
         self._steps = 0
         self._timeouts = 0
         self._in_flight = 0
+        # Seeds with a remembered failure, by repo key (failed_last).
+        self._failures: dict[str, WarmFailure] = {}
+        self._not_found: dict[str, str] = {}
+        # No report starts before `_paused_until`; until `_slow_until`, one
+        # at a time (both on `clock`).
+        self._paused_until = 0.0
+        self._slow_until = 0.0
+        # In a row, with no report made in between.
+        self._upstream = 0
+        self._limits = 0
+        self._looked_at = 0
+        self._queue = 0
         # One budget check at a time, so two workers can't both take the last points.
         self._budget = asyncio.Lock()
         # repo keys of the weekly refresh tier (--stale-only's snapshot ages).
@@ -243,6 +330,7 @@ class Warmer:
         """Around one report job: the budget checked first, with REPORT_POINTS
         held back for every report already in flight."""
         async with self._budget:
+            await self._hold()
             await self._enough_points()
             self._in_flight += 1
         try:
@@ -250,12 +338,62 @@ class Warmer:
         finally:
             self._in_flight -= 1
 
+    async def _hold(self) -> None:
+        """Before a report starts: sit out a pause, and after a "slow down"
+        wait for the report in flight, so they go one at a time."""
+        while True:
+            at = clock()
+            if at < self._paused_until:
+                await sleep(self._paused_until - at)
+            elif at < self._slow_until and self._in_flight:
+                await asyncio.sleep(POLL_S)
+            else:
+                return
+
+    def pause(self, seconds: float) -> None:
+        self._paused_until = max(self._paused_until, clock() + seconds)
+        self.result.pauses += 1
+
+    def slow_down(self, retry_after: float | None) -> None:
+        """GitHub rate-limited a report. Wait as long as it asked, longer each
+        time it says so again, then go one at a time for a while; OutOfBudget
+        without --wait-for-budget, or when it has gone on too long."""
+        if clock() < self._paused_until:
+            return  # another report in flight was told the same
+        self._limits += 1
+        wait = limit_wait(retry_after, self._limits)
+        if not self.wait_for_budget:
+            raise OutOfBudget(
+                "GitHub asked us to slow down (a rate limit, not a failing repository); "
+                f"it takes requests again in about {minutes(wait)}. Run again then, or "
+                "with --wait-for-budget to wait here")
+        if self._limits > MAX_LIMITS_IN_A_ROW:
+            raise OutOfBudget(
+                f"GitHub asked us to slow down {self._limits} times in a row, with no "
+                "report made in between; run again later")
+        self.pause(wait)
+        self._slow_until = self._paused_until + SLOW_S
+        self.say(f"GitHub asked us to slow down (a rate limit): waiting {minutes(wait)}, "
+                 f"then one report at a time for {minutes(SLOW_S)}")
+
     async def _enough_points(self) -> None:
         """OutOfBudget when the points left, less what the reports in flight
         may still spend, are under HOLT_WARM_MIN_POINTS; with --wait-for-budget,
         wait for them to come back instead."""
         floor = self.svc.settings.warm_min_points
         while True:
+            # This process's own readers are held by a rate limit: the points
+            # can't be asked for, and they are not what ran out.
+            hold = self.svc.pool.held()
+            if hold is not None:
+                kind = ("asked us to slow down (too much at once, not the hourly points)"
+                        if hold.secondary else "says the hourly points are used up")
+                why = f"GitHub {kind}; it takes requests again in about {minutes(hold.seconds)}"
+                if not self.wait_for_budget:
+                    raise OutOfBudget(why)
+                self.say(f"{why}; waiting")
+                await sleep(hold.seconds + 1)
+                continue
             remaining = await self.svc.lookup.remaining()
             spare = remaining - self._in_flight * REPORT_POINTS
             if spare >= floor:
@@ -373,23 +511,90 @@ class Warmer:
             self.result.reports_run += 1
             return
         key = repos.key(repo)
-        async with self.report_slot():
-            done = await self.run_job(Job(
-                kind="analysis", repo=repo, repo_key=key, mode="rules", days=DAYS, params={},
-                priority=BADGE_PRIORITY, dedupe_key=dedupe_key(key, "rules", DAYS)))
-        if done is None:
-            self.result.reports_failed += 1
-            self.result.failures.append(f"{repo}: timed out")
-        elif done.status == "done":
+        while True:
+            async with self.report_slot():
+                done = await self.run_job(Job(
+                    kind="analysis", repo=repo, repo_key=key, mode="rules", days=DAYS, params={},
+                    priority=BADGE_PRIORITY, dedupe_key=dedupe_key(key, "rules", DAYS)))
+            error = (done.error or {}) if done is not None and done.status != "done" else {}
+            if error.get("code") != "rate_limited":
+                break
+            # GitHub's doing, not this repository's: ask for it again after.
+            self.say(f"{repo}: not read (GitHub said to slow down)")
+            self.slow_down(error.get("retry_after"))
+        if done is not None and done.status == "done":
             self.result.reports_run += 1
+            self._upstream = self._limits = 0
             self.say(f"{repo}: {(done.result or {}).get('headline', 'done')}")
-        else:
-            self.result.reports_failed += 1
-            code = (done.error or {}).get("code", "error")
-            self.result.failures.append(f"{repo}: {code}")
-            self.say(f"{repo}: failed ({code})")
-            if code == "rate_limited":
-                raise OutOfBudget("GitHub rate limit reached")
+            await self.forget_failure(repo)
+            return
+        code = "timeout" if done is None else error.get("code", "error")
+        self.result.reports_failed += 1
+        self.result.failures.append(f"{repo}: {'timed out' if done is None else code}")
+        self.say(f"{repo}: failed ({code})")
+        await self.note_failure(repo, code)
+        if code in ("upstream", "timeout"):
+            self._upstream += 1
+            if self._upstream >= BREAKER_FAILURES:
+                self._upstream = 0
+                self.pause(BREAKER_PAUSE_S)
+                self.say(f"{BREAKER_FAILURES} reports in a row failed on GitHub's side; "
+                         f"pausing {minutes(BREAKER_PAUSE_S)}")
+
+    # --- seeds that failed ----------------------------------------------------
+
+    async def failed_last(self, seeds: list[str]) -> list[str]:
+        """`seeds` without those that failed lately and aren't due again
+        (counted in `skipped_failed`), and with the ones that are due at the
+        back, the longest overdue first. A failure older than the seed's
+        newest report is forgotten: something made the report since."""
+        keys = {repos.key(r) for r in seeds}
+        async with self.svc.db.session() as s:
+            rows = [f for f in (await s.execute(select(WarmFailure))).scalars()
+                    if f.repo_key in keys]
+            made = dict((await s.execute(
+                select(Report.repo_key, func.max(Report.created_at))
+                .where(Report.mode == "rules", Report.days == DAYS,
+                       Report.repo_key.in_([f.repo_key for f in rows]))
+                .group_by(Report.repo_key))).all()) if rows else {}
+            stale = [f.repo_key for f in rows
+                     if f.repo_key in made and utc(made[f.repo_key]) > utc(f.last_failed_at)]
+            if stale and not self.dry_run:
+                await s.execute(delete(WarmFailure).where(WarmFailure.repo_key.in_(stale)))
+                await s.commit()
+        self._failures = {f.repo_key: f for f in rows if f.repo_key not in stale}
+        self._not_found = {k: f.repo for k, f in self._failures.items() if f.code == "not_found"}
+        at = now()
+        front = [r for r in seeds if repos.key(r) not in self._failures]
+        due = sorted((utc(self._failures[repos.key(r)].retry_at), i, r)
+                     for i, r in enumerate(seeds) if repos.key(r) in self._failures)
+        back = [r for when, _, r in due if when <= at]
+        self.result.failed_last = len(back)
+        self.result.skipped_failed = len(due) - len(back)
+        return front + back
+
+    async def note_failure(self, repo: str, code: str) -> None:
+        """Remember that `repo`'s report failed, and when it may be tried again."""
+        key, at = repos.key(repo), now()
+        if code == "not_found":
+            self._not_found[key] = repo
+        async with self.svc.db.session() as s:
+            row = await s.get(WarmFailure, key)
+            if row is None:
+                row = WarmFailure(repo_key=key, repo=repo, failures=0, first_failed_at=at)
+                s.add(row)
+            row.code, row.failures, row.last_failed_at = code[:20], row.failures + 1, at
+            row.retry_at = at + retry_delay(code, row.failures)
+            await s.commit()
+
+    async def forget_failure(self, repo: str) -> None:
+        key = repos.key(repo)
+        self._not_found.pop(key, None)
+        if self._failures.pop(key, None) is None:
+            return
+        async with self.svc.db.session() as s:
+            await s.execute(delete(WarmFailure).where(WarmFailure.repo_key == key))
+            await s.commit()
 
     def reuse_hours(self, repo: str) -> float:
         """How old a snapshot of `repo` may be and still stand in for a GitHub
@@ -527,8 +732,13 @@ class Warmer:
             self.say(f"{tier} tier: {len(seeds)} repos")
         if stale_only:
             self._weekly = {repos.key(r) for r in await tier_repos(self.svc, "weekly", seeds)}
+        total = len(seeds)
         if reports:
             seeds, self.result.quiet_last = await quiet_last(self.svc, seeds)
+            seeds = await self.failed_last(seeds)
+            if self.result.skipped_failed or self.result.failed_last:
+                self.say(f"{self.result.skipped_failed} seeds skipped as recently failed; "
+                         f"{self.result.failed_last} that failed before go last")
             if self.parallel > 1:
                 self.say(f"{self.parallel} reports at a time")
         try:
@@ -545,6 +755,11 @@ class Warmer:
         except OutOfBudget as stop:
             self.result.stopped = str(stop)
             self.say(f"stopping: {stop}")
+        if reports:
+            r = self.result
+            made = r.reports_fresh + r.reports_rederived + (0 if self.dry_run else r.reports_run)
+            r.left = total - made
+            r.not_found = sorted(self._not_found.values(), key=str.lower)
         return self.result
 
     async def warm_seed(self, repo: str, *, reports: bool, starter: bool,
@@ -560,6 +775,7 @@ class Warmer:
         finish, then it is raised."""
         todo = iter(seeds)
         stops: list[OutOfBudget] = []
+        self._queue = len(seeds)
 
         async def worker() -> None:
             for repo in todo:
@@ -569,12 +785,25 @@ class Warmer:
                     stops.append(stop)
                 if stops:
                     return
+                self.looked_at()
 
         async with asyncio.TaskGroup() as group:
             for _ in range(min(self.parallel, len(seeds))):
                 group.create_task(worker())
         if stops:
             raise stops[0]
+
+
+    def looked_at(self) -> None:
+        """One more seed done with; a "progress:" line every PROGRESS_EVERY."""
+        self._looked_at += 1
+        if self.dry_run or (self._looked_at % PROGRESS_EVERY and self._looked_at != self._queue):
+            return
+        r = self.result
+        self.say(f"progress: {self._looked_at} of {self._queue} seeds looked at: "
+                 f"{r.reports_run} reports run, {r.reports_fresh} fresh, "
+                 f"{r.reports_failed} failed; {r.skipped_failed} skipped as recently failed; "
+                 f"{self._queue - self._looked_at} to go")
 
 
 async def tier_repos(svc, tier: str, seeds: list[str]) -> list[str]:
@@ -731,6 +960,9 @@ def main(argv: list[str] | None = None) -> int:
             print(result.summary())
             for failure in result.failures:
                 print(f"  failed: {failure}")
+            if result.not_found:
+                print("  not on GitHub (renamed away or deleted; fix the seed list): "
+                      + ", ".join(result.not_found))
             return 0
         finally:
             if works_queue:
