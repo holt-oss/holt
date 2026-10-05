@@ -503,8 +503,11 @@ hacktoberfest topic from the most-starred down until the list reaches
 `--target`, 10,000 by default) and drops repos that are gone, archived, forks
 or mirrors, under 20 stars, not pushed since June 2026 or closed to outside
 pull requests (~160 points in all). It drops catalogues, farms, practice
-repos and personal dotfiles by name and by description. Each script keeps the
-other's part:
+repos and personal dotfiles by name and by description. A repo already in
+the list stays, so its report keeps being refreshed, unless it is gone,
+archived, a fork or mirror, or closed to outside pull requests; one that a
+filter would now drop is printed for a person to decide. Each script keeps
+the other's part:
 
 ```sh
 GITHUB_TOKEN=$(gh auth token) uv run python scripts/build_seed_list.py --check

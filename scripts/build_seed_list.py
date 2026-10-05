@@ -35,7 +35,11 @@ With `--check` (reads GITHUB_TOKEN; GraphQL, about 1 point per request):
 Without `--check` it only prints what the free sources hold and writes nothing.
 
 Everything above the GENERATED marker in repos.txt is kept verbatim; everything
-below it is rebuilt. Catalogues (awesome-*, *-list, book lists, registries),
+below it is rebuilt. A repo already below the marker stays (production has its
+report and refreshes it) unless it is gone, archived, a fork or mirror, or closed
+to outside pull requests (ALWAYS_DROPPED): the star and push floors, the name and
+description filters and a search no longer returning it only keep new repos out.
+One the filters would drop is printed for a person to decide. Catalogues (awesome-*, *-list, book lists, registries),
 contribution farms, practice repos and personal dotfiles are dropped by name, and
 under `--check` also by what their description says (SKIP_DESCRIPTION), which is
 how a mirror GitHub does not flag as one is caught too.
@@ -406,24 +410,31 @@ def skipped(repo: str) -> bool:
     return repo.lower() in SKIP_REPOS or bool(SKIP_NAME.search(repo.split("/")[1]))
 
 
+# The reasons that also remove a repo already in the list.
+ALWAYS_DROPPED = {"gone", "archived", "fork or mirror", "closed to outside pull requests"}
+BY_DESCRIPTION = {"a mirror by its description", "catalogue or farm"}
+
+
 def drop_reason(node: dict | None) -> str | None:
     """Why a repository (REPO_FIELDS) does not belong in the list, or None if it does."""
     if not node:
         return "gone"
     if node["isArchived"]:
         return "archived"
-    description = node.get("description") or ""
-    if node["isFork"] or node.get("isMirror") or SKIP_MIRROR.search(description):
+    if node["isFork"] or node.get("isMirror"):
         return "fork or mirror"
+    if (node.get("hasPullRequestsEnabled") is False
+            or node.get("pullRequestCreationPolicy") == "COLLABORATORS_ONLY"):
+        return "closed to outside pull requests"
+    description = node.get("description") or ""
+    if SKIP_MIRROR.search(description):
+        return "a mirror by its description"
     if SKIP_DESCRIPTION.search(description):
         return "catalogue or farm"
     if node["stargazerCount"] < MIN_STARS:
         return f"under {MIN_STARS} stars"
     if (node["pushedAt"] or "") < ACTIVE_SINCE:
         return f"no push since {ACTIVE_SINCE}"
-    if (node.get("hasPullRequestsEnabled") is False
-            or node.get("pullRequestCreationPolicy") == "COLLABORATORS_ONLY"):
-        return "closed to outside pull requests"
     return None
 
 
@@ -533,10 +544,22 @@ def main() -> int:
     text = SEEDS.read_text(encoding="utf-8")
     head, _, generated = text.partition(MARKER)
     head = head.rstrip("\n")
-    before = listed(generated)
+    earlier: dict[str, str] = {}
+    topic_before: set[str] = set()  # the ones the hacktoberfest topic supplied
+    block = ""
+    for line in generated.splitlines():
+        if line.startswith("# source: "):
+            block = line.removeprefix("# source: ").split(" (")[0]
+        elif r := line.split("#", 1)[0].strip():
+            earlier[r.lower()] = r
+            if block == "hacktoberfest-topic":
+                topic_before.add(r.lower())
+    before = set(earlier)
     seen = listed(head)
     kept = len(seen)
     dropped: Counter[str] = Counter()
+    stayed: Counter[str] = Counter()  # already listed, kept for a reason that stops a new repo
+    flagged: list[str] = []  # already listed, and the name or description filter matches
     known: dict[str, dict] = {}  # repos GitHub search already described
     pushed = (datetime.now(UTC) - timedelta(days=SEARCH_PUSHED_DAYS)).strftime("%Y-%m-%d")
     scope = f"pushed:>={pushed} archived:false fork:false"
@@ -583,33 +606,48 @@ def main() -> int:
         for repo in (r for f in found for r in ([f] if "/" in f else mapped.get(f.lower(), []))):
             if repo.lower() in seen:
                 dropped["duplicate"] += 1
-            elif skipped(repo):
+            elif skipped(repo) and repo.lower() not in before:
                 dropped["catalogue or farm"] += 1
                 seen.add(repo.lower())
             else:
                 seen.add(repo.lower())
                 new.append(repo)
         blocks.append((name, where, new))
+    unsourced = [repo for key, repo in earlier.items() if key not in seen]
 
     if gh:
-        status = known | check(gh, [r for _, _, b in blocks for r in b if r not in known])
+        status = known | check(gh, [r for r in [*(r for _, _, b in blocks for r in b), *unsourced]
+                                    if r not in known])
         seen = listed(head)
-        checked = []
-        for name, where, new in blocks:
-            live = []
-            for repo in new:
-                if why := drop_reason(status[repo]):
-                    dropped[why] += 1
-                elif (current := status[repo]["nameWithOwner"]).lower() in seen:
-                    dropped["duplicate after rename"] += 1
-                else:
-                    seen.add(current.lower())
-                    live.append(current)
-            checked.append((name, where, live))
-        blocks = checked
+
+        def stays(repo: str) -> str | None:
+            """The name to list `repo` under, or None when it is dropped."""
+            why = drop_reason(status[repo])
+            listed_before = repo.lower() in before
+            if why and (why in ALWAYS_DROPPED or not listed_before):
+                dropped[why] += 1
+                return None
+            current = status[repo]["nameWithOwner"]
+            if current.lower() in seen:
+                dropped["duplicate after rename"] += 1
+                return None
+            if listed_before:
+                if why in BY_DESCRIPTION or skipped(repo):
+                    why = "catalogue, farm or mirror by name or description"
+                    flagged.append(current)
+                if why:
+                    stayed[why] += 1
+            seen.add(current.lower())
+            return current
+
+        blocks = [(name, where, [current for repo in new if (current := stays(repo))])
+                  for name, where, new in blocks]
+        carried = {current.lower(): current for repo in unsourced
+                   if (current := stays(repo))}
+        seen -= set(carried)  # so the topic search below can put them back in its block
 
         # The hacktoberfest topic is far larger than the list: take it from the top.
-        room = args.target - kept - sum(len(b) for _, _, b in blocks)
+        room = args.target - kept - sum(len(b) for _, _, b in blocks) - len(carried)
         terms = f"{HACKTOBERFEST_TERMS} {scope}"
         topic: list[str] = []
         floor = None
@@ -618,18 +656,27 @@ def main() -> int:
             if repo.lower() in seen:
                 continue
             seen.add(repo.lower())
-            if skipped(repo):
+            if repo.lower() in carried:
+                topic.append(carried.pop(repo.lower()))
+            elif skipped(repo):
                 dropped["catalogue or farm"] += 1
             elif why := drop_reason(node):
                 dropped[why] += 1
             else:
                 topic.append(repo)
                 floor = node["stargazerCount"]
-                if len(topic) >= room:
+                room -= 1
+                if room <= 0:
                     break
+        # Below where the search stopped, the topic's earlier repos stay in its block.
+        topic += [carried.pop(key) for key in list(carried) if key in topic_before]
         blocks.insert(0, ("hacktoberfest-topic",
                           f"GitHub search: {terms} stars:>={MIN_STARS}, most-starred first"
-                          f" (reached {floor} stars)", topic))
+                          + (f" (reached {floor} stars)" if floor else ""), topic))
+        stayed["no source returns it any more"] = len(carried)
+        blocks.append(("earlier builds", "listed by an earlier build and returned by no source "
+                       "now; kept while GitHub says they still take outside pull requests",
+                       list(carried.values())))
 
     out = [head, "", MARKER]
     for name, where, new in blocks:
@@ -639,6 +686,11 @@ def main() -> int:
         print(f"{name}: {len(new)} new", file=sys.stderr)
     for why, n in dropped.most_common():
         print(f"dropped ({why}): {n}", file=sys.stderr)
+    for why, n in stayed.most_common():
+        print(f"already listed, kept ({why}): {n}", file=sys.stderr)
+    if flagged:
+        print("already listed, kept, but the name or description filter matches (remove by hand "
+              "if they should go): " + ", ".join(sorted(flagged, key=str.lower)), file=sys.stderr)
     after = {r.lower() for _, _, b in blocks for r in b}
     print(f"no longer listed: {len(before - after)} of {len(before)} generated before",
           file=sys.stderr)
