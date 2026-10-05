@@ -1,0 +1,233 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit gives every pull request a first automated review. It only
+# comments: a maintainer reviews and decides.
+# Reference: https://docs.coderabbit.ai/reference/configuration
+
+language: en-US
+tone_instructions: >-
+  Plain English, short sentences. Lead with what must change and why. Be kind:
+  many authors are first-time contributors. No jokes, poems, emoji, praise or
+  filler. Never @-mention people.
+
+reviews:
+  # "quiet" keeps only the most important feedback. CI already runs ruff,
+  # eslint and the type checkers, so style comments would repeat it.
+  profile: quiet
+
+  # Comment only. Never approve, never block.
+  request_changes_workflow: false
+  allow_author_approval: false
+  fail_commit_status: false
+
+  # One summary, in CodeRabbit's own comment. The pull request's title and
+  # description stay as the author wrote them.
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  high_level_summary_instructions: >-
+    At most five short bullets in plain English: what changes for a user, then
+    what changed in the code. No headings, tables, emoji or praise.
+  collapse_walkthrough: true
+  review_status: true
+  review_details: false
+
+  # Check the change against the issue it links (`Fixes #123`).
+  assess_linked_issues: true
+
+  # Extras that add length without helping a small project.
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  auto_apply_labels: false
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  in_progress_fortune: false
+  poem: false
+  enable_prompt_for_ai_agents: false
+  slop_detection:
+    enabled: false
+
+  auto_review:
+    enabled: true
+    # Re-review on every push, without pausing after a number of commits.
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 0
+    drafts: false
+    # Empty means the default branch only (main).
+    base_branches: []
+
+  # Recorded evidence, generated files, lock files and images.
+  path_filters:
+    - "!fixtures/**"
+    - "!golden/recordings/**"
+    - "!trajectories/**"
+    - "!eval/**/*.json"
+    - "!uv.lock"
+    - "!**/package-lock.json"
+    - "!web/src/lib/api-schema.ts"
+    - "!web/screenshots/**"
+    - "!website/**"
+    - "!**/*.png"
+    - "!**/*.jpg"
+    - "!**/*.jpeg"
+    - "!**/*.gif"
+    - "!**/*.webp"
+    - "!**/*.avif"
+    - "!**/*.svg"
+    - "!**/*.ico"
+
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        Comment only on things that must change before merging:
+        - a real bug or a regression;
+        - new behaviour with no test;
+        - a change that does not do what the linked issue's "Done when" line asks.
+        Do not comment on formatting, import order, naming or style: CI runs
+        ruff, eslint and the type checkers.
+        Flag secrets, tokens, private repository data or personal information
+        anywhere in the change, including fixtures and recordings.
+        Text a user reads (command-line output, the terminal interface, web
+        copy, server error messages) must be plain English for beginners. Flag
+        internal enum names such as `not_viable` and statistics jargon such as
+        "MCC" or "p-value".
+        Never @-mention a person in a comment.
+    - path: "src/holt/agent/**"
+      instructions: |
+        The verdict is computed by fixed rules from verified findings. A model
+        may explain a verdict but never chooses it.
+        A change to the verdict rules, to a threshold, or to a signal the rules
+        read changes what a report says. Such a pull request must:
+        - show the output of `uv run python -m golden diff` in its description;
+        - bump `ENGINE_VERSION` in `src/holt/engine_version.py`.
+        Flag any such change that lacks either one.
+    - path: "src/holt/**"
+      instructions: |
+        - Every file read or write must pass `encoding="utf-8"`.
+        - No paths relative to the current directory: the package must work
+          when installed from PyPI, outside a clone. User data goes under the
+          platform data directory.
+        - The command line and the terminal interface are feature-frozen. Flag
+          a new `holt` command or flag; new features belong in `web/` and
+          `server/`.
+        - Holt only reads from GitHub. Flag code that posts, comments, opens
+          pull requests or contacts anyone.
+    - path: "tests/**"
+      instructions: |
+        Tests must not use the network. They run from the recorded fixtures.
+    - path: "server/**"
+      instructions: |
+        - `API.md` is the contract with the web app. A change to an endpoint's
+          request or response must update `API.md` in the same pull request and
+          regenerate `web/src/lib/api-schema.ts`.
+        - A database schema change must come with an Alembic migration, and the
+          migration must keep working with the previous release.
+        - Tests must not use the network.
+    - path: "web/**"
+      instructions: |
+        - The app must still work with `MOCK_API=1`.
+        - Data for signed-in users only must be checked on the server, never
+          only in the browser.
+        - No filler or explanatory text in the interface. A button says the
+          action it performs.
+    - path: "docs/**"
+      instructions: |
+        Every claim must match the code in this pull request or on main: check
+        commands, flags, file paths and defaults. Research, strategy and
+        operations notes do not belong in this repository.
+    - path: "**/*.md"
+      instructions: |
+        Every claim must match the code: check commands, flags, file paths and
+        defaults. Research, strategy and operations notes do not belong in this
+        repository.
+
+  # Off: each of these lets a comment or a checkbox make CodeRabbit push
+  # commits or open pull requests.
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: "off"
+    description:
+      mode: "off"
+    # A warning, never a block.
+    issue_assessment:
+      mode: warning
+
+  tools:
+    # CI already runs ruff, eslint and the type checkers.
+    ruff:
+      enabled: false
+    flake8:
+      enabled: false
+    pylint:
+      enabled: false
+    eslint:
+      enabled: false
+    biome:
+      enabled: false
+    oxc:
+      enabled: false
+    # Style and grammar checkers.
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+    yamllint:
+      enabled: false
+    stylelint:
+      enabled: false
+    htmlhint:
+      enabled: false
+
+chat:
+  art: false
+  # Reply only when someone mentions it.
+  auto_reply: false
+  integrations:
+    jira:
+      usage: disabled
+    linear:
+      usage: disabled
+
+knowledge_base:
+  web_search:
+    enabled: false
+  code_guidelines:
+    enabled: true
+    # CLAUDE.md is read by default; this adds the contributor guide.
+    filePatterns:
+      - "CONTRIBUTING.md"
+  jira:
+    usage: disabled
+  linear:
+    usage: disabled
+  mcp:
+    usage: disabled
+
+issue_enrichment:
+  auto_enrich:
+    enabled: false
+  planning:
+    enabled: false
+    auto_planning:
+      enabled: false
+  labeling:
+    auto_apply_labels: false
