@@ -243,6 +243,13 @@ def test_help_has_no_statistics_jargon(capsys):
             assert jargon not in text, (argv, jargon)
 
 
+def test_entry_points_help_does_not_claim_label_needs_model(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["analyze", "--help"])
+    text = capsys.readouterr().out
+    assert "label does as well" not in text
+
+
 def test_start_help_shows_examples(capsys):
     with pytest.raises(SystemExit):
         cli.main(["start", "--help"])
