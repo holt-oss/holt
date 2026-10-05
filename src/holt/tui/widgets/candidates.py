@@ -49,9 +49,11 @@ def _slug(slug: str, width: int = 37) -> str:
     if len(slug) <= width:
         return slug
     owner, sep, name = slug.partition("/")
+    if not sep:
+        return slug[: width - 1] + "…"
     if sep and len(name) + 2 <= width:
         return f"…/{name}"
-    return slug[: width - 1] + "…"
+    return "…/" + name[: width - 3] + "…"
 
 
 class CandidateList(KeepsHighlightVisible, ListView):
