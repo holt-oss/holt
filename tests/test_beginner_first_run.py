@@ -250,6 +250,16 @@ def test_entry_points_help_does_not_claim_label_needs_model(capsys):
     assert "label does as well" not in text
 
 
+def test_tui_entry_points_help_mentions_label_and_model(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["tui", "--help"])
+    text = " ".join(capsys.readouterr().out.split())
+    assert (
+        "suggestions need a model, but do no better than GitHub's "
+        "`good first issue` label"
+    ) in text
+
+
 def test_start_help_shows_examples(capsys):
     with pytest.raises(SystemExit):
         cli.main(["start", "--help"])
