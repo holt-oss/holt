@@ -396,7 +396,7 @@ Rules:
 `holt_server/warm.py` fills the caches before people arrive, so launch-day
 traffic mostly costs no GitHub quota at request time:
 
-1. **Reports** (7-day rules) for the ~1,550 repositories in `server/holt_server/seeds/repos.txt`,
+1. **Reports** (7-day rules) for the ~10,000 repositories in `server/holt_server/seeds/repos.txt`,
    skipping any under 20 hours old.
 2. **Starter issues** for the same repositories.
 3. **`/v1/find`** for the searches the web app's own pages make: the nine
@@ -427,9 +427,10 @@ uv run python -m holt_server.warm --limit 50 --no-find
 ```
 
 A report takes about 45 seconds, mostly waiting on GitHub, and about 12
-points on average, so three in flight do a cold sweep of the ~1,550 seeds in
-roughly 6–7 hours at about 2,900 points an hour (under GitHub's 5,000). With
-starter issues too, add about 5 points a seed, about 4,100 points an hour: the
+points on average, so three in flight do a cold sweep of the ~10,000 seeds
+(about 120,000 points) in roughly 42 hours at about 2,900 points an hour (under
+GitHub's 5,000). With starter issues too, add about 5 points a seed (about
+170,000 points in all), about 4,100 points an hour: the
 pass meets `HOLT_WARM_MIN_POINTS` within the hour, so run a long sweep with
 `--no-starter` or `--wait-for-budget`.
 
@@ -475,11 +476,12 @@ its real age. Otherwise the repo is read from GitHub as before.
 **GitHub cost, measured** (GraphQL points; a token has 5,000 an hour): a rules
 report ~10 (up to ~20 for very busy repositories), starter issues ~5, a find
 search ~60 when its repositories are not cached yet and much less when they
-are. A cold full pass is therefore roughly 300 × ~15–30 + 23 × ~20–60 ≈
-**5,000–10,000 points**: about two token-hours, e.g. two tokens in
-`GITHUB_TOKENS` for one hour, or one token over two runs (the second resumes
-where the first stopped, since finished reports are skipped). A daily re-warm
-costs about the same, because reports expire after 20 hours.
+are. A cold full pass is therefore roughly 10,000 × ~17 + 23 × ~20–60 ≈
+**170,000 points**: about 34 token-hours, so it takes two days on one token, or
+proportionally less with more tokens in `GITHUB_TOKENS`, over as many runs as
+it needs (each resumes where the last stopped, since finished reports are
+skipped). Warming everything again each day would cost the same, because
+reports expire after 20 hours; production refreshes by tier instead (above).
 
 The seed list is built by `server/scripts/build_seeds.py` (the same sourcing as
 `/v1/find`: the hacktoberfest topic, then beginner-friendly repositories in 12
@@ -494,20 +496,23 @@ Below its marker line, the list continues with blocks built by
 landscape), LFX Mentorship, Outreachy, goodfirstissue.dev,
 awesome-for-beginners and up-for-grabs, all free public lists. With `--check`
 it also searches GitHub (repositories with open good-first-issue and
-help-wanted issues in 13 languages, then the hacktoberfest topic from the
-most-starred down until the list reaches `--target`, 5,000 by default) and
-drops repos that are gone, archived, forks or mirrors, under 20 stars, not
-pushed since June 2026 or closed to outside pull requests (~70 points in
-all). It drops catalogues and farms by name. Each script keeps the other's
-part:
+help-wanted issues in 13 languages; the topics maintainers use to invite
+newcomers, such as `good-first-issue` and `help-wanted`; repositories in any
+language with at least three open good-first-issue issues; then the
+hacktoberfest topic from the most-starred down until the list reaches
+`--target`, 10,000 by default) and drops repos that are gone, archived, forks
+or mirrors, under 20 stars, not pushed since June 2026 or closed to outside
+pull requests (~160 points in all). It drops catalogues, farms, practice
+repos and personal dotfiles by name and by description. Each script keeps the
+other's part:
 
 ```sh
 GITHUB_TOKEN=$(gh auth token) uv run python scripts/build_seed_list.py --check
 ```
 
-With ~5,000 seeds a cold pass is about 5,000 × ~9 ≈ 45,000 points, so warm a
-new list with `--wait-for-budget` or in `--limit` steps rather than in one
-burst.
+With ~10,000 seeds a cold pass is about 10,000 × ~12 ≈ 120,000 points, a
+full day of one token's 5,000 an hour, so warm a new list with
+`--wait-for-budget` or in `--limit` steps rather than in one burst.
 
 ## Metrics
 

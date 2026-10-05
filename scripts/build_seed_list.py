@@ -19,9 +19,12 @@ Free sources (downloaded as plain files, no GitHub API):
 
 With `--check` (reads GITHUB_TOKEN; GraphQL, about 1 point per request):
   - Repository search, 100 results per point: per language in LANGUAGES, repos
-    with open good-first-issue and help-wanted issues (LANGUAGE_TERMS); then the
+    with open good-first-issue and help-wanted issues (LANGUAGE_TERMS); the topics
+    maintainers use to invite newcomers (BEGINNER_TOPICS); repos in any language
+    with open good-first-issue issues (ANY_LANGUAGE_TERMS); then the
     `hacktoberfest` topic, most-starred first, until the list reaches `--target`.
-    Both only take repos pushed in the last SEARCH_PUSHED_DAYS days.
+    All only take repos pushed in the last SEARCH_PUSHED_DAYS days. A search
+    returns at most 1,000 results, so a longer one is cut into star ranges.
   - A programme org that links an organisation with no hand mapping is mapped to
     its ORG_TOP most-starred repos.
   - One batched pass (100 repos per query) drops repos that are gone, archived,
@@ -32,11 +35,13 @@ With `--check` (reads GITHUB_TOKEN; GraphQL, about 1 point per request):
 Without `--check` it only prints what the free sources hold and writes nothing.
 
 Everything above the GENERATED marker in repos.txt is kept verbatim; everything
-below it is rebuilt. Catalogues (awesome-*, *-list, book lists, registries) and
-contribution farms are dropped by name.
+below it is rebuilt. Catalogues (awesome-*, *-list, book lists, registries),
+contribution farms, practice repos and personal dotfiles are dropped by name, and
+under `--check` also by what their description says (SKIP_DESCRIPTION), which is
+how a mirror GitHub does not flag as one is caught too.
 
     GITHUB_TOKEN=$(gh auth token) uv run python scripts/build_seed_list.py --check \\
-        [--target 5000] [--dry-run]
+        [--target 10000] [--dry-run]
 """
 
 from __future__ import annotations
@@ -82,9 +87,12 @@ LANGUAGES = ["Python", "JavaScript", "TypeScript", "Go", "Rust", "Java", "C++", 
              "Ruby", "Kotlin", "Swift", "Dart"]
 LANGUAGE_TERMS = "good-first-issues:>=3 help-wanted-issues:>=1"
 LANGUAGE_MIN_STARS = 50
+BEGINNER_TOPICS = ["good-first-issue", "help-wanted", "first-timers-only", "beginner-friendly",
+                   "up-for-grabs", "contributions-welcome"]
+ANY_LANGUAGE_TERMS = "good-first-issues:>=3"
 HACKTOBERFEST_TERMS = "topic:hacktoberfest"
 SEARCH_PUSHED_DAYS = 60
-REPO_FIELDS = ("nameWithOwner isArchived isFork isMirror pushedAt stargazerCount "
+REPO_FIELDS = ("nameWithOwner description isArchived isFork isMirror pushedAt stargazerCount "
                "hasPullRequestsEnabled pullRequestCreationPolicy")
 
 # GSoC 2026 orgs whose source link is an org (or an umbrella/idea page), mapped to
@@ -175,6 +183,7 @@ SKIP_NAME = re.compile(
     r"(^|[-_.])(awesome|list|lists|books?|resources|roadmaps?|cheatsheets?|"
     r"interview|curated|collection|algorithms?|snippets?|practice)([-_.]|$)|^awesome|awesome$|"
     r"first[-_]?contributions?|hacktoberfest|add[-_]?your[-_]?name|contributors?[-_]list|"
+    r"(^|[-_.])(dotfiles|hackerrank|beginners?)([-_.]|$)|leetcode[-_]solutions|\d+[-_]?days?[-_]?of|"
     r"^is-a-dev$|^register$|^public-apis$|^free-programming-books",
     re.I,
 )
@@ -192,7 +201,29 @@ SKIP_REPOS = {
     "swisskyrepo/payloadsallthethings", "projectdiscovery/public-bugbounty-programs",
     "kkrypt0nn/wordlists", "serhii-londar/open-source-mac-os-apps",
     "tomalaforge/angular-challenges",
+    "timonwa/techroadmap", "buzzpy/dev-encyclopedia", "mason-org/mason-registry",
+    "josharsh/100linesofcode", "zero-to-mastery/animation-nation",
+    "opensource-communities/guestbook", "shamilahmdt/devtasks", "abhisheks008/dl-simplified",
+    "dereknguyen269/programing-best-practices", "infosec-community/apac-conferences",
+    "dotaiz/ai-ml", "bowbahdoe/modernjava", "sumn2u/learn-javascript",
+    "pavanmudigonda/zero-to-ai", "dr-mushtaq/machine-learning",
+    "wingkwong/leetcode-the-hard-way", "devvsakib/frontend-projects", "codedex-io/projects",
+    "jentic/jentic-public-apis", "daviddavo/jgmd", "hanishrao/collective-ai-tools",
 }
+# What a description says when the name does not: the search sources reach lists,
+# teaching material and practice repos that the hand-kept lists never named.
+SKIP_MIRROR = re.compile(
+    r"\[mirror\b|\bmirror(ed)? (of|from)\b|read-only mirror|github mirror|is a mirror\b", re.I)
+SKIP_DESCRIPTION = re.compile(
+    r"^\W*(\w+ - )?((a|an|the|community|largest|complete|comprehensive) )*"
+    r"(curated (list|collection)|list) of\b|awesome list|"
+    r"collection of (all )?(free|learning|devops|accessible)|free resources|cheat ?sheets?|"
+    r"\b(book|tutorial|course|guide) for (\w+ )?beginners|\bbeginner'?s?'? (book|tutorial|guide)\b|"
+    r"beginner[- ]friendly (projects|guide|git tutorial|roblox)|projects? for beginners|"
+    r"\b\d+[- ]days? (of|challenge)|first (github )?pull request|"
+    r"learn open[- ]source contributions|^personal portfolio|零基础|量化交易入门",
+    re.I,
+)
 
 # Outreachy names communities, not repositories. Communities that work off GitHub
 # (Debian, GNOME, Wikimedia, the kernel, ...) are left out.
@@ -381,8 +412,11 @@ def drop_reason(node: dict | None) -> str | None:
         return "gone"
     if node["isArchived"]:
         return "archived"
-    if node["isFork"] or node.get("isMirror"):
+    description = node.get("description") or ""
+    if node["isFork"] or node.get("isMirror") or SKIP_MIRROR.search(description):
         return "fork or mirror"
+    if SKIP_DESCRIPTION.search(description):
+        return "catalogue or farm"
     if node["stargazerCount"] < MIN_STARS:
         return f"under {MIN_STARS} stars"
     if (node["pushedAt"] or "") < ACTIVE_SINCE:
@@ -485,7 +519,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--check", action="store_true",
                     help="use GitHub (GITHUB_TOKEN): search, org mapping, one batched hygiene pass")
-    ap.add_argument("--target", type=int, default=5000,
+    ap.add_argument("--target", type=int, default=10000,
                     help="with --check, fill the list to this many repos from the hacktoberfest topic")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
@@ -507,15 +541,18 @@ def main() -> int:
     pushed = (datetime.now(UTC) - timedelta(days=SEARCH_PUSHED_DAYS)).strftime("%Y-%m-%d")
     scope = f"pushed:>={pushed} archived:false fork:false"
 
+    def searched(name: str, terms: str) -> tuple[str, str, list[str]]:
+        terms = f"{terms} {scope}"
+        nodes = list(search(gh, terms, LANGUAGE_MIN_STARS))
+        known.update((n["nameWithOwner"], n) for n in nodes)
+        return (name, f"GitHub search: {terms} stars:>={LANGUAGE_MIN_STARS}",
+                [n["nameWithOwner"] for n in nodes])
+
     sources: list[tuple[str, str, list[str]]] = []
     if gh:
-        for language in LANGUAGES:
-            terms = f'language:"{language}" {LANGUAGE_TERMS} {scope}'
-            nodes = list(search(gh, terms, LANGUAGE_MIN_STARS))
-            known.update((n["nameWithOwner"], n) for n in nodes)
-            sources.append((f"good-first-issues {language}",
-                            f"GitHub search: {terms} stars:>={LANGUAGE_MIN_STARS}",
-                            [n["nameWithOwner"] for n in nodes]))
+        sources += [searched(f"good-first-issues {language}",
+                             f'language:"{language}" {LANGUAGE_TERMS}')
+                    for language in LANGUAGES]
     past = ", ".join(str(y) for y in GSOC_PAST_YEARS)
     sources += [
         ("gsoc-2026", f"GSoC 2026 organisations ({GSOC_URL.format(year=2026)}), orgs mapped by hand",
@@ -530,6 +567,10 @@ def main() -> int:
         ("awesome-for-beginners", AFB_URL, afb()),
         ("up-for-grabs", f"{UFG_URL} (label stats updated since {UFG_ACTIVE_SINCE})", ufg()),
     ]
+    if gh:
+        # After the lists above, so a repo they name stays in their block.
+        sources += [searched(f"topic {topic}", f"topic:{topic}") for topic in BEGINNER_TOPICS]
+        sources.append(searched("good-first-issues any language", ANY_LANGUAGE_TERMS))
 
     owners = sorted({r for _, _, found in sources for r in found if "/" not in r}, key=str.lower)
     mapped = top_repos(gh, owners) if gh else {}

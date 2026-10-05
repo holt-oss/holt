@@ -66,7 +66,7 @@ def test_seed_file_parsing(tmp_path):
 
 def test_committed_seed_list_is_usable():
     seeds = warm.load_seeds()
-    assert 4500 <= len(seeds) <= 5500
+    assert 9500 <= len(seeds) <= 10500
     assert len({s.lower() for s in seeds}) == len(seeds)
 
 

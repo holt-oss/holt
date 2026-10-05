@@ -392,8 +392,8 @@ Production starts with an empty cache. `deploy/prod/warm.sh` runs
 the server's environment; jobs go through the queue at badge priority,
 `HOLT_WARM_PARALLEL` (3) in flight at once, so people's requests always run
 first. Seeds that are closed to outside pull requests or dormant go last. A
-report costs about 12 GitHub GraphQL points, so a cold sweep of the ~1,550
-seeds is about 19,000 points over 6–7 hours. It stops by itself under
+report costs about 12 GitHub GraphQL points, so a cold sweep of the ~10,000
+seeds is about 120,000 points over about 42 hours. It stops by itself under
 `HOLT_WARM_MIN_POINTS` (counting the reports in flight) and picks up where it
 left off next time; with `--wait-for-budget` it waits for the points to come
 back instead.
@@ -466,8 +466,8 @@ Oldest first, through the job queue at badge priority (people first), and it
 stops below `HOLT_WARM_MIN_POINTS`; what's left carries on the next day. Each
 report it makes adds a snapshot. At about 12 GitHub points a report, a month
 costs about 3,900 points at today's ~325 repos (4,900 if 25 of them are
-weekly) and about 24,000 at 2,000 (about 32,000 with 200 weekly): 130 to
-1,070 points a day, against 5,000 an hour.
+weekly) and about 120,000 at the full ~10,000 seeds (about 128,000 with 200
+weekly): 130 to 4,300 points a day, against 5,000 an hour.
 
 **It ships off.** To switch it on (after a deploy that includes it):
 
