@@ -409,6 +409,27 @@ deploy/prod/warm.sh --dry-run
 deploy/prod/warm.sh --no-find --wait-for-budget   # then --status or --logs
 ```
 
+Seeds with no report go first. After them, a pass without `--tier` reads
+every report over 20 hours old again (`HOLT_WARM_MAX_AGE_HOURS`), which is
+right for an empty cache and wrong once most seeds have a report. **When the
+seed list has grown**, index it with the monthly tier instead: a first report
+for every seed without one, and only reports over a month old read again.
+
+```sh
+deploy/prod/warm.sh --dry-run --tier monthly            # the plan, also while a pass runs
+deploy/prod/warm.sh --tier monthly --wait-for-budget    # then --status or --logs
+```
+
+The dry run ends with one line, for example `plan: 3012 never reported; 0
+with a report older than 720 hours (30 days) or from an older engine; 6956
+fresh; 16 skipped as recently failed`. The pass's first log line says the
+age it uses and the setting it came from (`monthly tier: 9984 repos; reports
+older than 720 hours (30 days) are read again (HOLT_REFRESH_MONTHLY_HOURS)`).
+The tiers' ages are `HOLT_REFRESH_WEEKLY_HOURS` and
+`HOLT_REFRESH_MONTHLY_HOURS` in `~/.local/share/holt-prod/.env` (168 and 720
+unless set); `warm.sh --tier` and the refresh timer both get them through
+`compose.yml`.
+
 Only one pass runs at a time (an advisory lock, and `warm.sh` checks for the
 container). A deploy doesn't touch a running pass unless the engine changed:
 it keeps its old image and settings until it ends. To restart it on the new
@@ -424,7 +445,7 @@ pass by itself after such a deploy (stopping a pass that is still running).
 After a deploy by hand, run it once the deploy is up:
 
 ```sh
-deploy/prod/warm.sh --dry-run --stale-only   # "would analyse …" / "would make … again" per outdated seed
+deploy/prod/warm.sh --dry-run --stale-only   # "would analyse …" / "would make … again" for the first 20 outdated seeds, then the count
 deploy/prod/warm.sh --stale-only             # then --status or --logs
 ```
 
@@ -468,7 +489,8 @@ UTC (`warm-refresh.sh`, log `~/.local/share/holt-prod/logs/warm-refresh.log`):
 - **monthly**: the rest of the seed list, over 720 hours old
   (`HOLT_REFRESH_MONTHLY_HOURS`).
 
-Oldest first, through the job queue at badge priority (people first), and it
+Repos with no report first, then the oldest, through the job queue at badge
+priority (people first), and it
 stops below `HOLT_WARM_MIN_POINTS`; what's left carries on the next day. Each
 report it makes adds a snapshot. At about 12 GitHub points a report, a month
 costs about 3,900 points at today's ~325 repos (4,900 if 25 of them are
