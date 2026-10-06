@@ -758,8 +758,7 @@ def main(argv: list[str] | None = None) -> int:
     analyze.add_argument(
         "--entry-points",
         action="store_true",
-        help="also suggest issues to start with (experimental; needs a model, "
-             "and GitHub's `good first issue` label does as well)",
+        help="also suggest issues to start with (experimental; suggestions need a model, but do no better than GitHub's `good first issue` label)",
     )
     analyze.add_argument(
         "--no-model",
@@ -937,7 +936,7 @@ def main(argv: list[str] | None = None) -> int:
     tui.add_argument(
         "--entry-points",
         action="store_true",
-        help="also suggest issues to start with (experimental; needs a model)",
+        help="also suggest issues to start with (experimental; suggestions need a model, but do no better than GitHub's `good first issue` label)",
     )
     tui.set_defaults(func=cmd_tui)
 
