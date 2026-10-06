@@ -129,12 +129,12 @@ def test_rate_limited_job_stops_the_pass(h, starter_mod):
     h.engine.error = ApiError("rate_limited", "slow down", retry_after=60)
     seeds = ["octo/one", "octo/two", "octo/three", "octo/four", "pallets/flask", "NixOS/nixpkgs"]
     result = run(h, seeds, starter=False, finds=False)
-    assert result.stopped == "GitHub rate limit reached"
-    # Only the ones already in flight when the first failed.
-    assert 1 <= result.reports_failed <= h.svc.settings.warm_parallel < len(seeds)
-
-    result = run(h, seeds, starter=False, finds=False, parallel=1)
-    assert result.reports_failed == 1
+    assert result.stopped.startswith("GitHub asked us to slow down (a rate limit")
+    assert "again in about 1 minute" in result.stopped
+    # A rate limit is no repository's failure, and only the reports already
+    # in flight were asked for.
+    assert result.reports_failed == 0 and result.left == len(seeds)
+    assert 1 <= len(h.engine.calls) <= h.svc.settings.warm_parallel < len(seeds)
 
 
 def test_dry_run_changes_nothing(h, starter_mod):

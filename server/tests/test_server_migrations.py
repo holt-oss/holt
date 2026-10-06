@@ -187,3 +187,57 @@ def test_contribution_state_migration_is_idempotent(db):
     run(db, lambda c: command.stamp(migrate.config(c), "0026"))  # version ahead, columns gone
     run(db, lambda c: command.downgrade(migrate.config(c), "0025"))
     assert run(db, revision) == "0025"
+
+
+def test_warm_failures_migration_starts_from_the_failures_already_in_the_jobs_table(db):
+    # The seeds the warm pass kept failing on are known before the first pass
+    # on the new release, so it doesn't start with all of them once more.
+    from datetime import UTC, datetime, timedelta
+
+    import sqlalchemy as sa
+    from alembic import command
+
+    run(db, lambda c: command.upgrade(migrate.config(c), "0030"))
+    t0 = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
+
+    def job(repo, code, minutes, priority=10):
+        return {"id": f"{repo}-{minutes}"[:32], "kind": "analysis", "repo": repo,
+                "repo_key": repo.lower(), "mode": "rules", "days": 7, "params": {},
+                "charged": False, "priority": priority, "status": "error", "stage": "Failed",
+                "progress": 0.0, "error": {"code": code, "message": "m"},
+                "created_at": t0, "finished_at": t0 + timedelta(minutes=minutes)}
+
+    def fill(c):
+        meta = sa.MetaData()
+        jobs = sa.Table("jobs", meta, autoload_with=c)
+        reports = sa.Table("reports", meta, autoload_with=c)
+        c.execute(sa.insert(jobs), [
+            *[job("Big/Repo", "upstream", m) for m in (0, 30, 60, 90)],
+            job("gone/away", "not_found", 10),
+            job("octo/fixed", "upstream", 10),       # a report was made since
+            job("octo/limited", "rate_limited", 10),  # GitHub's doing, not the repository's
+            job("octo/person", "upstream", 10, priority=0),  # a person's check, not a warm report
+        ])
+        c.execute(sa.insert(reports), [{
+            "repo": "octo/fixed", "repo_key": "octo/fixed", "mode": "rules", "days": 7,
+            "report": {}, "created_at": t0 + timedelta(minutes=20)}])
+
+    run(db, fill)
+    run(db, lambda c: command.upgrade(migrate.config(c), "0031"))
+    got = run(db, lambda c: c.execute(text(
+        "SELECT repo_key, repo, code, failures, last_failed_at, retry_at FROM warm_failures "
+        "ORDER BY repo_key")).all())
+
+    def at(value):  # SQLite hands back text; Postgres, a datetime
+        when = value if isinstance(value, datetime) else datetime.fromisoformat(value)
+        return when.replace(tzinfo=None)
+
+    naive = t0.replace(tzinfo=None)
+    assert [(r[0], r[1], r[2], r[3]) for r in got] == [
+        ("big/repo", "Big/Repo", "upstream", 3), ("gone/away", "gone/away", "not_found", 1)]
+    # Three or more failures in a row: a day from the last one. Not there: a month.
+    assert at(got[0][4]) == naive + timedelta(minutes=90)
+    assert at(got[0][5]) == naive + timedelta(minutes=90, hours=24)
+    assert at(got[1][5]) == naive + timedelta(minutes=10, days=30)
+    run(db, lambda c: command.upgrade(migrate.config(c), "head"))
+    assert run(db, migrate.differences) == []

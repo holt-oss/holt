@@ -13,7 +13,8 @@
 #                                       a long sweep: when GitHub points run low,
 #                                       wait for them instead of stopping
 #   deploy/prod/warm.sh --logs          follow the running pass
-#   deploy/prod/warm.sh --status        is it running? last lines
+#   deploy/prod/warm.sh --status        is it running? last lines, and how far it is
+#                                       (seeds skipped as recently failed, seeds to go)
 #
 # Jobs go through the normal queue at badge priority, HOLT_WARM_PARALLEL (3)
 # in flight at once (--parallel N to change it), so user requests always run
@@ -34,7 +35,14 @@ case "${1:-}" in
     --logs) exec docker logs -f "$NAME" ;;
     --status)
         if docker ps -q --filter "name=^$NAME$" | grep -q .; then echo "running:"; else echo "not running; last run:"; fi
-        docker logs --tail 15 "$NAME" 2>&1 || echo "(no warm container yet)"; exit 0 ;;
+        docker logs --tail 15 "$NAME" 2>&1 || echo "(no warm container yet)"
+        # How far it is: the seeds skipped as recently failed, the last
+        # "progress:" line and, once the pass has ended, its summary.
+        echo "so far:"
+        docker logs "$NAME" 2>&1 \
+            | grep -E '^([0-9]+ seeds skipped as recently failed|progress: |reports [0-9]+ run, )' \
+            | tail -n 3 || true
+        exit 0 ;;
 esac
 
 # The same secrets and GitHub access as deploy.sh: `compose run` takes the

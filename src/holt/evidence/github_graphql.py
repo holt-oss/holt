@@ -32,7 +32,13 @@ from urllib.parse import quote
 import httpx
 
 from holt.about import language_shares, license_name
-from holt.evidence.errors import AuthError, RateLimited, RepoNotFound, UpstreamError
+from holt.evidence.errors import (
+    AuthError,
+    Forbidden,
+    RateLimited,
+    RepoNotFound,
+    UpstreamError,
+)
 from holt.evidence.provider import EvidenceProvider
 from holt.types import EvidenceRecord, Window
 
@@ -57,6 +63,10 @@ BACKOFF_BASE_S = 1.5
 # longer ones go back to the caller as `RateLimited(retry_after)`, because a web
 # request cannot hang for ten minutes.
 MAX_RATE_LIMIT_WAIT_S = 60.0
+# GitHub's advice for a secondary limit that names no wait: at least a minute.
+SECONDARY_WAIT_S = 60.0
+# How GitHub words a secondary limit ("abuse detection" is the older name).
+SECONDARY_WORDS = ("secondary rate limit", "abuse detection", "rate limit")
 
 # Comment and review bodies carry the signal Holt actually reads: tone, intent,
 # whether a maintainer engaged. Four thousand characters is far more than any of
@@ -533,31 +543,43 @@ def _is_bot(actor: dict[str, Any] | None) -> bool:
     return login.endswith("[bot]") or login in {"dependabot", "renovate", "greenkeeper"}
 
 
-def _rate_limit_wait(response: httpx.Response) -> float | None:
-    """Seconds GitHub asks us to wait, or None if this is not a rate limit.
+def _message(response: httpx.Response) -> str:
+    """What GitHub said in a refusal's body, shortened. Never holds a token."""
+    try:
+        body = response.json()
+        text = body.get("message") if isinstance(body, dict) else None
+        return str(text or response.text)[:200]
+    except Exception:  # noqa: BLE001 - a body we cannot decode says nothing
+        return ""
 
-    Secondary limits send `Retry-After`; the primary limit sends
-    `x-ratelimit-remaining: 0` with a reset time. A 403 with neither, and no
-    mention of a rate limit in the body, is a permissions problem instead.
+
+def _rate_limit(response: httpx.Response) -> tuple[float, bool] | None:
+    """(seconds GitHub asks us to wait, whether it is a secondary limit), or
+    None if this 403 or 429 is not a rate limit.
+
+    The primary limit (the hourly budget) sends `x-ratelimit-remaining: 0`
+    with a reset time. A secondary limit (too much at once) comes with points
+    to spare: a `Retry-After`, or only its message. A 403 with none of those is
+    GitHub refusing the request itself.
     """
     headers = response.headers
-    if (after := headers.get("retry-after")) is not None:
+    after: float | None = None
+    if (raw := headers.get("retry-after")) is not None:
         try:
-            return max(0.0, float(after))
+            after = max(0.0, float(raw))
         except ValueError:
-            return None
-    if headers.get("x-ratelimit-remaining") == "0" and headers.get("x-ratelimit-reset"):
+            after = None
+    if headers.get("x-ratelimit-remaining") == "0":
         try:
-            return max(0.0, float(headers["x-ratelimit-reset"]) - time.time())
+            reset = max(0.0, float(headers.get("x-ratelimit-reset") or "") - time.time())
         except ValueError:
-            return None
-    try:
-        text = response.text.lower()
-    except Exception:  # pragma: no cover - a body we cannot decode says nothing
-        text = ""
-    if "rate limit" in text:
-        # GitHub's documented advice for a secondary limit with no header.
-        return 60.0
+            reset = SECONDARY_WAIT_S
+        return max(reset, after or 0.0), False
+    if after is not None:
+        return after, True
+    text = _message(response).lower()
+    if response.status_code == 429 or any(word in text for word in SECONDARY_WORDS):
+        return SECONDARY_WAIT_S, True
     return None
 
 
@@ -594,6 +616,7 @@ class GitHubGraphQL:
         token: str | None = None,
         client: httpx.Client | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        attempts: int = MAX_ATTEMPTS,
     ) -> None:
         self.token = token or os.environ.get("GITHUB_TOKEN")
         if not self.token:
@@ -603,6 +626,9 @@ class GitHubGraphQL:
             )
         self._client = client or httpx.Client(timeout=TIMEOUT_S)
         self._sleep = sleep
+        # Tries per query (see MAX_ATTEMPTS). A query GitHub times out on
+        # costs it the same again each time, so background work asks less.
+        self.attempts = max(1, attempts)
         self.remaining: int | None = None
         # Rate-limit points GitHub charged this transport, summed over every
         # query. What one report costs is the difference across its fetch.
@@ -614,8 +640,8 @@ class GitHubGraphQL:
     def query(
         self, document: str, *, timeout: float | None = None, **variables: object
     ) -> dict[str, Any]:
-        for attempt in range(1, MAX_ATTEMPTS + 1):
-            last = attempt == MAX_ATTEMPTS
+        for attempt in range(1, self.attempts + 1):
+            last = attempt == self.attempts
             try:
                 response = self._client.post(
                     API,
@@ -633,12 +659,20 @@ class GitHubGraphQL:
             if status == 401:
                 raise AuthError("401 Unauthorized")
             if status in (403, 429):
-                wait = _rate_limit_wait(response)
-                if wait is None and status == 403:
-                    raise AuthError("403 Forbidden")
-                if last or (wait or 0) > MAX_RATE_LIMIT_WAIT_S:
-                    raise RateLimited(wait)
-                self._sleep(wait if wait is not None else self._delay(attempt))
+                limit = _rate_limit(response)
+                # The body is never kept, so this line is the only record of
+                # which kind of refusal it was.
+                log.warning(
+                    "GitHub answered %d: retry-after=%s x-ratelimit-remaining=%s (%s)",
+                    status, response.headers.get("retry-after"),
+                    response.headers.get("x-ratelimit-remaining"), _message(response))
+                if limit is None:
+                    raise Forbidden(_message(response) or "HTTP 403")
+                wait, secondary = limit
+                self._limited(wait, secondary)
+                if last or wait > MAX_RATE_LIMIT_WAIT_S:
+                    raise RateLimited(wait, secondary)
+                self._sleep(wait)
                 continue
             if status >= 500:
                 if last:
@@ -683,6 +717,11 @@ class GitHubGraphQL:
                 self.remaining = limit["remaining"]
                 self.points_used += limit.get("cost") or 0
         return data or {}
+
+    def _limited(self, wait: float, secondary: bool) -> None:
+        """GitHub just answered with a rate limit. For a subclass that shares
+        its token with other readers (the server's pool); it may raise
+        `RateLimited` to hand the wait back instead of sitting it out here."""
 
     def _delay(self, attempt: int) -> float:
         return BACKOFF_BASE_S * (2 ** (attempt - 1))

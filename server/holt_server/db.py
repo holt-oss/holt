@@ -598,6 +598,25 @@ class StarterCache(Base):
     rules_version: Mapped[int | None] = mapped_column(Integer, default=_rules_version)
 
 
+class WarmFailure(Base):
+    """A seed the warm pass couldn't make a report for, and when it may try
+    again (warm.py): one row per repository, removed when a report is made.
+    Without it a failing seed stayed "missing" and was first in every pass."""
+
+    __tablename__ = "warm_failures"
+
+    repo_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    repo: Mapped[str] = mapped_column(String(200))
+    # The failed job's error code (API.md): upstream, not_found, internal;
+    # or "timeout" when the job never finished.
+    code: Mapped[str] = mapped_column(String(20))
+    # Failures in a row; each one doubles the wait before the next try.
+    failures: Mapped[int] = mapped_column(Integer, default=1)
+    first_failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    last_failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    retry_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class Feedback(Base):
     """"Was this verdict right?" answers: one per person per report version.
 
