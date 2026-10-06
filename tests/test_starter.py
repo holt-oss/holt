@@ -217,6 +217,17 @@ def test_label_variants(label, kind):
     assert kind in starter.label_kinds([label])
 
 
+@pytest.mark.parametrize("label,recognized", [
+    ("hacktoberfest", True),
+    ("Hacktoberfest 2026", True),
+    ("hacktoberfest-2026", True),
+    ("🎃 hacktoberfest", True),
+    ("hacktoberfest-accepted", False),
+])
+def test_hacktoberfest_variants(label, recognized):
+    assert ("hacktoberfest" in starter.label_kinds([label])) is recognized
+
+
 def test_unrelated_labels_mean_nothing():
     assert starter.label_kinds(["bug", "hacktoberfest-accepted", "area/cli",
                                 "unassigned", "not taken"]) == set()

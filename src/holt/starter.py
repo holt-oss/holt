@@ -310,7 +310,7 @@ _BEGINNER = re.compile(r"\b(good first (issue|bug|pr|contribution|task|feature)|
                        r"newcomers?|starter|first contribution)\b")
 _EASY = re.compile(r"\b(easy|trivial|low hanging fruit|size (xs|s|small)|small)\b")
 _HELP = re.compile(r"\b(help wanted|up for grabs|contributions? welcome|prs? welcome)\b")
-_HACK = re.compile(r"^hacktoberfest$")
+_HACK = re.compile(r"^hacktoberfest([ -]*\d+)?$", re.I)
 # Labels saying someone already has it, e.g. React's "good first issue (taken)".
 _TAKEN = re.compile(r"(?<!not )(?<!un )\b(taken|claimed|assigned|in progress|"
                     r"work in progress|wip|being worked on|working on it|has (a )?pr|"
