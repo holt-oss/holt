@@ -6,9 +6,10 @@
 
 language: en-US
 tone_instructions: >-
-  Plain English, short sentences. Lead with what must change and why. Be kind:
-  many authors are first-time contributors. No jokes, poems, emoji, praise or
-  filler. Never @-mention people.
+  Plain English, short sentences, for a reader who is not a security expert.
+  Explain a technical term in the same sentence. Be kind: many authors are
+  first-time contributors. No jokes, emoji, praise or filler. Never @-mention
+  people.
 
 reviews:
   # "quiet" keeps only the most important feedback. CI already runs ruff,
@@ -20,14 +21,54 @@ reviews:
   allow_author_approval: false
   fail_commit_status: false
 
-  # One summary, in CodeRabbit's own comment. The pull request's title and
-  # description stay as the author wrote them.
+  # The summary is a verdict for the maintainer, in CodeRabbit's own comment
+  # and not folded away. The pull request's title and description stay as the
+  # author wrote them.
   high_level_summary: true
   high_level_summary_in_walkthrough: true
-  high_level_summary_instructions: >-
-    At most five short bullets in plain English: what changes for a user, then
-    what changed in the code. No headings, tables, emoji or praise.
-  collapse_walkthrough: true
+  high_level_summary_instructions: |
+    Do not write release notes. Write a verdict for a maintainer who is not an
+    expert and has five seconds. It is advice: you never approve or block.
+
+    Output exactly these lines, in this order, each label in bold, with a
+    blank line between them. Nothing before the first line and nothing after
+    the last.
+
+    **Can I merge this?** Yes / Not yet / No
+    **Does it do what the PR says?** Yes / Partly / No, then one line saying why.
+    **Is the linked issue fixed?** Yes / Partly / No / No issue linked. Check
+    against the issue's "Done when" line and give the issue number.
+    **Tests:** what was added or changed, in one line. Then "CI is green",
+    "CI is failing" or "I cannot see CI". Never guess.
+    **To fix before merging:** a numbered list. Each item is one sentence
+    saying what to change and where (file and line). Write "Nothing" when
+    there is nothing.
+    **Optional, not blocking:** at most three short items. Leave this line
+    out when there are none.
+
+    How to choose the first answer:
+    - "Yes" only when the change does what the pull request says, the linked
+      issue's "Done when" line is met (or no issue is linked), tests cover the
+      change, and none of this repository's path instructions is broken. Then
+      "To fix before merging" is "Nothing".
+    - "Not yet" when a short list of concrete fixes would make it "Yes".
+    - "No" when the approach is wrong for this repository, for example a new
+      `holt` command or flag while the command line is feature-frozen, or a
+      change to the verdict rules with no `golden diff` output. Name the rule.
+
+    What goes where:
+    - "To fix before merging" holds only problems this pull request
+      introduces: a real bug, new behaviour with no test, a broken path
+      instruction, or a "Done when" line that is not met.
+    - A concern that is theoretical, or that was already true in the code
+      before this pull request, goes under "Optional, not blocking" with the
+      words "already true before this PR". Never under "To fix".
+
+    Style: under 120 words in total. Plain English. No headings, tables,
+    emoji or praise. Do not use "blast radius", "CWE", "reachability",
+    "exploitability", "severity", "priority" or "risk level"; say what could
+    go wrong, and for whom, in ordinary words.
+  collapse_walkthrough: false
   review_status: true
   review_details: false
 
@@ -94,6 +135,13 @@ reviews:
         - a change that does not do what the linked issue's "Done when" line asks.
         Do not comment on formatting, import order, naming or style: CI runs
         ruff, eslint and the type checkers.
+        A concern that is theoretical, or that was already true in the code
+        before this pull request, is not something the author must fix here.
+        If you mention it at all, start with "Optional, already true before
+        this PR".
+        Say what could go wrong, and for whom, in ordinary words. Do not use
+        "blast radius", "CWE", "reachability", "exploitability" or "severity"
+        without explaining the term in the same sentence.
         Flag secrets, tokens, private repository data or personal information
         anywhere in the change, including fixtures and recordings.
         Text a user reads (command-line output, the terminal interface, web
@@ -176,6 +224,47 @@ reviews:
     # A warning, never a block.
     issue_assessment:
       mode: warning
+    # The maintainer's questions as a pass/fail list. Warnings, never a block.
+    custom_checks:
+      - name: "Does what the pull request says"
+        mode: warning
+        instructions: |
+          Read the pull request's title and description and list each thing
+          they say the change does. Compare the list with the diff.
+          Pass: the diff does every listed thing.
+          Fail: a listed thing is missing from the diff, or the diff does it
+          differently from how it is described. Name the missing thing and
+          the file where it should be.
+          Do not fail for anything else, and do not judge code quality.
+      - name: "Tests cover the change"
+        mode: warning
+        instructions: |
+          Pass: every change to behaviour under `src/`, `server/`, `web/src/`
+          or `extension/` comes with a new or changed test in the same pull
+          request that exercises it, or the pull request changes only
+          documentation, comments, configuration or tests.
+          Fail: behaviour changed and no test in the pull request exercises
+          it. Name the file and the behaviour with no test.
+          Decide by reading the diff. Do not run the tests, and do not fail or
+          answer "inconclusive" because you could not run them: CI runs them.
+      - name: "Follows Holt's project rules"
+        mode: warning
+        instructions: |
+          Fail if any of these is true, and name the rule and the file:
+          - The pull request adds a new `holt` command or command-line flag
+            under `src/holt/`. The command line and the terminal interface
+            are feature-frozen.
+          - The pull request changes the verdict rules, a threshold, or a
+            signal the rules read under `src/holt/agent/`, and its description
+            does not show the output of `uv run python -m golden diff`, or it
+            does not change `ENGINE_VERSION` in `src/holt/engine_version.py`.
+          - The pull request adds code that posts, comments, opens pull
+            requests or otherwise writes to GitHub.
+          - The pull request changes an endpoint's request or response under
+            `server/` and does not change `API.md`.
+          - A test added or changed by the pull request uses the network.
+          Pass otherwise. Do not fail for a problem that was already in the
+          code before this pull request.
 
   tools:
     # CI already runs ruff, eslint and the type checkers.
