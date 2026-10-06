@@ -101,10 +101,10 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | `HOLT_ALERT_EMAIL_DAILY_LIMIT` | `100` | The provider's daily sending limit (Resend's free tier), for alert and account emails together. They stop 5 short of it in any 24 hours: "your turn" emails go first, daily emails that don't fit go out once there is room. Only a pass's receipt may use the last 5. |
 | `HOLT_ACCOUNT_EMAILS` | `0` (off) | The switch for account emails: the welcome, a pass's receipt, and the "ending" ones. Off, none is sent. They also need `RESEND_API_KEY`. See [Account emails](#account-emails). |
 | `HOLT_WARM_SEEDS` | the list shipped in the package (`holt_server/seeds/repos.txt`) | The warm pass's seed list. |
-| `HOLT_WARM_MAX_AGE_HOURS` | `20` | A warm pass skips repos whose report is younger than this. |
+| `HOLT_WARM_MAX_AGE_HOURS` | `20` | A warm pass without `--tier` skips repos whose report is younger than this. A tier pass never uses it. |
 | `HOLT_WARM_MIN_POINTS` | `1500` | A warm pass stops when any GitHub token has fewer GraphQL points left, counting 20 for each report still in flight. |
 | `HOLT_WARM_PARALLEL` | `3` | Report jobs a warm pass keeps in flight at once (`--parallel N` for one pass). They run in the background lane, so keep `HOLT_BADGE_CONCURRENCY` at least this. |
-| `HOLT_REFRESH_WEEKLY_HOURS`, `HOLT_REFRESH_MONTHLY_HOURS` | `168`, `720` | The refresh tiers' ages, as `deploy/prod/warm-refresh.sh` uses them. `warm --stale-only` reuses a snapshot up to its repo's tier age. |
+| `HOLT_REFRESH_WEEKLY_HOURS`, `HOLT_REFRESH_MONTHLY_HOURS` | `168`, `720` | The refresh tiers' ages: `warm --tier weekly` and `--tier monthly` skip repos whose report is younger than this (`deploy/prod/compose.yml` passes both to the server). `warm --stale-only` reuses a snapshot up to its repo's tier age. |
 | `HOLT_MAX_PAGES` | `8` | Pull-request pages crawled per analysis (25 PRs a page). |
 | `HOLT_EVIDENCE_DIR` | empty (off) | Keep every report's evidence here, one gzipped file per report (`<owner>__<name>/<UTC time>.json.gz`, the shape of a golden recording). See [Evidence snapshots](#evidence-snapshots). |
 | `HOLT_EVIDENCE_KEEP_DAYS` | `0` (keep all) | Delete a repo's snapshots older than N days when it gets a new one; its newest always stays. |
@@ -396,8 +396,10 @@ Rules:
 `holt_server/warm.py` fills the caches before people arrive, so launch-day
 traffic mostly costs no GitHub quota at request time:
 
-1. **Reports** (7-day rules) for the ~10,000 repositories in `server/holt_server/seeds/repos.txt`,
-   skipping any under 20 hours old.
+1. **Reports** (7-day rules) for the ~10,000 repositories in `server/holt_server/seeds/repos.txt`:
+   the seeds with no report first, then the rest, skipping any under 20 hours
+   old (`HOLT_WARM_MAX_AGE_HOURS`; a `--tier` pass uses its tier's age instead,
+   below).
 2. **Starter issues** for the same repositories.
 3. **`/v1/find`** for the searches the web app's own pages make: the nine
    `/hacktoberfest` tabs, and each `/find` language chip with and without
@@ -419,6 +421,8 @@ decided by the repository being archived, closed to outside pull requests in
 GitHub's settings, or inactive, or `repo_meta` says archived or no push in 90
 days. A pass that runs out of budget has done the useful ones first. This
 reads only what Holt already has, never GitHub; the summary counts them.
+A seed with no report at all still comes before every report that is only
+due again, closed or dormant or not.
 
 A seed whose report fails is remembered (`warm_failures`) and not asked for
 again for six hours, doubling with each failure in a row up to a week; when
@@ -446,12 +450,20 @@ and says so. Without the flag it ends at the first one and says when to run
 again. The log line `GitHub answered 403: retry-after=… x-ratelimit-remaining=…`
 records which kind it was.
 
-The pass prints a `progress:` line every 25 seeds and, in its summary, how
+The pass's first line says how old a report must be to be read again and
+which setting says so, then how many seeds have no report yet. It prints a
+`progress:` line every 25 seeds and, in its summary, how
 many seeds were skipped as recently failed and how many are still without a
 current report; `deploy/prod/warm.sh --status` shows the last of each.
 
+`--dry-run` prints the plan and makes no GitHub call: the first 20 reports it
+would make, in order, then one line such as `plan: 3012 never reported; 0
+with a report older than 720 hours (30 days) or from an older engine; 6956
+fresh; 16 skipped as recently failed`, and the GitHub points that would cost.
+It changes nothing, so it also runs while another pass holds the lock.
+
 ```sh
-uv run python -m holt_server.warm --dry-run           # what would run, and its GitHub points
+uv run python -m holt_server.warm --dry-run           # the plan, and its GitHub points
 uv run python -m holt_server.warm                     # the whole thing
 uv run python -m holt_server.warm --limit 50 --no-find
 ```
@@ -466,17 +478,24 @@ pass meets `HOLT_WARM_MIN_POINTS` within the hour, so run a long sweep with
 
 Or set `HOLT_WARM_INTERVAL_HOURS` to run it inside the API on a schedule.
 
-**Refresh tiers** (`--tier`): reports only, oldest first, skipping any younger
-than `HOLT_WARM_MAX_AGE_HOURS`. `weekly` is every repo someone saved
-(`saved_repos`) or viewed in the last 30 days (`repo_views`), seed or not;
-`monthly` is the rest of the seed list. Production's refresh timer
+**Refresh tiers** (`--tier`): reports only, the never reported first and then
+the oldest, skipping any younger than the tier's age. `weekly` is every repo
+someone saved (`saved_repos`) or viewed in the last 30 days (`repo_views`),
+seed or not, read again after `HOLT_REFRESH_WEEKLY_HOURS` (168); `monthly` is
+the rest of the seed list, after `HOLT_REFRESH_MONTHLY_HOURS` (720). The pass
+takes the age from those settings itself; `HOLT_WARM_MAX_AGE_HOURS` plays no
+part in a tier pass. Production's refresh timer
 (`deploy/prod/warm-refresh.sh`, off until the owner switches it on) runs both
-daily with a week's and a month's age.
+daily.
 
 ```sh
-HOLT_WARM_MAX_AGE_HOURS=168 uv run python -m holt_server.warm --tier weekly --dry-run
-HOLT_WARM_MAX_AGE_HOURS=720 uv run python -m holt_server.warm --tier monthly
+uv run python -m holt_server.warm --tier weekly --dry-run
+uv run python -m holt_server.warm --tier monthly --wait-for-budget
 ```
+
+The second line is also how to index a seed list that grew: every seed with
+no report gets one, and nothing younger than a month is read again. A pass
+without `--tier` would read every report over 20 hours old again after them.
 
 ## Evidence snapshots
 
@@ -545,7 +564,8 @@ GITHUB_TOKEN=$(gh auth token) uv run python scripts/build_seed_list.py --check
 
 With ~10,000 seeds a cold pass is about 10,000 × ~12 ≈ 120,000 points, a
 full day of one token's 5,000 an hour, so warm a new list with
-`--wait-for-budget` or in `--limit` steps rather than in one burst.
+`--wait-for-budget` or in `--limit` steps rather than in one burst, and a
+list that grew with `--tier monthly --wait-for-budget` (above).
 
 ## Metrics
 

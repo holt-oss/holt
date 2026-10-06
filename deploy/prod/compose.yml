@@ -156,6 +156,10 @@ services:
       HOLT_JOB_CONCURRENCY: ${HOLT_JOB_CONCURRENCY:-6}
       HOLT_BADGE_CONCURRENCY: ${HOLT_BADGE_CONCURRENCY:-3}
       HOLT_WARM_PARALLEL: ${HOLT_WARM_PARALLEL:-3}
+      # The refresh tiers' ages: how old a report gets before `warm --tier`
+      # reads it again. warm.sh and warm-refresh.sh both get them from here.
+      HOLT_REFRESH_WEEKLY_HOURS: ${HOLT_REFRESH_WEEKLY_HOURS:-168}
+      HOLT_REFRESH_MONTHLY_HOURS: ${HOLT_REFRESH_MONTHLY_HOURS:-720}
       # Database connections this server keeps (holt_server/db.py): one for
       # each of the nine job workers' short writes and their heartbeat, which
       # page requests share, each for a few milliseconds. No overflow: opening

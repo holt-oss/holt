@@ -3,12 +3,18 @@
 # the seed list, detached, in the server image with the server's env.
 #
 #   deploy/prod/warm.sh                 start a full pass in the background
-#   deploy/prod/warm.sh --dry-run       what it would do (foreground)
+#   deploy/prod/warm.sh --dry-run       the plan: seeds never reported, due again,
+#                                       fresh (foreground; with any other flags, and
+#                                       also while a pass is running)
 #   deploy/prod/warm.sh --limit 50 --no-find
 #   deploy/prod/warm.sh --stale-only    after a deploy that bumps ENGINE_VERSION:
 #                                       re-run only reports an older engine made
 #                                       (from kept evidence where it is fresh)
-#   deploy/prod/warm.sh --tier weekly   one refresh tier (warm-refresh.sh runs both)
+#   deploy/prod/warm.sh --tier monthly --wait-for-budget
+#                                       index a seed list that grew: a first report
+#                                       for every seed without one, then only reports
+#                                       over the tier's age again (a month; a week for
+#                                       --tier weekly). warm-refresh.sh runs both tiers.
 #   deploy/prod/warm.sh --no-find --wait-for-budget
 #                                       a long sweep: when GitHub points run low,
 #                                       wait for them instead of stopping
@@ -20,6 +26,10 @@
 # in flight at once (--parallel N to change it), so user requests always run
 # first. Only one pass runs at a time (the pass's advisory lock), so a pass
 # started by an older deploy keeps going until it ends or is stopped.
+# A tier's age is the server's HOLT_REFRESH_WEEKLY_HOURS (168) or
+# HOLT_REFRESH_MONTHLY_HOURS (720), which compose.yml passes; without --tier
+# a pass reads again every report over HOLT_WARM_MAX_AGE_HOURS (20) old. The
+# pass's first line says which.
 # Run it after the first deploy (an empty cache) and after a long outage.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -50,7 +60,7 @@ esac
 # the server has no API budget and the pass ends at once ("points left 0").
 load_prod_env
 
-if [[ "${1:-}" == --dry-run ]]; then
+if [[ " $* " == *" --dry-run "* ]]; then
     compose run --rm --no-deps server python -m holt_server.warm "$@"; exit $?
 fi
 
