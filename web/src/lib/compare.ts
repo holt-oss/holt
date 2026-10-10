@@ -8,8 +8,8 @@ import type { Report, Stats, Verdict } from "./types.ts";
 
 export const MAX = 4;
 
-/** Repos from `?repos=` or `?add=` (commas or spaces; names or URLs), de-duplicated, at most MAX. */
-export function parseList(v: string | string[] | undefined): string[] {
+/** Repos from `?repos=` or `?add=` (commas or spaces; names or URLs), de-duplicated, at most MAX (or `max`, to see what was asked for past it). */
+export function parseList(v: string | string[] | undefined, max = MAX): string[] {
   const raw = (Array.isArray(v) ? v.join(",") : v ?? "").split(/[,\s]+/);
   const out: string[] = [];
   for (const r of raw) {
@@ -17,7 +17,7 @@ export function parseList(v: string | string[] | undefined): string[] {
     const name = ref && `${ref.owner}/${ref.repo}`;
     if (name && !out.some((o) => o.toLowerCase() === name.toLowerCase())) out.push(name);
   }
-  return out.slice(0, MAX);
+  return out.slice(0, max);
 }
 
 /**
@@ -62,6 +62,11 @@ export const SUGGESTIONS: { label: string; repos: string[] }[] = [
   { label: "react vs vue vs svelte", repos: ["facebook/react", "vuejs/core", "sveltejs/svelte"] },
   { label: "rust vs go", repos: ["rust-lang/rust", "golang/go"] },
 ];
+
+/** Whether any number gets a best mark: the table's corner and the key under it show the mark only then. */
+export function anyLead(lead: Record<Lead, number[]>): boolean {
+  return Object.values(lead).some((l) => l.length > 0);
+}
 
 export type Lead = "merged" | "reply" | "firstTimers" | "silent" | "closed";
 

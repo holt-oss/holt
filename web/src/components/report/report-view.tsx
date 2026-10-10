@@ -1,6 +1,8 @@
 // The full report. Shared by the server page (cached report) and the client
 // runner (report that just finished streaming), so no server-only imports.
 import { ChevronDown, Info } from "lucide-react";
+import Link from "next/link";
+import { compareHref } from "@/lib/compare";
 import { shortDate, timeAgo } from "@/lib/format";
 import { EXAMPLE_PATH } from "@/lib/example-report";
 import { planCta } from "@/lib/merge-plan-offer";
@@ -272,7 +274,14 @@ export function ReportView({
             is here too, so the header above the verdict stays one row. */}
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1" data-after-verdict>
           <span className="sm:hidden">{!example && report.mode === "rules" && <ReportModeLink mode="rules" rulesHref={`/${repo}`} plan={plan} />}</span>
-          <ShareMenu url={url} text={shareText} />
+          <span className="flex items-center justify-between gap-4 max-sm:w-full">
+            {!example && (
+              <Link href={compareHref([repo])} prefetch={false} className="inline-flex min-h-11 items-center gap-1.5 text-[0.85rem] text-blue transition-colors hover:text-ink" data-compare-link>
+                Compare<span className="sr-only"> with another repo</span> <span aria-hidden="true">→</span>
+              </Link>
+            )}
+            <ShareMenu url={url} text={shareText} />
+          </span>
         </div>
 
         {issuesBehindControl(report.verdict) && (

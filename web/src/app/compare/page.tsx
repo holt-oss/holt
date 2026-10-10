@@ -7,7 +7,7 @@ import { CompareTable, Issues, IssuesSkeleton, type Column } from "@/components/
 import { PageTransition } from "@/components/motion/page-transition";
 import { AppPageHeader } from "@/components/shell/app-page";
 import { getReport, savedNames, searchRepos, starterIssues } from "@/lib/api";
-import { bareNames, compareHref as href, compareTitle, MAX, parseList, pickRepo, savedToAdd, SUGGESTIONS } from "@/lib/compare";
+import { anyLead, bareNames, compareHref as href, compareTitle, contenders, leaders, MAX, parseList, pickRepo, savedToAdd, SUGGESTIONS } from "@/lib/compare";
 import { clock } from "@/lib/home";
 import { caller, requireUser, type SessionUser } from "@/lib/session";
 
@@ -19,7 +19,35 @@ export const metadata: Metadata = {
 };
 
 const short = (list: string[]) => list.map((r) => r.split("/")[1]).join(" vs ");
+/** How many repos past MAX are still read from the URL, to say which were left out. */
+const ASKED = MAX + 8;
 const CHIP = "border border-line px-2 py-1 text-muted transition-colors hover:border-blue hover:text-ink";
+
+/** Type a repo in: the whole list on an empty page, one more beside the ones already here. */
+function AddForm({ repos, className }: { repos: string[]; className: string }) {
+  return (
+    <form action="/compare" method="get" className={`${className} flex max-w-xl items-center border border-line-strong bg-panel transition-colors focus-within:border-blue`}>
+      {repos.length > 0 && <input type="hidden" name="repos" value={repos.join(",")} />}
+      <label htmlFor="add" className="sr-only">
+        {repos.length ? "Another repo to compare: a name, owner/name, or a GitHub link" : "Repos to compare: names, owner/name, or GitHub links"}
+      </label>
+      <span aria-hidden="true" className="pl-3 text-amber">+</span>
+      <input
+        id="add"
+        name="add"
+        required
+        placeholder={repos.length ? "name or owner/name" : "excalidraw, pallets/flask"}
+        autoComplete="off"
+        autoCapitalize="none"
+        spellCheck={false}
+        className="min-w-0 flex-1 bg-transparent px-2 py-3 text-[0.92rem] outline-none placeholder:text-faint"
+      />
+      <button type="submit" className="self-stretch border-l border-line-strong px-4 text-[0.85rem] text-muted transition-colors hover:text-ink">
+        {repos.length ? "add" : "compare"}
+      </button>
+    </form>
+  );
+}
 
 async function IssuesSlot({ repo, user }: { repo: string; user: SessionUser }) {
   const r = await starterIssues(repo, 2, await caller(user));
@@ -40,11 +68,12 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
   );
   const named = (v: string | string[] | undefined) => bareNames(v).flatMap((n) => looked.find((l) => l.name === n)?.repo ?? []);
   const problems = looked.filter((l) => !l.repo);
-  const repos = parseList([...parseList(sp.repos), ...named(sp.repos)]);
-  const extra = parseList([...parseList(sp.add), ...named(sp.add)]);
-  const all = [...repos, ...extra.filter((e) => !repos.some((r) => r.toLowerCase() === e.toLowerCase()))].slice(0, MAX);
-  // Keep the URL shareable: fold ?add= into ?repos=. Not when something couldn't be found: the redirect would drop the note saying so.
-  if (sp.add !== undefined && !problems.length) redirect(href(all));
+  // Everything asked for, in order: the first MAX are compared, the rest are named as left out.
+  const wanted = parseList([...parseList(sp.repos, ASKED), ...named(sp.repos), ...parseList(sp.add, ASKED), ...named(sp.add)], ASKED);
+  const all = wanted.slice(0, MAX);
+  const over = wanted.slice(MAX);
+  // Keep the URL shareable: fold ?add= into ?repos=. Not when something couldn't be found or fit: the redirect would drop the note saying so.
+  if (sp.add !== undefined && !problems.length && !over.length) redirect(href(all));
   const reports = await Promise.all(all.map((r) => getReport(r)));
   // The way in from a shortlist: your saved repos, one tap each.
   const saved = (await savedNames(user.id)) ?? [];
@@ -52,7 +81,9 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
 
   // Nothing picked (or the last one removed): no table, only the ways to start one.
   const shown = all.map((repo, i) => ({ repo, r: reports[i] }));
-  const title = compareTitle(shown.map(({ r }) => (r.ok ? r.data : null)));
+  const checked = shown.map(({ r }) => (r.ok ? r.data : null));
+  const title = compareTitle(checked);
+  const marks = anyLead(leaders(contenders(checked)));
 
   const columns: Column[] = shown.map(({ repo, r }) => {
     const removeHref = href(all.filter((x) => x !== repo));
@@ -72,25 +103,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
     <PageTransition>
       <div className="app-page">
         <AppPageHeader sentence title={title} mood={shown.length ? "ready" : "thinking"}>
-          {!all.length && (
-            <form action="/compare" method="get" className="mt-6 flex max-w-xl items-center border border-line-strong bg-panel transition-colors focus-within:border-blue">
-              <label htmlFor="add" className="sr-only">Repos to compare: names, owner/name, or GitHub links</label>
-              <span aria-hidden="true" className="pl-3 text-amber">+</span>
-              <input
-                id="add"
-                name="add"
-                required
-                placeholder="excalidraw, pallets/flask"
-                autoComplete="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                className="min-w-0 flex-1 bg-transparent px-2 py-3 text-[0.92rem] outline-none placeholder:text-faint"
-              />
-              <button type="submit" className="self-stretch border-l border-line-strong px-4 text-[0.85rem] text-muted transition-colors hover:text-ink">
-                compare
-              </button>
-            </form>
-          )}
+          {all.length < 2 && <AddForm repos={all} className="mt-6" />}
           {problems.length > 0 && (
             <p role="status" className="mt-3 max-w-xl font-sans text-[0.86rem] leading-snug text-orange">
               {problems.map((l) => (
@@ -98,6 +111,11 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
                   {l.failed ? `Couldn't look up “${l.name}” just now.` : `No repository named “${l.name}”.`} Try owner/name, like psf/requests.
                 </span>
               ))}
+            </p>
+          )}
+          {over.length > 0 && (
+            <p role="status" className="mt-3 max-w-xl font-sans text-[0.86rem] leading-snug text-orange">
+              Four at most. Left out: {over.join(", ")}.
             </p>
           )}
           {fromSaved.length > 0 && (
@@ -149,9 +167,10 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
               </p>
             )}
             <CompareTable columns={columns} issues={issues} now={clock()} label={`Comparing ${short(all)}`} />
+            {all.length >= 2 && all.length < MAX && <AddForm repos={all} className="mt-4" />}
             {/* The table's key: each mark in its own column, its meaning beside it. */}
             <dl className="mt-5 grid max-w-2xl grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2 gap-y-2 border-t border-line pt-4 font-sans text-[0.8rem] leading-snug text-faint">
-              {shown.length > 1 && (
+              {marks && (
                 <>
                   <dt className="text-center font-mono text-green"><span className="sr-only">Triangle</span><span aria-hidden="true">▲</span></dt>
                   <dd>
