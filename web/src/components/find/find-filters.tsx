@@ -18,7 +18,7 @@ const TIME_SHORT: Record<number, string> = { 1: "1d", 3: "3d", 7: "1w", 30: "1mo
 // Controls are 40px tall on a phone and 32px from tablets up, so the bar that holds them stays thin.
 // Typeface: names (languages, topics, kinds of work) are chips in the mono face, as on the cards;
 // the phrases you read (how long, how experienced, the switch) are in the sans face.
-const seg = "flex h-10 items-center justify-center whitespace-nowrap border px-2 font-sans text-[0.8rem] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue sm:h-8 sm:px-3 sm:text-[0.84rem]";
+const seg = "flex h-10 items-center justify-center whitespace-nowrap border px-2 font-sans text-[0.75rem] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue sm:h-8 sm:px-3 sm:text-[0.84rem]";
 const segOn = "picked";
 const segOff = "border-line-strong text-muted hover:border-blue hover:text-ink";
 const chipOn = "picked";
