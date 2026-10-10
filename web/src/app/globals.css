@@ -68,6 +68,11 @@
   --hf: #6a3dd1;
   --hf-bg: #ece3fb;
   --hf-line: #c9b5f2;
+  /* A control that is on (the `picked` utility, the sidebar, the tabs): --sel is
+     its firm line, --sel-bg the tint inside. Declared once: both follow --blue
+     into the dark theme. `tint-hf` swaps in Hacktoberfest's purple. */
+  --sel: var(--blue);
+  --sel-bg: color-mix(in srgb, var(--blue) 11%, transparent);
   color-scheme: light;
 
   /* Motion (the motion plan). Short, decelerating, tiny distances;
@@ -182,6 +187,8 @@
   --color-hf: var(--hf);
   --color-hf-bg: var(--hf-bg);
   --color-hf-line: var(--hf-line);
+  --color-sel: var(--sel);
+  --color-sel-bg: var(--sel-bg);
   /* Every Tailwind `transition-*` utility uses the motion tokens. */
   --default-transition-duration: var(--dur-fast);
   --default-transition-timing-function: var(--ease-out);
@@ -2628,18 +2635,18 @@
   }
   .side-item[aria-current="page"] {
     color: var(--ink);
-    background: color-mix(in srgb, var(--blue) 11%, transparent);
+    background: var(--sel-bg);
     font-weight: 600;
   }
   .side-item[aria-current="page"] .side-icon {
-    color: var(--blue);
+    color: var(--sel);
   }
   .side-item[aria-current="page"]::before {
     position: absolute;
     inset: 9px auto 9px -8px;
     width: 3px;
     border-radius: 0 3px 3px 0;
-    background: var(--blue);
+    background: var(--sel);
     content: "";
   }
   /* A count that needs you (orange, as on Your pull requests) or a season's mark. */
@@ -3111,19 +3118,30 @@
     background: var(--panel-2);
     color: var(--ink);
   }
+  /* Where you are: ink, semi-bold and the selected line, drawn under the tab
+     on the band's own rule (as .app-tab does). No box: the filters below are
+     the boxed things. */
   .find-tab[aria-current="page"] {
-    border-color: var(--line-strong);
-    background: var(--panel);
+    position: relative;
     color: var(--ink);
     font-weight: 600;
   }
+  .find-tab[aria-current="page"]::after {
+    position: absolute;
+    inset: auto 0 -4px;
+    height: 2px;
+    background: var(--sel);
+    content: "";
+  }
   .find-tab[data-tab="hacktoberfest"] {
+    --sel: var(--hf);
     color: var(--hf);
   }
-  .find-tab[data-tab="hacktoberfest"]:hover,
-  .find-tab[data-tab="hacktoberfest"][aria-current="page"] {
-    border-color: var(--hf-line);
+  .find-tab[data-tab="hacktoberfest"]:hover {
     background: var(--hf-bg);
+  }
+  .find-tab[aria-current="page"]:hover {
+    background: none;
   }
   .find-band + :not(.find-tray) {
     margin-top: 24px;
@@ -3216,7 +3234,7 @@
     color: var(--ink);
   }
   .app-tab[aria-current="page"] {
-    border-bottom-color: var(--blue);
+    border-bottom-color: var(--sel);
     color: var(--ink);
     font-weight: 600;
   }
@@ -3684,6 +3702,23 @@
       font-size: 0.76rem;
     }
   }
+}
+
+/* Selected, one grammar for every control that can be on: ink, semi-bold, a
+   firm line in the accent and a light tint of it inside. The control keeps
+   its own shape: chips are boxes, segments are joined, a switch tints its
+   track, tabs take only the line (underneath) and the sidebar a bar on the
+   left. Never a verdict colour: green, amber and orange say what Holt found. */
+@utility picked {
+  border-color: var(--sel);
+  background-color: var(--sel-bg);
+  color: var(--ink);
+  font-weight: 600;
+}
+/* Hacktoberfest's purple is the season's tint inside that grammar. */
+@utility tint-hf {
+  --sel: var(--hf);
+  --sel-bg: var(--hf-bg);
 }
 
 /* A text link that stands alone gets a 44px tall hit area without moving its

@@ -14,7 +14,7 @@ export function MotionChoice({ initial }: { initial: Motion }) {
           <label
             key={o.value}
             className={`inline-flex min-h-11 cursor-pointer items-center border px-3 text-[0.87rem] transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue ${
-              value === o.value ? "border-blue bg-blue/10 text-blue" : "border-line-strong text-muted hover:text-ink"
+              value === o.value ? "picked" : "border-line-strong text-muted hover:text-ink"
             }`}
           >
             <input

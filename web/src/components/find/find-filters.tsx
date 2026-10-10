@@ -17,9 +17,9 @@ const TIME_SHORT: Record<number, string> = { 1: "1d", 3: "3d", 7: "1w", 30: "1mo
 
 // Controls are 40px tall on a phone and 32px from tablets up, so the bar that holds them stays thin.
 const seg = "flex h-10 items-center justify-center whitespace-nowrap border px-2 text-[0.75rem] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue sm:h-8 sm:px-3 sm:text-[0.8rem]";
-const segOn = "border-green bg-green font-semibold text-on-accent";
+const segOn = "picked";
 const segOff = "border-line-strong text-muted hover:border-blue hover:text-ink";
-const chipOn = "border-blue bg-blue text-on-accent";
+const chipOn = "picked";
 const chipOff = "border-line-strong text-muted hover:border-blue hover:text-ink";
 // Languages you type in: any name GitHub knows (find-picks.ts keeps up to 10, each up to 40 characters).
 const MAX_LANGS = 10;
@@ -105,7 +105,7 @@ export function FindFilters({ picks, onChange, hf, busy = false }: {
         <div ref={langRow} className="relative flex w-full min-w-0 gap-1.5 overflow-x-auto pr-6 [mask-image:linear-gradient(to_right,#000_calc(100%-1.5rem),transparent)] [scrollbar-width:none] @5xl:w-auto @5xl:flex-1">
           {/* Below one row there's no room beside Time, so the switch leads the chips. */}
           {hf && (
-            <button type="button" role="switch" aria-checked={picks.hf} aria-label={hfLabel} onClick={() => set({ hf: !picks.hf })} className={`${chip} @5xl:hidden ${picks.hf ? "border-hf bg-hf-bg font-semibold text-hf" : chipOff}`}>
+            <button type="button" role="switch" aria-checked={picks.hf} aria-label={hfLabel} onClick={() => set({ hf: !picks.hf })} className={`${chip} @5xl:hidden ${picks.hf ? "tint-hf picked" : chipOff}`}>
               Hacktoberfest
             </button>
           )}
@@ -182,13 +182,13 @@ export function FindFilters({ picks, onChange, hf, busy = false }: {
           </div>
 
           {hf && (
-            <button type="button" role="switch" aria-checked={picks.hf} onClick={() => set({ hf: !picks.hf })} className="group hidden h-8 shrink-0 items-center gap-2 text-left text-[0.8rem] @5xl:flex">
+            <button type="button" role="switch" aria-checked={picks.hf} onClick={() => set({ hf: !picks.hf })} className={`group hidden h-8 shrink-0 items-center gap-2 text-left text-[0.8rem] @5xl:flex ${picks.hf ? "font-semibold" : "text-muted hover:text-ink"}`}>
               <span
                 aria-hidden="true"
-                className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-3.5 after:rounded-full after:transition-transform group-focus-visible:outline-2 group-focus-visible:outline-blue ${picks.hf ? "border-hf bg-hf-bg after:translate-x-4 after:bg-hf" : "border-line-strong bg-panel-2 after:bg-faint"}`}
+                className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-3.5 after:rounded-full after:transition-transform group-focus-visible:outline-2 group-focus-visible:outline-blue ${picks.hf ? "tint-hf border-sel bg-sel-bg after:translate-x-4 after:bg-sel" : "border-line-strong bg-panel-2 after:bg-faint"}`}
               />
               <span>
-                {hfLabel} <span className="hidden text-faint @7xl:inline">· {hf.note}</span>
+                {hfLabel} <span className="hidden font-normal text-faint @7xl:inline">· {hf.note}</span>
               </span>
             </button>
           )}

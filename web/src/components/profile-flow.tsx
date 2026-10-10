@@ -22,7 +22,7 @@ const NOTE: Partial<Record<QuestionId, string>> = {
 
 const CHIP =
   "min-h-12 border px-4 text-[0.92rem] transition-colors focus-visible:outline-2 focus-visible:outline-blue disabled:opacity-60";
-const ON = "border-blue bg-blue text-on-accent";
+const ON = "picked";
 const OFF = "border-line-strong hover:border-blue";
 
 export function ProfileFlow({ adultConfirmed, startAt = "start" }: { adultConfirmed: boolean; startAt?: FlowStep }) {
