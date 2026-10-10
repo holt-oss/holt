@@ -3871,14 +3871,18 @@
   scale: 0;
   content: "";
 }
+/* Ticked, in the selected grammar (`picked`): ink, the --sel line round the
+   box, the --sel-bg tint inside and the mark in --sel. The label keeps its
+   weight, so a tick never moves its neighbours in the card. */
 .compare-tick[aria-pressed="true"] {
-  color: var(--blue);
+  color: var(--ink);
 }
 .compare-tick[aria-pressed="true"] .compare-tick-box {
-  border-color: var(--blue);
-  background: var(--blue);
+  border-color: var(--sel);
+  background: var(--sel-bg);
 }
 .compare-tick[aria-pressed="true"] .compare-tick-box::after {
+  border-color: var(--sel);
   scale: 1;
 }
 .compare-tick:focus-visible {
