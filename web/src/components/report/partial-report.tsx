@@ -38,7 +38,6 @@ export function PartialReport({ report, back, land }: { report: Report; back: st
                 <span aria-hidden="true" className={`size-1.5 rounded-full ${t.bg}`} />
                 {report.headline}
               </h1>
-              <span className="text-[0.78rem] uppercase tracking-[0.08em] text-faint">rules report</span>
             </div>
             {land ? (
               <VerdictCat mood={TONE_MOOD[report.tone]} className="text-[1rem] normal-case tracking-normal sm:text-[1.2rem]" />

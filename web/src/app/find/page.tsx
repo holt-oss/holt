@@ -12,7 +12,7 @@ import { hacktoberfestSwitch } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Find a project",
-  description: "Projects that reply to and merge outside contributors, with specific issues to start on. Filter by language and how much time you have.",
+  description: "Projects that reply to and merge outside contributors, with specific issues to start on. Filter by language and how fast maintainers reply.",
   alternates: { canonical: "/find" },
 };
 

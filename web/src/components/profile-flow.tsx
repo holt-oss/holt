@@ -84,7 +84,7 @@ export function ProfileFlow({ adultConfirmed, startAt = "start" }: { adultConfir
             <h2 id="flow-h" ref={heading} tabIndex={-1} className="mt-3 text-[1.2rem] font-semibold tracking-tight outline-none">
               Let Holt pick repos for you
             </h2>
-            <p className="prose-sans mt-1 text-[0.95rem] text-muted">Four quick taps: your languages, your time, your experience, what you like doing.</p>
+            <p className="prose-sans mt-1 text-[0.95rem] text-muted">Four quick taps: your languages, how long you&apos;d wait for a reply, your experience, what you like doing.</p>
             {!adultConfirmed && <p className="mt-2 font-sans text-[0.89rem] text-faint">Profiles are for people 18 or older.</p>}
             <div className="mt-4 flex flex-wrap items-center gap-4">
               <button type="button" onClick={() => go(null, "start")} className="btn-primary">

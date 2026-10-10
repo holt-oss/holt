@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CatFace } from "@/components/cat-face";
+import { ChipRow } from "@/components/find/chip-row";
 import { FindFrame } from "@/components/find/find-frame";
 import { ErrorPanel } from "@/components/error-panel";
 import { FindList } from "@/components/find/find-list";
@@ -123,7 +124,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
           </p>
         )}
         <nav aria-label="Language">
-          <ul className="flex flex-wrap gap-2">
+          <ChipRow current={tab.id} className="flex flex-wrap gap-2">
             {LANGS.map((l) => (
               <li key={l.id}>
                 <Link
@@ -156,7 +157,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
             <li>
               <HfLangAdd />
             </li>
-          </ul>
+          </ChipRow>
         </nav>
 
         <section aria-label={`Welcoming Hacktoberfest projects: ${tab.label}`} className="mt-6">

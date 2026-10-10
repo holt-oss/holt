@@ -12,7 +12,8 @@ import { SuggestInput } from "./suggest-input";
 // start with a capital (GitHub topics keep their own lowercase spelling);
 // actions (check, add, more filters, reset filters)
 // are lowercase; notes and hints in brackets or after "·" run on in lowercase.
-const TIME_SHORT: Record<number, string> = { 1: "Evening", 3: "Weekend", 7: "Week", 30: "Month" };
+// On a phone the label and all four options share one line, so the options are short there; the words stay for screen readers.
+const TIME_SHORT: Record<number, string> = { 1: "1d", 3: "3d", 7: "1w", 30: "1mo" };
 
 // Controls are 40px tall on a phone and 32px from tablets up, so the bar that holds them stays thin.
 const seg = "flex h-10 items-center justify-center whitespace-nowrap border px-2 text-[0.75rem] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue sm:h-8 sm:px-3 sm:text-[0.8rem]";
@@ -160,7 +161,8 @@ export function FindFilters({ picks, onChange, hf, busy = false }: {
         </div>
 
         <div className="flex w-full min-w-0 items-center gap-x-3 sm:gap-x-4 @5xl:w-auto @5xl:shrink-0">
-          <div role="radiogroup" aria-label="Time you have" className="grid min-w-0 flex-1 grid-cols-4 sm:flex sm:flex-none">
+          <span id={`${panelId}-time`} className="shrink-0 whitespace-nowrap text-[0.75rem] text-faint sm:text-[0.8rem]">Replies within</span>
+          <div role="radiogroup" aria-labelledby={`${panelId}-time`} className="-ml-1 grid min-w-0 flex-1 grid-cols-4 sm:-ml-2 sm:flex sm:flex-none">
             {TIME.map((t, i) => {
               const on = picks.days === t.days;
               return (
@@ -169,11 +171,11 @@ export function FindFilters({ picks, onChange, hf, busy = false }: {
                   type="button"
                   role="radio"
                   aria-checked={on}
-                  aria-label={t.label}
                   onClick={() => set({ days: t.days })}
                   className={`${seg} ${on ? segOn : segOff} ${i ? "-ml-px" : ""} relative ${on ? "z-10" : ""}`}
                 >
-                  {TIME_SHORT[t.days]}
+                  <span aria-hidden="true" className="sm:hidden">{TIME_SHORT[t.days]}</span>
+                  <span className="max-sm:sr-only">{t.label}</span>
                 </button>
               );
             })}

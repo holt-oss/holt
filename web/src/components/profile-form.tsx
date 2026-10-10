@@ -38,7 +38,7 @@ export function ProfileForm({
       </fieldset>
 
       <fieldset>
-        <legend className={LEGEND}>Time you have for one contribution</legend>
+        <legend className={LEGEND}>How long you&apos;d wait for a first reply</legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {TIME.map((t) => (
             <label key={t.days} className={BOX}>
