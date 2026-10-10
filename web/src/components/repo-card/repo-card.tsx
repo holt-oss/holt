@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { compact } from "@/lib/discover";
+import { issueSkill, issueTaken, NONE_FREE } from "@/lib/format";
 import { issueSummary, langColor, statPills, type CardRepo } from "@/lib/repo-card";
 import { VerdictPill } from "../report/verdict-pill";
 import { OddsMeter } from "./odds-bar";
@@ -16,7 +17,10 @@ import { LangDot, RepoAvatar } from "./repo-avatar";
  */
 export function RepoCard({ r, report, focusHref, onOpen, actions, verdict = true, why = false }: { r: CardRepo; report: string; focusHref: string; onOpen?: () => void; actions?: React.ReactNode; verdict?: boolean; why?: boolean }) {
   const [owner, name] = r.repo.split("/");
+  // Free issues come first, so a taken one here means every one is taken.
   const issue = r.issues[0];
+  const taken = issue ? issueTaken(issue) : false;
+  const skill = issue ? issueSkill(issue) : null;
   // The merged share is marked on the bar; the other numbers sit under it as plain text, not tags.
   const pills = statPills(r.stats);
   const rest = r.stats.attempts && r.stats.merged != null ? pills.slice(1) : pills;
@@ -106,13 +110,18 @@ export function RepoCard({ r, report, focusHref, onOpen, actions, verdict = true
 
       {issue ? (
         <p className="relative mt-3 border-t border-dashed border-line pt-2.5 font-sans text-[0.88rem] leading-snug">
-          <span className="block font-sans text-[0.78rem] text-faint">An issue to start with</span>
-          <a href={issue.url} target="_blank" rel="noopener noreferrer" data-umami-event="starter-issue-click" className="mt-0.5 line-clamp-2 font-semibold text-ink after:absolute after:inset-0 hover:text-blue">
+          <span className={`block font-sans text-[0.78rem] ${taken ? "text-amber" : "text-faint"}`}>{taken ? NONE_FREE : "An issue to start with"}</span>
+          <a href={issue.url} target="_blank" rel="noopener noreferrer" data-umami-event="starter-issue-click" className={`mt-0.5 line-clamp-2 after:absolute after:inset-0 hover:text-blue ${taken ? "text-muted" : "font-semibold text-ink"}`}>
             <span className="font-mono text-[0.85rem] font-normal text-blue">#{issue.number}</span> {issue.title}
             <span className="sr-only"> (opens GitHub)</span>
           </a>
-          {/* Only when someone is on it: "unclaimed" above already says when nobody is. */}
-          {issue.on_it && (issue.people || issue.open_prs) ? <span className="mt-0.5 block text-[0.8rem] text-amber">{issue.on_it}</span> : null}
+          {/* Who is on it only when someone is ("unclaimed" above already says when nobody is), then the skill it names. */}
+          {(taken && issue.on_it) || skill ? (
+            <span className="mt-0.5 flex flex-wrap gap-x-2 text-[0.8rem] text-faint">
+              {taken && issue.on_it && <span className="text-amber">{issue.on_it}</span>}
+              {skill && <span>{skill}</span>}
+            </span>
+          ) : null}
         </p>
       ) : r.reason ? (
         <p className="mt-3 line-clamp-2 border-t border-dashed border-line pt-2.5 font-sans text-[0.88rem] leading-snug text-muted">{r.reason}</p>

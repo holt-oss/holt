@@ -322,14 +322,15 @@ async def starter_issues(svc: Services, keys: list[str]) -> dict[str, list[dict]
 
 
 def card_issues(raw: list[dict]) -> list[StarterIssue]:
-    """The first CARD_ISSUES that parse, nobody-on-it first (stable)."""
+    """The first CARD_ISSUES that parse, nobody-on-it first (stable); taken
+    ones only when few are free (`starter.offered`)."""
     issues = []
     for i in raw:
         try:
             issues.append(StarterIssue.model_validate(i))
         except ValueError:
             continue
-    return sorted(issues, key=lambda i: bool(i.people or i.open_prs))[:CARD_ISSUES]
+    return starter.offered(issues)[:CARD_ISSUES]
 
 
 async def checked_this_week(svc: Services) -> dict[str, int]:

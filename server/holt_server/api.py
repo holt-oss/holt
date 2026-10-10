@@ -603,11 +603,11 @@ async def starter_issues(owner: str, repo: str, request: Request,
     name = repos.normalize(f"{owner}/{repo}")
     # A cache hit costs nothing: no rate limit, no GitHub.
     if (hit := await cached_starter_issues(svc, name)) is not None:
-        return schema.StarterIssues(repo=hit.repo, issues=hit.issues[:limit])
+        return schema.StarterIssues(repo=hit.repo, issues=starter.offered(hit.issues)[:limit])
     starter.function("starter_issues")  # 501 before spending a rate-limit hit
     rate_limit(svc, who, "read")
     canonical, issues = await fetch_starter_issues(svc, name)
-    return schema.StarterIssues(repo=canonical, issues=issues[:limit])
+    return schema.StarterIssues(repo=canonical, issues=starter.offered(issues)[:limit])
 
 
 # Repository-name searches already answered: the same name is asked for again

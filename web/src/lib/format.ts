@@ -1,3 +1,4 @@
+import { LANGS, MORE_LANGS } from "./profile.ts";
 import type { StarterIssue, Stats, Tone } from "./types";
 
 export function pct(n: number, d: number): number {
@@ -186,6 +187,36 @@ export function evidenceRef(url: string): string {
   const m = url.match(/github\.com\/[^/]+\/[^/]+\/(pull|issues|discussions|commit)\/([^/#?]+)/);
   if (!m) return "open on GitHub";
   return m[1] === "commit" ? m[2].slice(0, 7) : `#${m[2]}`;
+}
+
+/** Someone is already on it: an open pull request, an assignee, or a recent "can I work on this?". */
+export function issueTaken(issue: Pick<StarterIssue, "people" | "open_prs">): boolean {
+  return Boolean(issue.people || issue.open_prs);
+}
+
+/** Said when a repo has starter issues and someone is on every one. */
+export const NONE_FREE = "No free starter issue right now";
+
+const LANG_NAMES = new Map([...LANGS, ...MORE_LANGS].map((l) => [l.toLowerCase(), l]));
+const LANG_SHORT: Record<string, string> = { js: "JavaScript", ts: "TypeScript", py: "Python", golang: "Go", cpp: "C++", csharp: "C#" };
+const WORK: Record<string, string> = { docs: "Docs", tests: "Tests", design: "Design", translations: "Translations" };
+
+/**
+ * The skill an issue asks for, when it says so itself: a language one of its
+ * labels names ("python", "lang: rust"), else the kind of work when that isn't
+ * code. Null otherwise: nothing is guessed.
+ */
+export function issueSkill(issue: Pick<StarterIssue, "labels" | "areas">): string | null {
+  for (const raw of issue.labels) {
+    const label = raw.toLowerCase().trim();
+    for (const name of [label, label.split(/[:/]/).pop()!.trim()]) {
+      // One-letter names ("C", "R") are too easy to hit by accident.
+      const lang = LANG_SHORT[name] ?? (name.length > 1 ? LANG_NAMES.get(name) : undefined);
+      if (lang) return lang;
+    }
+  }
+  const work = issue.areas?.[0];
+  return work && work !== "code" ? WORK[work] ?? null : null;
 }
 
 /** The one-line "what to do next" for a starter issue. */
