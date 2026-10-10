@@ -59,9 +59,9 @@ export function ShareBar({ url, text }: { url: string; text: string }) {
 const ICON = "grid size-9 place-items-center text-faint transition-colors hover:text-ink";
 
 /**
- * Share, for the report's header under the save bookmark: copy the link,
+ * Share, under the report's verdict and next action: copy the link,
  * WhatsApp, X and LinkedIn as bare icons, always there. No box and nothing to
- * open first. The row's right edge lines up with the bookmark's.
+ * open first.
  */
 export function ShareMenu({ url, text }: { url: string; text: string }) {
   const [copied, setCopied] = useState(false);

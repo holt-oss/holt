@@ -1,4 +1,4 @@
-// In a report's header, under the repo name: what the project is (as many lines as it needs),
+// In a report's header, under the repo name: what the project is (as many lines as it needs; two on a phone),
 // how big and alive it is (one row, stars first) and, on a line of its own, the
 // website and GitHub link. The licence, start year, branch and topics are in the
 // sidebar (project-sidebar.tsx).
@@ -22,7 +22,8 @@ export function RepoAbout({ about, repo, verdict }: { about: About; repo: string
         <span className="text-muted">{owner}/</span>
         {name}
       </p>
-      {line && <p className="mt-1 max-w-3xl font-sans text-[0.9rem] leading-snug text-muted [overflow-wrap:anywhere]">{line}</p>}
+      {/* Two lines at most on a phone, so the verdict isn't pushed down; in full from `sm` up. */}
+      {line && <p className="mt-1 line-clamp-2 max-w-3xl font-sans text-[0.9rem] leading-snug text-muted [overflow-wrap:anywhere] sm:line-clamp-none">{line}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.82rem] text-muted sm:gap-x-4">
         {marks.map((f) =>
           f.repo ? (

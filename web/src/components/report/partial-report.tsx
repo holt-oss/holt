@@ -8,10 +8,12 @@ import Link from "next/link";
 import { statLines, timeAgo } from "@/lib/format";
 import { signInHref } from "@/lib/gate";
 import { fullStats } from "@/lib/repo-card";
+import { SITE_URL } from "@/lib/site";
 import type { Report } from "@/lib/types";
 import { CatFace } from "../cat-face";
 import { OddsBar } from "../repo-card/odds-bar";
 import { Skeleton, SkeletonText } from "../skeleton";
+import { ShareMenu } from "./share-bar";
 import { TONE, TONE_MOOD } from "./tone";
 import { VerdictCat } from "./verdict-cat";
 
@@ -22,7 +24,8 @@ import { VerdictCat } from "./verdict-cat";
  */
 export function PartialReport({ report, back, land }: { report: Report; back: string; land?: boolean }) {
   const t = TONE[report.tone];
-  const lead = statLines(report.stats)[0];
+  // No outside PR to count (pull requests off, say): no odds, and no "0 of 0".
+  const lead = report.stats.outsider_attempts > 0 ? statLines(report.stats)[0] : undefined;
   return (
     <div className="max-w-4xl space-y-6" data-teaser>
       {/* The same compact card as the full report's (report-view.tsx, VerdictHero), with the odds and one number. */}
@@ -46,19 +49,23 @@ export function PartialReport({ report, back, land }: { report: Report; back: st
           <p className="mt-3 max-w-3xl font-sans text-[1rem] leading-snug text-ink sm:text-[1.05rem]" data-line="reason">
             {report.verdict_line}
           </p>
-          <div className="mt-3 max-w-2xl" data-odds>
-            <OddsBar stats={fullStats(report.stats)} className="h-2.5" />
-            {lead && (
+          {lead && (
+            <div className="mt-3 max-w-2xl" data-odds>
+              <OddsBar stats={fullStats(report.stats)} className="h-2.5" />
               <p className="mt-2 font-sans text-[0.93rem] text-muted" data-line="lead-number">
                 <span className={`mr-2 font-mono text-[1.15rem] font-semibold tracking-tight ${lead.tone === "neutral" ? "text-ink" : TONE[lead.tone].text}`}>{lead.big}</span>
                 {lead.label}
               </p>
-            )}
-          </div>
+            </div>
+          )}
           <p className="mt-3 text-[0.78rem] text-faint">
             checked <time dateTime={report.generated_at} suppressHydrationWarning>{timeAgo(report.generated_at)}</time>
           </p>
         </div>
+      </div>
+
+      <div className="flex justify-end">
+        <ShareMenu url={`${SITE_URL}/${report.repo}`} text={`${report.repo} on Holt: ${report.headline}.`} />
       </div>
 
       <section aria-label="The full report" className="relative" data-locked>
@@ -71,9 +78,9 @@ export function PartialReport({ report, back, land }: { report: Report; back: st
             </div>
           ))}
         </div>
-        <div className="absolute inset-x-0 top-10 flex justify-center px-4 sm:top-14">
-          <Link href={signInHref(back)} prefetch={false} className="btn-primary" data-signin-card>
-            sign in to see the full report <span aria-hidden="true">→</span>
+        <div className="absolute inset-x-0 top-10 flex justify-center sm:top-14">
+          <Link href={signInHref(back)} prefetch={false} className="btn-primary whitespace-nowrap max-sm:px-3" data-signin-card>
+            sign in for the full report <span aria-hidden="true">→</span>
           </Link>
         </div>
       </section>
