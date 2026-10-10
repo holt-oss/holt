@@ -21,7 +21,8 @@ export function FindFrame({ tab, title, signedIn, children }: {
   const tabs = findTabs({ signedIn, season: hacktoberfest() !== null, current: tab });
   const link = (t: (typeof tabs)[number]) => (
     <Link key={t.id} href={t.href} aria-current={t.id === tab ? "page" : undefined} className="find-tab" data-tab={t.id}>
-      {t.label}
+      {/* On a phone the three tabs fit only as "Find", "Browse", "Hacktoberfest"; the rest stays for screen readers. */}
+      {t.short ? <span>{t.short}<span className="max-sm:sr-only">{t.label.slice(t.short.length)}</span></span> : t.label}
     </Link>
   );
   const main = tabs.filter((t) => t.id !== "hacktoberfest");

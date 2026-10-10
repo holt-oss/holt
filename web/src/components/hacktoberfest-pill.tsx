@@ -25,7 +25,7 @@ export function HacktoberfestPill({ year, short }: { year: number; short: string
         <span className="truncate text-muted">
           {short}
         </span>
-        <span aria-hidden="true">→</span>
+        <span aria-hidden="true" className="max-sm:hidden">→</span>
       </Link>
       <button
         type="button"

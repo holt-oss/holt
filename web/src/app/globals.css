@@ -1012,9 +1012,11 @@
     }
   }
   /* About 2/3 of a landing section heading and 2.5x the line under it: one
-     line across the footer's narrowest desktop measure (--wrap-max). */
+     line across the footer's narrowest desktop measure (--wrap-max). Under
+     about 416px the line is wider than the screen at 1.3rem, so it scales
+     down with the width. */
   .ft-signoff {
-    font-size: clamp(1.3rem, 3.4vw, 2.6rem);
+    font-size: clamp(min(1.3rem, 5vw), 3.4vw, 2.6rem);
     line-height: 1.15;
   }
   .ft-caret {
@@ -2327,6 +2329,26 @@
    layered ones, so the pill's own `inline-flex` utility can't override it. */
 :root[data-hf-dismissed] .hf-pill {
   display: none;
+}
+
+/* Hacktoberfest's language chips on a phone: one scrolling row with a
+   right-edge fade, like Find's, so the list starts on the first screen.
+   Outside @layer for the same reason: the list's own `flex-wrap` utility
+   would win otherwise. Positioned, so the chips' screen-reader text scrolls
+   with the row and can't widen the page. */
+@media (max-width: 639px) {
+  .find-band ~ nav[aria-label="Language"] > ul {
+    position: relative;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-right: 1.5rem;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+  }
+  .find-band ~ nav[aria-label="Language"] > ul > li {
+    flex-shrink: 0;
+  }
 }
 
 /* Scroll-driven slide for the OPEN / SOURCE band (see scroll-marquee.tsx).

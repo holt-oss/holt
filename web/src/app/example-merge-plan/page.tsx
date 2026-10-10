@@ -33,7 +33,7 @@ export default async function ExampleMergePlanPage({ searchParams }: PageProps<"
         <div className="report-wide relative py-8 sm:py-12">
           <aside className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 border border-line-strong bg-panel-2 px-4 py-3 font-sans text-[0.9rem] text-muted" data-example-banner>
             <span className="border border-blue px-2 py-0.5 font-mono text-[0.85rem] text-blue">Example merge plan</span>
-            <span className="min-w-0 flex-1">
+            <span className="min-w-0 flex-1 max-sm:basis-full">
               Recorded {recorded}. Real counts, quotes and links; the plan&apos;s wording stands in for the AI&apos;s.
             </span>
             <span className="flex flex-wrap gap-x-4 gap-y-2">
@@ -44,15 +44,16 @@ export default async function ExampleMergePlanPage({ searchParams }: PageProps<"
             </span>
           </aside>
 
-          <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+          <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-3 sm:gap-x-4">
             <ReportBackLink href={`/${plan.repo}`} />
             <RepoAvatar repo={plan.repo} size={40} />
-            <div className="min-w-0 flex-1">
+            {/* On a phone the name keeps the rest of the first line, and the mode link goes under it. */}
+            <div className="min-w-0 flex-1 max-sm:basis-[calc(100%-6.5rem)]">
               <p className="text-[1.05rem] font-semibold tracking-tight [overflow-wrap:anywhere] sm:text-[1.25rem]">
                 <span className="text-muted">{owner}/</span>
                 {repo}
               </p>
-              <a href={`https://github.com/${plan.repo}`} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center truncate text-[0.82rem] text-faint hover:text-blue sm:block sm:min-h-0">
+              <a href={`https://github.com/${plan.repo}`} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center truncate text-[0.78rem] text-faint hover:text-blue sm:block sm:min-h-0 sm:text-[0.82rem]">
                 github.com/{plan.repo} ↗
               </a>
             </div>
