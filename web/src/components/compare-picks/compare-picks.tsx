@@ -76,14 +76,13 @@ function Bar({ signedIn }: { signedIn: boolean }) {
             </button>
           </li>
         ))}
-        {list.length > 1 && (
-          <li className="shrink-0">
-            <button type="button" onClick={store.clear} className="h-11 px-2 text-[0.8rem] text-faint transition-colors hover:text-ink sm:h-9">
-              clear
-            </button>
-          </li>
-        )}
       </ul>
+      {/* Outside the row that scrolls, so it is never faded or cut. */}
+      {list.length > 1 && (
+        <button type="button" onClick={store.clear} className="-mx-1 h-11 shrink-0 px-2 text-[0.8rem] text-faint transition-colors hover:text-ink sm:h-9">
+          clear
+        </button>
+      )}
       {list.length > 1 && (
         <Link
           href={comparePicksHref(list, signedIn)}
