@@ -193,10 +193,11 @@ def day_year(d: datetime, tz: ZoneInfo) -> str:
 
 
 def money(amount: int, currency: str) -> str:
-    """Minor units as people write them: "₹99", "₹249.50"."""
+    """Minor units as people write them: "₹99", "₹249.50", "$7"."""
     whole, rest = divmod(amount, 100)
     number = f"{whole:,}" + (f".{rest:02d}" if rest else "")
-    return f"₹{number}" if currency == "INR" else f"{number} {currency}"
+    sign = {"INR": "₹", "USD": "$"}.get(currency)
+    return f"{sign}{number}" if sign else f"{number} {currency}"
 
 
 def pro_gives(cat: pricing.Catalogue) -> tuple[int | None, bool]:

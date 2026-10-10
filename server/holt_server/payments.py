@@ -1,13 +1,16 @@
-"""Pro passes: Razorpay, INR, one-time payments (API.md, "Passes").
+"""Pro passes: one-time payments, in INR through Razorpay and in USD through
+Dodo Payments (API.md, "Passes").
 
 A pass is one payment for a fixed number of days of Pro. It never renews.
 Off by default. Passes are offered and orders created only when
-`HOLT_PAYMENTS_ENABLED=1`, the Razorpay keys are set, and the pass is on sale
+`HOLT_PAYMENTS_ENABLED=1`, a processor is set up, and the pass is on sale
 with a price in pricing.json (outside production, `HOLT_PASSES_ON_SALE=1`
-puts every pass on sale). Everything about an order (pass, days, price)
-comes from that file when the order is created, never from the browser.
+puts every pass on sale). INR needs the Razorpay keys; USD needs Dodo's key,
+its webhook secret and the pass's Dodo product id. Each works without the
+other. Everything about an order (pass, days, price) comes from that file
+when the order is created, never from the browser.
 
-The flow:
+The Razorpay flow:
 
 1. `POST /v1/me/orders {"pass"}` creates a Razorpay order for the pass's
    price and an `orders` row, and returns what Razorpay Checkout needs.
@@ -36,9 +39,33 @@ sometimes at the same moment: exactly one of them gives it.
 An order row keeps the pass id in `pack_id` and its days in `expires_days`
 (the columns date from credit packs; `credits` is 0).
 
-With payments switched off, confirm and the webhook still settle orders that
-already exist (someone may have paid just before the switch); no new order
-can be made.
+The Dodo flow (the client, and what it relies on in Dodo's API, are in
+payments_dodo.py):
+
+1. `POST /v1/me/orders {"pass", "currency": "USD"}` checks that the pass's
+   Dodo product is still a one-time USD product at the catalogue's price,
+   opens a hosted checkout for one of it (USD only, no discount codes), and
+   keeps the session id on an `orders` row. The buyer is sent to Dodo.
+2. Dodo sends them back to the thank-you page, which calls
+   `POST /v1/me/orders/{id}/check`: the server asks Dodo for the session's
+   payment with its API key. Nothing in the return address is read.
+3. Dodo also sends webhooks (`payment.succeeded`, `payment.failed`, …), which
+   `web/` forwards, body untouched, to `POST /v1/payments/dodo/webhook`. The
+   signature is checked (Standard Webhooks); the payment it names is then
+   fetched from Dodo, so both ways in settle the same thing.
+
+Pro is given only for a `succeeded` payment that bought exactly one of the
+pass's product, in USD, for the order's price (Dodo may add tax on top);
+anything else puts the order on `held`. Giving it is the same transaction as
+Razorpay's, so the return and the webhooks give once between them.
+
+A refund or a dispute (`refund.succeeded`, `dispute.*`) is written on the
+order's `note` and logged as an error. It changes nothing by itself: Pro
+stays until a person takes it away (`python -m holt_server.credits`).
+
+With payments switched off, confirm, check and the webhooks still settle
+orders that already exist (someone may have paid just before the switch); no
+new order can be made.
 """
 
 from __future__ import annotations
@@ -51,7 +78,7 @@ import logging
 import re
 import uuid
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, Header, Query, Request
@@ -59,7 +86,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
-from holt_server import account_mail, credits, entitlements, pricing, schema
+from holt_server import account_mail, credits, entitlements, payments_dodo, pricing, schema
 from holt_server.db import Order, User, iso, now, utc
 from holt_server.deps import Caller, caller, internal, services, signed_in
 from holt_server.errors import ApiError, upstream
@@ -79,9 +106,14 @@ CURRENCY = "INR"
 MIN_AMOUNT = 100
 # Razorpay webhook bodies are a few KB.
 MAX_WEBHOOK_BYTES = 256 * 1024
+# Times an hour one user's unsettled Dodo orders are looked up at Dodo (the
+# thank-you page asks a few times per purchase).
+CHECKS_PER_HOUR = 120
 
 ORDER_ID = re.compile(r"^order_[A-Za-z0-9]{1,40}$")
 PAYMENT_ID = re.compile(r"^pay_[A-Za-z0-9]{1,40}$")
+# Ours: 32 hex characters.
+HOLT_ORDER_ID = re.compile(r"^[0-9a-f]{32}$")
 
 OFF = "Passes aren't on sale yet. Everything free in Holt keeps working."
 UNCONFIRMED = ("We couldn't confirm that payment. If money left your account, Pro "
@@ -161,19 +193,32 @@ def build(settings: Settings) -> Razorpay | None:
 
 
 async def call(fn, *args, **kwargs) -> dict:
-    """A Razorpay call, off the event loop, its failure made plain."""
+    """A Razorpay or Dodo call, off the event loop, its failure made plain."""
     try:
         return await asyncio.to_thread(fn, *args, **kwargs)
     except ProviderError as exc:
         log.warning("razorpay call failed: %s", exc)
         raise upstream("Razorpay") from exc
+    except payments_dodo.DodoError as exc:
+        log.warning("dodo call failed: %s", exc)
+        raise upstream("Dodo Payments") from exc
 
 
 # --- what is on sale -----------------------------------------------------------------
 
 
-def payments_on(svc: Services) -> bool:
+def razorpay_on(svc: Services) -> bool:
     return svc.settings.payments_enabled and svc.razorpay is not None
+
+
+def dodo_on(svc: Services) -> bool:
+    """Whether USD can be sold at all: the key and a webhook secret that reads."""
+    return (svc.settings.payments_enabled and svc.dodo is not None
+            and svc.dodo.webhooks_on)
+
+
+def payments_on(svc: Services) -> bool:
+    return razorpay_on(svc) or dodo_on(svc)
 
 
 def price(p: pricing.Pass) -> int | None:
@@ -184,12 +229,31 @@ def price(p: pricing.Pass) -> int | None:
     return amount
 
 
+def usd_price(svc: Services, pid: str, p: pricing.Pass) -> int | None:
+    """The pass's USD price when it is on sale and has a Dodo product, else None."""
+    amount = p.price.usd_cents
+    if not p.on_sale or not amount or pid not in svc.dodo.products:
+        return None
+    return amount
+
+
+def prices(svc: Services, pid: str, p: pricing.Pass) -> list[schema.PassPrice]:
+    """What the pass can be bought for now, INR first."""
+    out = []
+    if razorpay_on(svc) and (amount := price(p)) is not None:
+        out.append(schema.PassPrice(currency=CURRENCY, amount=amount))
+    if dodo_on(svc) and (amount := usd_price(svc, pid, p)) is not None:
+        out.append(schema.PassPrice(currency=payments_dodo.CURRENCY, amount=amount))
+    return out
+
+
 def passes_body(svc: Services) -> schema.Passes:
     if not payments_on(svc):
         return schema.Passes(on_sale=False, passes=[], features=[])
     cat = entitlements.catalogue(svc)
-    out = [schema.PassOffer(id=pid, name=p.name, days=p.days, amount=amount, currency=CURRENCY)
-           for pid, p in cat.passes.items() if (amount := price(p)) is not None]
+    out = [schema.PassOffer(id=pid, name=p.name, days=p.days, amount=sold[0].amount,
+                            currency=sold[0].currency, prices=sold)
+           for pid, p in cat.passes.items() if (sold := prices(svc, pid, p))]
     if not out:
         return schema.Passes(on_sale=False, passes=[], features=[])
     features = [schema.PassFeature(id=f, name=cat.features[f].name, per_month=a.per_month,
@@ -206,14 +270,38 @@ def startup_line(svc: Services) -> tuple[int, str]:
                                "ignored; only the pricing file puts a pass on sale there")
     if not s.payments_enabled:
         return logging.INFO, "passes: off (HOLT_PAYMENTS_ENABLED is 0)"
-    if svc.razorpay is None:
-        return logging.INFO, "passes: off (no Razorpay keys)"
-    ids = [p.id for p in passes_body(svc).passes]
-    if not ids:
-        return logging.INFO, "passes: off (no pass is on sale)"
+    trouble = dodo_trouble(svc)
+    level = logging.WARNING if trouble else logging.INFO
+    if svc.razorpay is None and svc.dodo is None:
+        return level, f"passes: off (no Razorpay keys, no Dodo key){trouble}"
+    offers = passes_body(svc).passes
+    if not offers:
+        return level, f"passes: off (no pass is on sale){trouble}"
     how = " (HOLT_PASSES_ON_SALE)" if s.sell_every_pass else ""
-    mode = "test" if svc.razorpay.key_id.startswith("rzp_test_") else "LIVE"
-    return logging.INFO, f"passes: on sale{how}: {', '.join(ids)}; Razorpay {mode} keys"
+    sold = []
+    inr = [o.id for o in offers if any(p.currency == CURRENCY for p in o.prices)]
+    if inr:
+        mode = "test" if svc.razorpay.key_id.startswith("rzp_test_") else "LIVE"
+        sold.append(f"{', '.join(inr)}; Razorpay {mode} keys")
+    usd = [o.id for o in offers
+           if any(p.currency == payments_dodo.CURRENCY for p in o.prices)]
+    if usd:
+        mode = "test" if svc.dodo.env == "test" else "LIVE"
+        sold.append(f"{', '.join(usd)} in USD; Dodo {mode} mode")
+    return level, f"passes: on sale{how}: {'; '.join(sold)}{trouble}"
+
+
+def dodo_trouble(svc: Services) -> str:
+    """Why USD isn't on sale although someone began to set Dodo up, for the
+    startup line; empty when it is, or when nobody did."""
+    s = svc.settings
+    if svc.dodo is None:
+        return "; Dodo off (DODO_ENV must be test or live)" if s.dodo_api_key else ""
+    if not svc.dodo.webhooks_on:
+        return "; Dodo off (DODO_WEBHOOK_SECRET is missing or not a whsec_ secret)"
+    if not svc.dodo.products:
+        return "; Dodo off (no DODO_PRODUCT_PRO_* is set)"
+    return ""
 
 
 def order_name(o: Order, p: pricing.Pass | None) -> str:
@@ -228,7 +316,8 @@ def order_body(svc: Services, o: Order) -> schema.Order:
     p = entitlements.catalogue(svc).passes.get(o.pack_id)
     return schema.Order(id=o.id, item=o.pack_id, name=order_name(o, p),
                         days=None if o.credits else o.expires_days,
-                        amount=o.amount, currency=o.currency, status=o.status,
+                        amount=o.amount, currency=o.currency, provider=o.provider,
+                        status=o.status,
                         created_at=iso(o.created_at), paid_at=iso(o.paid_at))
 
 
@@ -351,11 +440,124 @@ async def settle(svc: Services, payment: dict[str, Any]) -> str:
     return "pending"
 
 
+# --- Dodo: settling a payment -------------------------------------------------------------
+
+
+async def dodo_order(svc: Services, payment: dict[str, Any]) -> Order | None:
+    """The order a Dodo payment belongs to: the one whose checkout session it
+    was made in, else the one its metadata names (the server put the order's
+    id there when it opened the checkout; a buyer can't)."""
+    session_id = payment.get("checkout_session_id")
+    order = await order_by_provider_id(svc, session_id if isinstance(session_id, str) else None)
+    if order is None:
+        meta = payment.get("metadata")
+        named = meta.get("holt_order") if isinstance(meta, dict) else None
+        if isinstance(named, str) and HOLT_ORDER_ID.match(named):
+            async with svc.db.session() as s:
+                order = await s.get(Order, named)
+    return order if order is not None and order.provider == payments_dodo.Dodo.name else None
+
+
+async def settle_dodo(svc: Services, payment: dict[str, Any]) -> str:
+    """Act on a payment as Dodo's API returned it (`GET /payments/{id}`, asked
+    with our key). Returns what happened, for the log and the tests."""
+    order = await dodo_order(svc, payment)
+    pid = str(payment.get("payment_id") or "")
+    if order is None:
+        return "unknown_order"
+    if not payments_dodo.PAYMENT_ID.match(pid):
+        return "ignored"
+    status = payment.get("status")
+    if order.status == "paid":
+        if order.provider_payment_id != pid and status == "succeeded":
+            log.error("order %s was paid twice (%s, then %s): refund the second",
+                      order.id, order.provider_payment_id, pid)
+        return "already_paid"
+    if status in ("failed", "cancelled"):
+        await set_status(svc, order.id, "failed", str(payment.get("error_message") or ""))
+        return "failed"
+    if status != "succeeded":
+        return "pending"
+    product_id = svc.dodo.products.get(order.pack_id) if svc.dodo is not None else None
+    why = payments_dodo.mismatch(payment, product_id=product_id, amount=order.amount,
+                                 currency=order.currency, order_id=order.id)
+    if why:
+        note = f"payment {pid}: {why}"
+        log.error("order %s held: %s", order.id, note)
+        await set_status(svc, order.id, "held", note)
+        return "held"
+    return "paid" if await credit(svc, order.id, pid) else "already_paid"
+
+
+async def dodo_payment(svc: Services, payment_id: str) -> dict[str, Any] | None:
+    """The payment, from Dodo. None if Dodo has no such payment."""
+    try:
+        payment = await asyncio.to_thread(svc.dodo.fetch_payment, payment_id)
+    except payments_dodo.DodoError as exc:
+        if exc.status == 404:
+            return None
+        log.warning("dodo call failed: %s", exc)
+        raise upstream("Dodo Payments") from exc
+    if payment.get("payment_id") != payment_id:
+        log.error("dodo answered for payment %r when asked for %s",
+                  str(payment.get("payment_id"))[:80], payment_id)
+        raise upstream("Dodo Payments")
+    return payment
+
+
+async def look_up(svc: Services, order: Order) -> str:
+    """Ask Dodo what became of the order's checkout, and settle it."""
+    session = await call(svc.dodo.fetch_checkout, order.provider_order_id)
+    pid = session.get("payment_id")
+    if not isinstance(pid, str) or not payments_dodo.PAYMENT_ID.match(pid):
+        return "pending"  # the buyer hasn't submitted a payment yet
+    payment = await dodo_payment(svc, pid)
+    if payment is None:
+        return "pending"
+    found = await dodo_order(svc, payment)
+    if found is None or found.id != order.id:
+        log.error("dodo payment %s is not for order %s", pid, order.id)
+        return "ignored"
+    return await settle_dodo(svc, payment)
+
+
+async def after_sale(svc: Services, event: str, what: dict[str, Any]) -> str:
+    """A refund or a dispute on a payment that paid an order: written on the
+    order and logged as an error, once. Pro is neither taken away nor quietly
+    kept: a person decides (`python -m holt_server.credits`)."""
+    pid = what.get("payment_id")
+    ref = str(what.get("refund_id") or what.get("dispute_id") or "")[:80]
+    if not isinstance(pid, str) or not pid or not ref:
+        return "ignored"
+    line = f"{event} {ref}"
+    async with svc.db.session() as s:
+        order = (await s.execute(
+            select(Order).where(Order.provider == payments_dodo.Dodo.name,
+                                Order.provider_payment_id == pid)
+            .with_for_update())).scalar_one_or_none()
+        if order is None:
+            return "unknown_order"
+        if line in (order.note or ""):
+            return "recorded"
+        at = now()
+        money = f"{what.get('amount')} {what.get('currency') or ''}".strip()[:40]
+        entry = f"{at.date().isoformat()} {line}: {money}"
+        order.note = f"{order.note}\n{entry}" if order.note else entry
+        order.updated_at = at
+        await s.commit()
+        order_id, user_id, item = order.id, order.user_id, order.pack_id
+    log.error("order %s (%s, user %s): %s on payment %s for %s. Pro was not changed: "
+              "decide by hand", order_id, item, user_id, line, pid, money)
+    return "recorded"
+
+
 # --- routes ----------------------------------------------------------------------------
 
 
 class OrderIn(BaseModel):
     pass_: str = Field(alias="pass", min_length=1, max_length=40)
+    # INR is paid through Razorpay, USD through Dodo Payments.
+    currency: Literal["INR", "USD"] = "INR"
 
 
 class ConfirmIn(BaseModel):
@@ -380,7 +582,9 @@ async def create_order(body: OrderIn, request: Request,
         raise ApiError("payments_off", OFF)
     pid = body.pass_
     p = entitlements.catalogue(svc).passes.get(pid)
-    amount = price(p) if p else None
+    if body.currency == payments_dodo.CURRENCY:
+        return await create_dodo_order(svc, who, user_id, pid, p)
+    amount = price(p) if p and razorpay_on(svc) else None
     if p is None or amount is None:
         raise ApiError("invalid_request", "That pass isn't on sale.")
     svc.limiter.hit(who.rate_key, who.limit(svc))
@@ -407,6 +611,70 @@ async def create_order(body: OrderIn, request: Request,
                            item=pid, days=p.days)
 
 
+async def product_sells(svc: Services, product_id: str, amount: int) -> None:
+    """Refuse to open a checkout unless the Dodo product is still a one-time
+    USD product at the catalogue's price: Dodo charges what the product says,
+    so this is what keeps the price the server's. Asked again every few minutes."""
+    dodo = svc.dodo
+    at = now().timestamp()
+    matched = dodo.checked.get(product_id)
+    if matched and matched[0] == amount and at - matched[1] < payments_dodo.PRODUCT_CHECK_S:
+        return
+    product = await call(dodo.fetch_product, product_id)
+    why = payments_dodo.product_problem(product, amount)
+    if why:
+        dodo.checked.pop(product_id, None)
+        log.error("dodo product %s can't sell its pass: %s", product_id, why)
+        raise upstream("Dodo Payments")
+    dodo.checked[product_id] = (amount, at)
+
+
+async def create_dodo_order(svc: Services, who: Caller, user_id: str, pid: str,
+                            p: pricing.Pass | None) -> schema.Checkout:
+    amount = usd_price(svc, pid, p) if p and dodo_on(svc) else None
+    if p is None or amount is None:
+        raise ApiError("invalid_request", "That pass isn't on sale.")
+    svc.limiter.hit(who.rate_key, who.limit(svc))
+    await credits.ensure_user(svc, user_id)
+    dodo = svc.dodo
+    product_id = dodo.products[pid]
+    await product_sells(svc, product_id, amount)
+    row = Order(id=uuid.uuid4().hex, user_id=user_id, pack_id=pid, credits=0,
+                expires_days=p.days, amount=amount, currency=payments_dodo.CURRENCY,
+                provider=dodo.name, status="created")
+    site = svc.settings.web_url.rstrip("/")
+    made = await call(dodo.create_checkout, product_id=product_id,
+                      return_url=f"{site}/pricing/thanks?order={row.id}",
+                      cancel_url=f"{site}/pricing?currency=usd",
+                      metadata={"holt_order": row.id, "pass": pid})
+    session_id, url = made.get("session_id"), made.get("checkout_url")
+    if not (isinstance(session_id, str) and payments_dodo.ID.match(session_id)
+            and isinstance(url, str) and url.startswith("https://")):
+        log.error("dodo checkout for %s came back without a session id or a URL", row.id)
+        raise upstream("Dodo Payments")
+    row.provider_order_id = session_id
+    at = now()
+    row.created_at = row.updated_at = at
+    async with svc.db.session() as s:
+        s.add(row)
+        await s.commit()
+    return schema.Checkout(order_id=row.id, provider="dodo", key_id=None,
+                           provider_order_id=session_id, checkout_url=url, amount=amount,
+                           currency=payments_dodo.CURRENCY, name="Holt",
+                           description=f"Pro, {p.name}", item=pid, days=p.days)
+
+
+async def confirmed(svc: Services, order_id: str, user_id: str) -> schema.OrderConfirmed:
+    async with svc.db.session() as s:
+        order = await s.get(Order, order_id)
+    user = await credits.get_user(svc, user_id)
+    cat = entitlements.catalogue(svc)
+    plan = entitlements.effective_plan(cat, user)
+    return schema.OrderConfirmed(
+        order=order_body(svc, order), plan=plan,
+        plan_expires_at=iso(user.plan_expires_at) if plan != pricing.FREE else None)
+
+
 @router.post("/me/orders/confirm")
 async def confirm_order(body: ConfirmIn, request: Request,
                         who: Caller = Depends(caller)) -> schema.OrderConfirmed:
@@ -430,14 +698,29 @@ async def confirm_order(body: ConfirmIn, request: Request,
             raise ApiError("payment_unconfirmed", UNCONFIRMED)
         result = await settle(svc, payment)
         log.info("confirm %s %s -> %s", oid, pid, result)
-    async with svc.db.session() as s:
-        order = await s.get(Order, order.id)
-    user = await credits.get_user(svc, user_id)
-    cat = entitlements.catalogue(svc)
-    plan = entitlements.effective_plan(cat, user)
-    return schema.OrderConfirmed(
-        order=order_body(svc, order), plan=plan,
-        plan_expires_at=iso(user.plan_expires_at) if plan != pricing.FREE else None)
+    return await confirmed(svc, order.id, user_id)
+
+
+@router.post("/me/orders/{order_id}/check")
+async def check_order(order_id: str, request: Request,
+                      who: Caller = Depends(caller)) -> schema.OrderConfirmed:
+    """Where one of the user's orders stands. For a Dodo order not settled
+    yet, Dodo is asked first (the buyer is back from its checkout): nothing
+    comes from the browser but which order to look at."""
+    svc = services(request)
+    user_id = signed_in(who)
+    order = None
+    if HOLT_ORDER_ID.match(order_id):
+        async with svc.db.session() as s:
+            order = await s.get(Order, order_id)
+    if order is None or order.user_id != user_id:
+        raise ApiError("not_found", "We couldn't find that order.")
+    if (order.provider == payments_dodo.Dodo.name and order.status in ("created", "failed")
+            and svc.dodo is not None):
+        svc.read_limiter.hit(f"order-check:{who.rate_key}", CHECKS_PER_HOUR)
+        result = await look_up(svc, order)
+        log.info("check %s -> %s", order.id, result)
+    return await confirmed(svc, order.id, user_id)
 
 
 @router.get("/me/orders")
@@ -497,3 +780,53 @@ async def razorpay_webhook(
     result = await settle(svc, payment)
     log.info("razorpay webhook %s %s -> %s", event, payment.get("id"), result)
     return {"ok": True, "result": result}
+
+
+@router.post("/payments/dodo/webhook", dependencies=[Depends(internal)])
+async def dodo_webhook(
+    request: Request,
+    webhook_id: str | None = Header(default=None),
+    webhook_timestamp: str | None = Header(default=None),
+    webhook_signature: str | None = Header(default=None),
+) -> dict[str, Any]:
+    """Dodo's webhook, forwarded by `web/` with the body byte for byte and its
+    three Standard Webhooks headers. Answers 200 for anything signed, even
+    events it ignores; 400 for anything not signed; 502 (Dodo retries) when
+    Dodo can't be asked about the payment."""
+    svc = services(request)
+    dodo = svc.dodo
+    if dodo is None:
+        raise ApiError("payments_off", OFF)
+    body = await bounded_body(request)
+    if not dodo.webhook_ok(body, webhook_id, webhook_timestamp, webhook_signature):
+        log.warning("dodo webhook with a bad signature refused")
+        raise ApiError("payment_unconfirmed", "Bad webhook signature.")
+    try:
+        data = json.loads(body)
+        event = str(data.get("type") or "")
+        what = data.get("data")
+    except (ValueError, AttributeError) as exc:
+        raise ApiError("invalid_request", "Malformed webhook body.") from exc
+    if not isinstance(what, dict):
+        return {"ok": True, "result": "ignored"}
+    if event in payments_dodo.AFTER_SALE_EVENTS:
+        result = await after_sale(svc, event, what)
+    elif event in payments_dodo.PAYMENT_EVENTS:
+        result = await dodo_event(svc, what)
+    else:
+        return {"ok": True, "result": "ignored"}
+    log.info("dodo webhook %s %s -> %s", event, str(what.get("payment_id"))[:80], result)
+    return {"ok": True, "result": result}
+
+
+async def dodo_event(svc: Services, what: dict[str, Any]) -> str:
+    """A signed payment event. It says which payment; what the payment is,
+    and which order it is for, comes from Dodo's API, the same as on the
+    buyer's return."""
+    pid = what.get("payment_id")
+    if not isinstance(pid, str) or not payments_dodo.PAYMENT_ID.match(pid):
+        return "ignored"
+    payment = await dodo_payment(svc, pid)
+    if payment is None:
+        return "unknown_order"
+    return await settle_dodo(svc, payment)

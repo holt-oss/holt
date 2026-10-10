@@ -124,6 +124,16 @@ services:
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      # USD passes through Dodo Payments, TEST mode only. The mode is fixed
+      # here, not read from anywhere: staging only ever talks to Dodo's test
+      # host, where a live key doesn't work. preview.sh passes the rest on
+      # from secrets.env, and nothing while that file says DODO_ENV=live.
+      DODO_ENV: test
+      DODO_API_KEY: ${DODO_API_KEY:-}
+      DODO_WEBHOOK_SECRET: ${DODO_WEBHOOK_SECRET:-}
+      DODO_PRODUCT_PRO_1M: ${DODO_PRODUCT_PRO_1M:-}
+      DODO_PRODUCT_PRO_3M: ${DODO_PRODUCT_PRO_3M:-}
+      DODO_PRODUCT_PRO_12M: ${DODO_PRODUCT_PRO_12M:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       # Account emails (server/README.md, "Account emails"): the welcome, a
       # pass's receipt and the "ending" ones. Off unless staging's .env says

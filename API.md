@@ -733,28 +733,41 @@ passes that stays switched off (below):
 #### Passes (checkout)
 
 A pass is one payment for a fixed number of days of Pro (`pro_1m` 30 days,
-`pro_3m` 90, `pro_12m` 365). It never renews. Razorpay, INR. **Switched
-off** unless the server has `HOLT_PAYMENTS_ENABLED=1` and its Razorpay keys,
-and a pass in the catalogue has `on_sale: true` and an INR price (outside
-production, `HOLT_PASSES_ON_SALE=1` puts every pass on sale: staging, in
-Razorpay test mode). While off,
+`pro_3m` 90, `pro_12m` 365). It never renews. It can be paid in INR through
+Razorpay or in USD through Dodo Payments (the merchant of record for USD);
+each processor works without the other. **Switched off** unless the server
+has `HOLT_PAYMENTS_ENABLED=1` and a pass in the catalogue has `on_sale: true`
+and a price (outside production, `HOLT_PASSES_ON_SALE=1` puts every pass on
+sale: staging, in both processors' test modes). INR also needs the Razorpay
+keys. USD also needs `DODO_API_KEY`, `DODO_WEBHOOK_SECRET` and the pass's
+Dodo product id (`DODO_PRODUCT_PRO_1M`, `_3M`, `_12M`). While off,
 `GET /v1/passes` offers nothing and `POST /v1/me/orders` answers 403
 `payments_off`. The price and the days always come from the server's
 catalogue.
 
 - `GET /v1/passes` (internal key; no user needed) → `{"on_sale": false, "passes": [Pass], "features": [PassFeature]}`,
-  `Pass`: `{"id": "pro_1m", "name": "1 month", "days": 30, "amount": 9900, "currency": "INR"}`
-  (`amount` in paise), `PassFeature`: `{"id": "merge_plan", "name": "Merge plan", "per_month": 30, "unlimited": false}`
+  `Pass`: `{"id": "pro_1m", "name": "1 month", "days": 30, "amount": 9900, "currency": "INR", "prices": [{"currency": "INR", "amount": 9900}, {"currency": "USD", "amount": 700}]}`.
+  `prices` is every currency the pass can be bought in now, INR first, in
+  minor units (paise, cents); `amount` and `currency` repeat the first of
+  them. A pass with no price on sale is left out.
+  `PassFeature`: `{"id": "merge_plan", "name": "Merge plan", "per_month": 30, "unlimited": false}`
   (what Pro unlocks; every pass gives the same Pro). `on_sale` is false and
   both lists empty while payments are off or no pass is on sale.
-- `POST /v1/me/orders {"pass": "pro_1m"}` → `Checkout`:
-  `{"order_id", "provider": "razorpay", "key_id", "provider_order_id", "amount", "currency", "name", "description", "item", "days"}`,
-  everything Razorpay Checkout needs (`key_id` is the public key id; `item` is
-  the pass id). Any other field in the body is ignored. 400
-  `invalid_request` for a pass not on sale, 403 `payments_off`, 502
-  `upstream` when Razorpay fails. Counts against the user's hourly work limit.
+- `POST /v1/me/orders {"pass": "pro_1m", "currency": "INR" | "USD"}`
+  (`currency` defaults to `INR`) → `Checkout`:
+  `{"order_id", "provider": "razorpay" | "dodo", "key_id", "provider_order_id", "checkout_url", "amount", "currency", "name", "description", "item", "days"}`.
+  For INR, everything Razorpay Checkout needs (`key_id` is the public key id;
+  `checkout_url` is null). For USD, `checkout_url` is the page on Dodo
+  Payments to send the buyer to (`key_id` is null; `provider_order_id` is
+  Dodo's checkout session). Dodo sends the buyer back to
+  `{HOLT_WEB_URL}/pricing/thanks?order={order_id}`. `item` is the pass id. Any
+  other field in the body is ignored. 400 `invalid_request` for a pass not on
+  sale in that currency, 403 `payments_off`, 502 `upstream` when the
+  processor fails, or when the pass's Dodo product isn't a one-time USD
+  product at the catalogue's price (the server checks before it opens a
+  checkout, and logs why). Counts against the user's hourly work limit.
 - `POST /v1/me/orders/confirm {"razorpay_order_id", "razorpay_payment_id", "razorpay_signature"}`
-  (exactly what Checkout's success handler receives) →
+  (Razorpay only: exactly what Checkout's success handler receives) →
   `{"order": Order, "plan": "pro", "plan_expires_at": "…" | null}` (the plan
   in force afterwards). The server checks the signature, then asks Razorpay
   for the payment, and gives the pass only when the payment is captured (it
@@ -764,11 +777,23 @@ catalogue.
   amount didn't match (nothing given; a person checks it). 400
   `payment_unconfirmed` for a bad signature, 404 for an order that isn't this
   user's. Safe to repeat.
+- `POST /v1/me/orders/{order_id}/check` (no body) → the same shape as
+  confirm: where the user's order stands, `created` included. For a Dodo
+  order not settled yet, the server first asks Dodo for the checkout
+  session's payment (with its API key) and settles it: this is how the
+  buyer's return from Dodo gives the pass. Nothing is read from the request
+  but the order id. The pass is given only for a `succeeded` payment that
+  bought exactly one of the pass's Dodo product, in USD, for the order's
+  price (the payment's total, or its total less tax when Dodo adds tax on
+  top); anything else is `held`. A Razorpay order is only read. 404 for an
+  order that isn't this user's, 429 past 120 lookups at Dodo an hour, 502
+  `upstream` when Dodo fails. Safe to repeat.
 - `GET /v1/me/orders?limit=50` → `{"orders": [Order]}`, newest first, the
-  purchase history. `Order`: `{"id", "item", "name", "days", "amount", "currency", "status", "created_at", "paid_at"}`,
+  purchase history. `Order`: `{"id", "item", "name", "days", "amount", "currency", "provider", "status", "created_at", "paid_at"}`,
   `item` the pass id (or a credit pack's, for purchases from before passes,
-  with `days` null), `status` one of `paid`, `failed` (the payment was
-  declined), `held`. Checkouts that were opened and never paid are left out.
+  with `days` null), `provider` `razorpay` or `dodo`, `status` one of `paid`,
+  `failed` (the payment was declined), `held`. Checkouts that were opened and
+  never paid are left out.
 - `POST /v1/payments/razorpay/webhook` (internal key; no user). `web/` serves
   Razorpay's webhook URL (`/api/payments/razorpay/webhook`) and forwards the
   request body byte for byte with its `X-Razorpay-Signature` header. The
@@ -778,16 +803,31 @@ catalogue.
   (the result is for logs). Handled: `payment.authorized` (captured),
   `payment.captured` and `order.paid` (given), `payment.failed`. Anything
   else, including `subscription.*`, is `ignored`.
+- `POST /v1/payments/dodo/webhook` (internal key; no user). `web/` serves
+  Dodo's webhook URL (`/api/billing/dodo/webhook`) and forwards the request
+  body byte for byte with its `webhook-id`, `webhook-timestamp` and
+  `webhook-signature` headers. The server verifies the signature (Standard
+  Webhooks, `DODO_WEBHOOK_SECRET`, a timestamp within 5 minutes) before
+  reading the body: 400 `payment_unconfirmed` if it doesn't match. Signed
+  events answer 200 with the same `{"ok": true, "result": …}`, plus
+  `"recorded"`. Handled: `payment.succeeded`, `payment.failed`,
+  `payment.cancelled` and `payment.processing` (the event only says which
+  payment: the server fetches it from Dodo and settles it exactly as the
+  check call does; 502 if Dodo can't be asked, so Dodo sends the event again);
+  `refund.succeeded` and `dispute.*` (`recorded`: written on the order and
+  logged as an error; the plan is not changed, a person decides). Anything
+  else is `ignored`, and a payment that isn't for one of Holt's orders is
+  `unknown_order`.
 
 What a pass does (`Me.plan`, `Me.plan_expires_at`): the plan becomes `pro`
 for the pass's days, counted from when the user's current Pro ends if it
-hasn't yet (so passes stack), else from the payment. Pro that an admin gave
-with no end stays as it is. A pass is given once per order, whichever of the
-confirm call and the webhooks arrives first, however often they repeat:
-marking the order paid and extending the plan happen in one transaction, and a
-payment id can pay only one order. With payments switched off, orders that
-already exist are still confirmed, so someone who paid just before the switch
-gets their pass.
+hasn't yet (so passes stack, across currencies too), else from the payment.
+Pro that an admin gave with no end stays as it is. A pass is given once per
+order, whichever of the confirm or check call and the webhooks arrives first,
+however often they repeat: marking the order paid and extending the plan
+happen in one transaction, and a payment id can pay only one order. With
+payments switched off, orders that already exist are still settled, so
+someone who paid just before the switch gets their pass.
 
 ### Admin (read-only)
 

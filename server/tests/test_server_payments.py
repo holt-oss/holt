@@ -173,8 +173,10 @@ def test_passes_on_sale_come_from_the_pricing_file(hp):
     body = hp.get("/v1/passes").json()
     assert body["on_sale"] is True
     assert body["passes"] == [
-        {"id": "pro_1m", "name": "1 month", "days": 30, "amount": PRICE, "currency": "INR"},
-        {"id": "pro_3m", "name": "3 months", "days": 90, "amount": 24900, "currency": "INR"},
+        {"id": "pro_1m", "name": "1 month", "days": 30, "amount": PRICE, "currency": "INR",
+         "prices": [{"currency": "INR", "amount": PRICE}]},
+        {"id": "pro_3m", "name": "3 months", "days": 90, "amount": 24900, "currency": "INR",
+         "prices": [{"currency": "INR", "amount": 24900}]},
     ]
     assert body["features"] == [
         {"id": "merge_plan", "name": "Merge plan", "per_month": 30, "unlimited": False},
@@ -214,9 +216,11 @@ def test_payments_are_off_by_default(tmp_path):
 
 
 PACKAGED = [
-    {"id": "pro_1m", "name": "1 month", "days": 30, "amount": 9900, "currency": "INR"},
-    {"id": "pro_3m", "name": "3 months", "days": 90, "amount": 24900, "currency": "INR"},
-    {"id": "pro_12m", "name": "12 months", "days": 365, "amount": 79900, "currency": "INR"},
+    {"id": pid, "name": name, "days": days, "amount": amount, "currency": "INR",
+     "prices": [{"currency": "INR", "amount": amount}]}
+    for pid, name, days, amount in (("pro_1m", "1 month", 30, 9900),
+                                    ("pro_3m", "3 months", 90, 24900),
+                                    ("pro_12m", "12 months", 365, 79900))
 ]
 
 

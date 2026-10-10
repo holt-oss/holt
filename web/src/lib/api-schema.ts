@@ -734,6 +734,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/orders/{order_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Order
+         * @description Where one of the user's orders stands. For a Dodo order not settled
+         *     yet, Dodo is asked first (the buyer is back from its checkout): nothing
+         *     comes from the browser but which order to look at.
+         */
+        post: operations["check_order_v1_me_orders__order_id__check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/playbook/{owner}/{repo}": {
         parameters: {
             query?: never;
@@ -949,6 +971,29 @@ export interface paths {
         get: operations["get_passes_v1_passes_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/payments/dodo/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dodo Webhook
+         * @description Dodo's webhook, forwarded by `web/` with the body byte for byte and its
+         *     three Standard Webhooks headers. Answers 200 for anything signed, even
+         *     events it ignores; 400 for anything not signed; 502 (Dodo retries) when
+         *     Dodo can't be asked about the payment.
+         */
+        post: operations["dodo_webhook_v1_payments_dodo_webhook_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1537,11 +1582,14 @@ export interface components {
         };
         /**
          * Checkout
-         * @description POST /v1/me/orders: what Razorpay Checkout needs to take the payment.
+         * @description POST /v1/me/orders: what Razorpay Checkout needs to take the payment
+         *     (INR), or the page on Dodo Payments to send the buyer to (USD).
          */
         Checkout: {
             /** Amount */
             amount: number;
+            /** Checkout Url */
+            checkout_url: string | null;
             /** Currency */
             currency: string;
             /** Days */
@@ -1551,16 +1599,16 @@ export interface components {
             /** Item */
             item: string;
             /** Key Id */
-            key_id: string;
+            key_id: string | null;
             /** Name */
             name: string;
             /** Order Id */
             order_id: string;
             /**
              * Provider
-             * @constant
+             * @enum {string}
              */
-            provider: "razorpay";
+            provider: "razorpay" | "dodo";
             /** Provider Order Id */
             provider_order_id: string;
         };
@@ -2389,6 +2437,8 @@ export interface components {
             name: string;
             /** Paid At */
             paid_at: string | null;
+            /** Provider */
+            provider: string;
             /**
              * Status
              * @enum {string}
@@ -2397,7 +2447,8 @@ export interface components {
         };
         /**
          * OrderConfirmed
-         * @description POST /v1/me/orders/confirm: the order (paid, or still being confirmed) and the plan in force.
+         * @description POST /v1/me/orders/confirm and /v1/me/orders/{id}/check: the order
+         *     (paid, or still being confirmed) and the plan in force.
          */
         OrderConfirmed: {
             order: components["schemas"]["Order"];
@@ -2408,6 +2459,12 @@ export interface components {
         };
         /** OrderIn */
         OrderIn: {
+            /**
+             * Currency
+             * @default INR
+             * @enum {string}
+             */
+            currency: "INR" | "USD";
             /** Pass */
             pass: string;
         };
@@ -2482,6 +2539,15 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** Prices */
+            prices: components["schemas"]["PassPrice"][];
+        };
+        /** PassPrice */
+        PassPrice: {
+            /** Amount */
+            amount: number;
+            /** Currency */
+            currency: string;
         };
         /**
          * Passes
@@ -3800,6 +3866,7 @@ export type PartialStats = components['schemas']['PartialStats'];
 export type Pass = components['schemas']['Pass'];
 export type PassFeature = components['schemas']['PassFeature'];
 export type PassOffer = components['schemas']['PassOffer'];
+export type PassPrice = components['schemas']['PassPrice'];
 export type Passes = components['schemas']['Passes'];
 export type Plan = components['schemas']['Plan'];
 export type PlanAi = components['schemas']['PlanAi'];
@@ -5494,6 +5561,41 @@ export interface operations {
             };
         };
     };
+    check_order_v1_me_orders__order_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-holt-user"?: string | null;
+                "x-holt-client-ip"?: string | null;
+                "x-holt-internal-key"?: string | null;
+            };
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderConfirmed"];
+                };
+            };
+            /** @description Default Response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     unlock_playbook_v1_me_playbook__owner___repo__post: {
         parameters: {
             query?: never;
@@ -6079,6 +6181,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Passes"];
+                };
+            };
+            /** @description Default Response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    dodo_webhook_v1_payments_dodo_webhook_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "webhook-id"?: string | null;
+                "webhook-timestamp"?: string | null;
+                "webhook-signature"?: string | null;
+                "x-holt-internal-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Default Response */
