@@ -92,7 +92,7 @@ async function ReportsCta() {
 
 export default async function Home() {
   const hf = hacktoberfest();
-  // Signed out, the paste boxes go through sign-in (see lib/gate.ts).
+  // Signed out, the paste boxes open the report page like signed in (pasteHref, lib/gate.ts).
   const [user, report] = await Promise.all([currentUser(), landingReport()]);
   const signedIn = Boolean(user);
   const replay = buildReplay(report);

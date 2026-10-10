@@ -15,18 +15,18 @@
 // Everything is in the server HTML, links included; motion is CSS
 // (globals.css, .ft-*) and never runs under reduced motion.
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { inputMood, type CatMood } from "@/lib/cat";
 import { deviceReduces, prefersReducedMotion, setMotion, toggledMotion } from "@/lib/motion";
-import { NOT_A_REPO, pasteTarget } from "@/lib/gate";
+import { NOT_A_REPO, pasteHref } from "@/lib/gate";
 import { timeAgo } from "@/lib/format";
 import { checkedLabel, type RecentChecks } from "@/lib/recent-checks";
 import { parseRepoInput } from "@/lib/repo";
 import { GITHUB_REPO_URL, LEGAL_PAGES, SITE_HOST } from "@/lib/site";
 import { useReducedMotion } from "./motion/use-seen";
-import { askExists, useBusy } from "./paste-box";
+import { useOpen } from "./paste-box";
 import { ReactiveCat } from "./reactive-cat";
 
 const SIGN_OFF = "git commit --to-the-right-repo";
@@ -86,7 +86,6 @@ function ReportFooter({ signedIn }: { signedIn: boolean }) {
 }
 
 export function Footer({ signedIn = false }: { signedIn?: boolean }) {
-  const router = useRouter();
   // The landing page is "/"; every other page
   // already has its own action, so only the landing ends on the form.
   const path = usePathname();
@@ -102,7 +101,7 @@ export function Footer({ signedIn = false }: { signedIn?: boolean }) {
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useBusy();
+  const [busy, open] = useOpen();
   const [seen, setSeen] = useState(false);
   const [waves, setWaves] = useState(0);
   const [recent, setRecent] = useState<RecentChecks | null>(null);
@@ -159,17 +158,15 @@ export function Footer({ signedIn = false }: { signedIn?: boolean }) {
     });
   };
 
-  const go = async () => {
+  const go = () => {
     if (!ref) {
       setError(NOT_A_REPO);
       return;
     }
     setError("");
-    setBusy(true);
     const repo = `${ref.owner}/${ref.repo}`;
-    // Like the paste box: signed out, through sign-in (examples need none).
     track("paste-submit", { repo, signedIn: signedIn ? "yes" : "no", from: "footer" });
-    router.push(await pasteTarget(repo, signedIn, askExists));
+    open(pasteHref(repo));
   };
 
   const react = (m: CatMood) => ({
@@ -236,7 +233,7 @@ export function Footer({ signedIn = false }: { signedIn?: boolean }) {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                void go();
+                go();
               }}
               className="mt-10 grid max-w-[820px] grid-cols-[auto_minmax(0,1fr)_auto] items-stretch border border-line-strong bg-bg transition-colors focus-within:border-blue"
             >

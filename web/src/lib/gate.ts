@@ -71,26 +71,17 @@ export function arrivalGate(pathname: string, search: string, cookies: string[])
   return signInHref(`${pathname}${search}`);
 }
 
-/** Where the paste box sends a repo: its report, through sign-in when signed out (examples need none). */
-export function pasteHref(repo: string, signedIn: boolean): string {
-  const report = `/${repo}`;
-  return reportAccess(repo, signedIn) === "full" ? report : signInHref(report);
+/**
+ * Where every repo box sends a repo: its report, signed in or not, the same
+ * page the URL opens. Signed out that is the teaser, or the free check when
+ * there is no result yet (reportShows); a typo gets the not-found page.
+ */
+export function pasteHref(repo: string): string {
+  return `/${repo}`;
 }
 
 /** What a paste box says when the input can't be a repo. */
 export const NOT_A_REPO = "That doesn't look like a repo. Try owner/name or a github.com link.";
-
-/**
- * Where a paste box goes, like pasteHref, except that before a sign-in wall
- * it asks whether the repo exists: a typo then lands on the not-found page
- * (the report URL, which answers 404) rather than on sign-in. Any doubt (the
- * check failed) keeps the sign-in route.
- */
-export async function pasteTarget(repo: string, signedIn: boolean, exists: (repo: string) => Promise<boolean>): Promise<string> {
-  const href = pasteHref(repo, signedIn);
-  if (href === `/${repo}`) return href;
-  return (await exists(repo).catch(() => true)) ? href : `/${repo}`;
-}
 
 type Refusal = { status: 401; error: ApiError };
 

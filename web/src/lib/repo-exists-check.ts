@@ -1,6 +1,5 @@
-// The one repo-exists checker per server process, shared by the proxy (the
-// report page's 404) and GET /api/repo-exists (the paste boxes, before they
-// send a signed-out visitor to sign in). Mock mode answers from the fixtures.
+// The repo-exists checker, one per server process, for the proxy (the report
+// page's 404). Mock mode answers from the fixtures.
 import { isMockNotFound } from "./mock/fixtures";
 import { probeGitHub, repoExistsChecker } from "./repo-exists";
 
