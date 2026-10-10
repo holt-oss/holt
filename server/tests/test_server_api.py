@@ -458,6 +458,23 @@ def test_starter_issues_say_who_is_already_on_each(h, fake_starter, monkeypatch)
         (0, 0, "Nobody on it yet"), (2, 1, "2 people already on it, 1 open pull request")]
 
 
+def test_starter_issues_leave_out_taken_ones_when_enough_are_free(h, fake_starter, monkeypatch):
+    listed = [{"number": 1, "title": "a", "people": 1, "open_prs": 1},
+              *({"number": n, "title": "b", "people": 0, "open_prs": 0} for n in (2, 3))]
+    mod = sys.modules["holt.starter"]
+    monkeypatch.setattr(mod, "starter_issues", lambda repo, token, limit, as_of=None: listed)
+
+    def numbers(repo):
+        return [i["number"] for i in h.get(f"/v1/repos/{repo}/starter-issues").json()["issues"]]
+
+    # Two free: the taken one is still listed, after them.
+    assert numbers("octo/one") == [2, 3, 1]
+    assert numbers("octo/one") == [2, 3, 1]  # the same from the cache
+    listed.append({"number": 4, "title": "c", "people": 0, "open_prs": 0})
+    assert numbers("octo/two") == [2, 3, 4]
+    assert numbers("octo/two") == [2, 3, 4]
+
+
 def test_find(h, fake_starter):
     r = h.post("/v1/find", {"languages": ["python"], "hacktoberfest": True, "limit": 5})
     assert r.status_code == 202

@@ -89,6 +89,26 @@ def issue(obj: Any, repo: str | None = None) -> dict[str, Any]:
     }
 
 
+# With this many issues nobody is on, the ones someone is on are left out.
+ENOUGH_FREE = 3
+
+
+def taken(obj: Any) -> bool:
+    """Someone is already on this issue: an open pull request, an assignee, or
+    a recent "can I work on this?" (`people`, `open_prs`)."""
+    return bool(_get(obj, "people") or _get(obj, "open_prs"))
+
+
+def offered(issues: list) -> list:
+    """The issues to send, from a stored list: those nobody is on, in their
+    order, then the taken ones, unless `ENOUGH_FREE` are free. Applied on
+    every send, so lists stored before it follow it too."""
+    free = [i for i in issues if not taken(i)]
+    if len(free) >= ENOUGH_FREE:
+        return free
+    return [*free, *(i for i in issues if taken(i))]
+
+
 def rules_version() -> int:
     """`holt.starter.RULES_VERSION`: which rules picked a list of starter issues."""
     return getattr(module(), "RULES_VERSION", 0)
@@ -133,7 +153,7 @@ def find_result(obj: Any) -> dict[str, Any] | None:
         "language": language or None,
         "stars": int(stars) if isinstance(stars, (int, float)) else None,
         "stats": stats,
-        "issues": [issue(i, repo) for i in (_get(obj, "issues") or [])],
+        "issues": offered([issue(i, repo) for i in (_get(obj, "issues") or [])]),
     }).model_dump(mode="json")
 
 
