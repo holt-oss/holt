@@ -1829,6 +1829,8 @@ export interface components {
             reason: string;
             /** Repo */
             repo: string;
+            /** Standout */
+            standout: string | null;
             /** Stars */
             stars: number | null;
             stats: components["schemas"]["Stats"];
@@ -3214,6 +3216,8 @@ export interface components {
             reason: string;
             /** Repo */
             repo: string;
+            /** Standout */
+            standout: string | null;
             /** Stars */
             stars: number | null;
             stats: components["schemas"]["Stats"];

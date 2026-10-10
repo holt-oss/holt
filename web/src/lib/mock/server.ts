@@ -235,7 +235,7 @@ export async function discover(sort: DiscoverSort, language: string | null, topi
     .filter((r) => !hacktoberfest || tagged.has(r.repo))
     .map((r) => ({
       ...counts(mockAbout(r.repo)),
-      repo: r.repo, verdict: r.verdict, headline: r.headline, tone: r.tone, reason: r.verdict_line, stats: r.stats,
+      repo: r.repo, verdict: r.verdict, headline: r.headline, tone: r.tone, reason: r.verdict_line, standout: null, stats: r.stats,
       description: null, language: null, languages: [], stars: null, topics: [], pushed_at: null, checked_this_week: null, generated_at: r.generated_at,
       issues: mockIssues(r.repo).slice(0, 5),
     }));
@@ -581,7 +581,7 @@ function mockPicks(): Recommendation[] {
   });
   const pick = (repo: string, language: string, description: string, stars: number, topics: string[], s: Stats, why: string[], issues: StarterIssue[]): Recommendation => {
     const r = withDerived({ ...mockReport(repo, "rules", 7), stats: s });
-    return { repo, ...counts(mockAbout(repo)), ...verdictView("viable"), verdict: "viable", odds: r.odds, reason: r.verdict_line, numbers_line: r.numbers_line, why, stats: s, description, language, languages: [language], stars, topics, issues, checked_at: at(5) };
+    return { repo, ...counts(mockAbout(repo)), ...verdictView("viable"), verdict: "viable", odds: r.odds, reason: r.verdict_line, standout: null, numbers_line: r.numbers_line, why, stats: s, description, language, languages: [language], stars, topics, issues, checked_at: at(5) };
   };
   // Enough further picks for /me/picks to load in parts.
   const MORE: [repo: string, language: string, description: string, stars: number][] = [
