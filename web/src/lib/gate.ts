@@ -3,7 +3,8 @@
 // report: the verdict, the odds and one number, with the rest behind sign-in.
 // Find, Browse and the Hacktoberfest page are open: their lists come from
 // what Holt has already checked, and every card leads to a report (so, signed
-// out, to its teaser). Opening a report with no result yet runs the free
+// out, to its teaser). Find's filters work signed out too, answered from that
+// index alone (findReads): only an account's search goes on to GitHub. Opening a report with no result yet runs the free
 // check (anon-check.ts: the report page only, rate-limited per IP, never for
 // bots); anything else that starts a check or a search needs an account, and
 // so do Compare, pre-flight, the dashboard and settings (ACCOUNT_PAGES):
@@ -105,7 +106,10 @@ export function signedInGate(userId: string | null | undefined): Refusal | null 
   return userId ? null : refuse("Sign in first.");
 }
 
-/** POST /api/find: null when this caller may run a search. */
-export function findGate(userId: string | null | undefined): Refusal | null {
-  return userId ? null : refuse("Sign in to search with your own filters.");
+/**
+ * POST /api/find, what answers this caller's filters. `search`: Holt's index,
+ * then a GitHub search. `index`: the index alone, which calls GitHub for nothing.
+ */
+export function findReads(userId: string | null | undefined): "search" | "index" {
+  return userId ? "search" : "index";
 }

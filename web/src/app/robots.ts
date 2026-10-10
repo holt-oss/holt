@@ -16,6 +16,8 @@ export default function robots(): MetadataRoute.Robots {
         "/me/", "/settings", "/compare$", "/compare?", "/preflight$", "/preflight?",
         // Board facets (an order, a topic) run a heavy query per hit; the boards themselves stay crawlable.
         "/discover?", "/discover/*?", "/hacktoberfest?",
+        // A Find search is /find with other filters; /find itself stays crawlable.
+        "/find?",
       ],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
