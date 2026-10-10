@@ -4,6 +4,7 @@ import { boardHref, boardTitle, emptyText, SORTS, widenBoard } from "@/lib/disco
 import { langColor } from "@/lib/repo-card";
 import { currentUser } from "@/lib/session";
 import type { DiscoverSort } from "@/lib/types";
+import { ComparePicks } from "../compare-picks/compare-picks";
 import { ErrorPanel } from "../error-panel";
 import { EmptyState } from "../shell/app-page";
 import { PageTransition } from "../motion/page-transition";
@@ -80,7 +81,9 @@ export async function DiscoverView({ sort, language, topic }: { sort: DiscoverSo
             <ErrorPanel error={result.error} retryHref={here} />
           ) : data!.repos.length ? (
             // The first part is rendered here; the list loads the rest as it is scrolled. A new board is a new list.
-            <BoardList key={here} sort={sort} language={language} topic={topic} saved={saved} first={{ items: data!.repos, next: data!.next ?? null, total: data!.total ?? data!.repos.length }} />
+            <ComparePicks signedIn={Boolean(user)}>
+              <BoardList key={here} sort={sort} language={language} topic={topic} saved={saved} first={{ items: data!.repos, next: data!.next ?? null, total: data!.total ?? data!.repos.length }} />
+            </ComparePicks>
           ) : (
             <EmptyState title={emptyText(sort, language, topic, data!.trending_min)}>
               {widenBoard({ sort, language, topic }).map((w, i) => (
