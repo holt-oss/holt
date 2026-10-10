@@ -474,7 +474,8 @@ with no body to a matching `If-None-Match`.
 
 ### `GET /v1/repos/{owner}/{repo}/starter-issues?limit=20`
 Open issues in this repo that suit a newcomer and nobody has taken, best
-first (issues nobody is on before the rest):
+first (issues nobody is on before the rest; with 3 or more of those, the ones
+someone is on are left out):
 `{"repo": "…", "issues": [StarterIssue]}`. Cached per repository for 1 hour;
 a cache hit costs no GitHub call and no rate limit. A miss counts against the
 **read** limit, never the work limit (see Rate limits).
@@ -518,8 +519,9 @@ Results come from two places, in this order, with no repo twice:
    `hacktoberfest` is true; archived repos and forks left out (a repo closed
    to outside pull requests is left out by its verdict). The typical first
    reply must fit in `days`. Only repos with starter issues Holt already knows
-   (read within the last 72 hours; up to 3, best first) are listed. Read from
-   the database: no GitHub call, no rate limit.
+   (read within the last 72 hours; up to 5, best first) are listed, those
+   with an issue nobody is on before those whose issues are all taken. Read
+   from the database: no GitHub call, no rate limit.
 2. **The GitHub search**: repos found by searching GitHub for these filters and
    screened with the rules, ordered by starter-issue quality.
 
@@ -537,7 +539,9 @@ Results come from two places, in this order, with no repo twice:
   find job returns `results` instead of `report`; the SSE `done` event carries
   `{"results": [...]}`, the index then the search. While it runs, the search
   also reads the starter issues of the first few index matches that have none
-  known, so they can join the answer. If the search fails (an `error` event),
+  known, so they can join the answer, and reads again those of the first 12
+  listed that were read more than 6 hours ago (one GitHub query each), so the
+  issues shown first aren't ones closed or taken since. If the search fails (an `error` event),
   the index part from the `202` is still the answer to show.
 - **Over the work limit** with index results: `200 {"status": "done",
   "results": [...], "complete": false}`, the index part only (no search ran
@@ -573,7 +577,12 @@ show: "Nobody on it yet", "1 open pull request", "2 people already on it" or
 linked pull request), taken (an assignee active in the last 45 days, or a
 "taken" label), or not tasks at all (calls for maintainers, tracking and meta
 issues, epics) are never listed. Starter issues cached before these fields
-existed are fetched again rather than served.
+existed are fetched again rather than served. An issue is **taken** when
+`people` or `open_prs` is above 0. Wherever issues are sent (here, find
+results, Discover cards) the ones nobody is on come first, and taken ones are
+left out when 3 or more are free; this is applied on every send, so cached
+lists follow it too. A list whose issues are all taken is still sent: the web
+says "No free starter issue right now" over it.
 `beginner` and `areas` are worked out from the labels and title every time an
 issue is sent, so cached issues have them too. The web uses them with a
 profile (see Profile); they never change a verdict or which repos are listed.
@@ -629,7 +638,8 @@ people. Reads only the database: no GitHub call and no rate limit.
 
 `issues` are the repo's starter issues as `GET /v1/repos/{o}/{r}/starter-issues`
 (or the warm pass) last cached them (at most 5, nobody-on-it first), when that
-was within 72 hours and by the current starter rules; otherwise `[]`. Discover
+was within 72 hours and by the current starter rules; otherwise `[]`. Taken
+issues are left out when 3 or more are free, as everywhere. Discover
 never reads GitHub for them.
 
 `description`, `language`, `stars`, the four counts, `topics` (all of them,
