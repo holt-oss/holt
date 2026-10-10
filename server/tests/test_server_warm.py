@@ -151,6 +151,57 @@ def test_dry_run_changes_nothing(h, starter_mod):
         result.summary())
 
 
+def test_a_dry_run_prints_a_plan_that_fits_a_screen(h, monkeypatch):
+    from datetime import timedelta
+
+    from holt_server.db import Report, WarmFailure, now
+
+    from conftest import canned_report
+
+    def report(repo, days_ago):
+        return Report(repo=repo, repo_key=repo.lower(), mode="rules", days=7,
+                      report=canned_report(repo), created_at=now() - timedelta(days=days_ago))
+
+    async def add():
+        async with h.svc.db.session() as s:
+            s.add_all([report("octo/one", 0), report("octo/two", 3), report("octo/three", 9),
+                       WarmFailure(repo_key="octo/four", repo="octo/four", code="upstream",
+                                   failures=1, first_failed_at=now(), last_failed_at=now(),
+                                   retry_at=now() + timedelta(hours=6))])
+            await s.commit()
+
+    h.client.portal.call(add)
+    monkeypatch.setattr(warm, "DRY_RUN_LINES", 3)
+    new = [f"new/r{i}" for i in range(4)]
+    lines: list[str] = []
+    run(h, ["octo/one", "octo/two", "octo/three", "octo/four", *new], dry_run=True,
+        starter=False, meta=False, finds=False, say=lines.append)
+    assert lines == [
+        "reports older than 20 hours are read again (HOLT_WARM_MAX_AGE_HOURS)",
+        "4 seeds have no report yet and go first",
+        "1 seeds skipped as recently failed; 0 that failed before go last",
+        "would analyse new/r0", "would analyse new/r1", "would analyse new/r2",
+        "... and 3 more, in that order",
+        "plan: 4 never reported; 2 with a report older than 20 hours or from an older "
+        "engine; 1 fresh; 1 skipped as recently failed",
+    ]
+
+
+def test_a_dry_run_doesnt_wait_for_the_pass_that_is_running(h, monkeypatch):
+    import contextlib
+
+    @contextlib.asynccontextmanager
+    async def held(lock_id):
+        yield False  # another process is warming
+
+    monkeypatch.setattr(h.svc.db, "advisory_lock", held)
+    lines: list[str] = []
+    assert run(h, ["octo/one"], say=lines.append) is None
+    assert lines == ["another process is warming; skipped"]
+    result = run(h, ["octo/one"], dry_run=True, starter=False, meta=False, finds=False)
+    assert result.reports_run == 1 and rows(h, Job) == []
+
+
 def test_a_timed_out_job_fails_its_repo_and_the_pass_goes_on(h, starter_mod, monkeypatch):
     budget(h, 5000)
     real = warm.Warmer._run_job
@@ -343,7 +394,10 @@ def test_closed_and_dormant_seeds_go_last(h):
     lines = []
     result = run(h, seeds, dry_run=True, starter=False, meta=False, finds=False,
                  say=lines.append)
-    assert [x.removeprefix("would analyse ") for x in lines if x.startswith("would")] == ordered
+    # The never reported first, the closed and dormant last among them; then
+    # the reports due again, the same way.
+    assert [x.removeprefix("would analyse ") for x in lines if x.startswith("would")] == [
+        "pallets/flask", "octo/three", "octo/four", "octo/two", "octo/one", "NixOS/nixpkgs"]
     assert result.quiet_last == 4 and "4 closed or dormant seeds last" in result.summary()
 
 

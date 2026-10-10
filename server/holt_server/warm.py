@@ -3,7 +3,7 @@ issues, the repository details Discover shows, and the /find searches the web
 app's default pages make.
 
     python -m holt_server.warm                 # everything, stopping on GitHub budget
-    python -m holt_server.warm --dry-run       # what would run, no GitHub calls
+    python -m holt_server.warm --dry-run       # the plan, no GitHub calls
     python -m holt_server.warm --no-find --limit 50
     python -m holt_server.warm --stale-only    # after a deploy: redo reports from an older engine
     python -m holt_server.warm --tier weekly   # reports only: saved or recently viewed repos
@@ -18,7 +18,10 @@ How it stays out of the way:
   request runs first. The pass keeps HOLT_WARM_PARALLEL (3) report jobs in
   flight and queues the next as one finishes; the runner's badge lane
   (HOLT_BADGE_CONCURRENCY) should allow as many at a time.
-* Fresh work is skipped: reports under HOLT_WARM_MAX_AGE_HOURS (20), finds
+* Seeds with no report yet go first, in every pass that makes reports: a
+  missing report comes before any refresh.
+* Fresh work is skipped: reports under HOLT_WARM_MAX_AGE_HOURS (20; a tier
+  pass uses its tier's age instead), finds
   and starter issues still inside most of their cache lifetime. A report or
   find made by an older engine version (holt.engine_version) is never fresh.
   `--stale-only` does just those: every seed whose latest report is from an
@@ -28,7 +31,8 @@ How it stays out of the way:
   a month; at least HOLT_EVIDENCE_REUSE_HOURS), the report is made again from
   it, in this process, with no GitHub call.
 * Seeds the last look found closed to outside pull requests (GitHub's
-  settings, or archived) or dormant (no push in DORMANT_DAYS) go last, so a
+  settings, or archived) or dormant (no push in DORMANT_DAYS) go last (among
+  the never reported, and again among the rest), so a
   pass that runs out of budget has done the useful ones. That comes from
   their last report and repo_meta; nothing is read from GitHub to decide it.
 * Repository details (discover.py) are read for every reported repo at once,
@@ -38,9 +42,15 @@ How it stays out of the way:
   rest from going stale. The summary says how many GitHub points it used.
 * Refresh tiers (`--tier`, deploy/prod/warm-refresh.sh): repos someone saved,
   viewed in the last INTEREST_DAYS, or has an open pull request PR watch
-  alerts on, are the weekly tier; the rest of the seed list is the monthly one. A tier pass runs reports only, the oldest
-  first, and skips any younger than HOLT_WARM_MAX_AGE_HOURS, which the
-  timer sets per tier (a week, a month).
+  alerts on, are the weekly tier; the rest of the seed list is the monthly one. A tier pass runs reports only, the never
+  reported first and then the oldest, and skips any younger than its tier's
+  age: HOLT_REFRESH_WEEKLY_HOURS (168) or HOLT_REFRESH_MONTHLY_HOURS (720),
+  never HOLT_WARM_MAX_AGE_HOURS. So `--tier monthly --wait-for-budget` is
+  how a grown seed list is indexed without reading young reports again.
+* The pass's first line says the age it uses. `--dry-run` prints the plan
+  (never reported, due again, fresh, skipped as recently failed) and the
+  first DRY_RUN_LINES seeds in order; it changes nothing, so it also runs
+  while another pass holds the lock.
 * Before each report job, and every few other steps, it checks the GitHub
   GraphQL points left on every token and stops below HOLT_WARM_MIN_POINTS,
   counting REPORT_POINTS for each report still in flight, so a warm pass can
@@ -148,6 +158,8 @@ SLOW_S = 30 * 60
 MAX_LIMITS_IN_A_ROW = 6
 # A "progress:" line every this many seeds (`warm.sh --status` shows the last).
 PROGRESS_EVERY = 25
+# A dry run names this many reports it would make, in order, then counts.
+DRY_RUN_LINES = 20
 # The pauses' clock and sleep (the tests put their own in).
 clock = time.monotonic
 sleep = asyncio.sleep
@@ -225,6 +237,12 @@ def limit_wait(retry_after: float | None, in_a_row: int) -> float:
     return min(asked * 2 ** (max(in_a_row, 1) - 1), LIMIT_WAIT_MAX_S)
 
 
+def age(hours: float) -> str:
+    """`720 hours (30 days)`."""
+    days = f" ({hours / 24:g} days)" if hours >= 48 and hours % 24 == 0 else ""
+    return f"{hours:g} hours{days}"
+
+
 def minutes(seconds: float) -> str:
     n = max(1, round(seconds / 60))
     return f"{n} minute{'' if n == 1 else 's'}"
@@ -241,6 +259,8 @@ class Result:
     skipped_failed: int = 0
     # Failed before and due again: asked for after everything else.
     failed_last: int = 0
+    # Seeds in this pass with no report at all: asked for first.
+    never_reported: int = 0
     # Seeds this pass leaves without a current report (failed, skipped or
     # not reached).
     left: int = 0
@@ -293,6 +313,12 @@ class Warmer:
         self.parallel = 1 if dry_run else max(1, parallel or svc.settings.warm_parallel)
         self.wait_for_budget = wait_for_budget
         self.result = Result(dry_run=dry_run)
+        # A report younger than this is fresh, and the setting it comes from
+        # (`run` puts a tier's own age here).
+        self.max_age_hours = svc.settings.warm_max_age_hours
+        self.max_age_setting = "HOLT_WARM_MAX_AGE_HOURS"
+        # Reports a dry run would make (`would`).
+        self._would = 0
         self._steps = 0
         self._timeouts = 0
         self._in_flight = 0
@@ -422,7 +448,7 @@ class Warmer:
         return Report(created_at=row[0], engine_version=row[1]) if row else None
 
     async def report_is_fresh(self, repo: str) -> bool:
-        cutoff = now() - timedelta(hours=self.svc.settings.warm_max_age_hours)
+        cutoff = now() - timedelta(hours=self.max_age_hours)
         latest = await self.latest_report(repo)
         return latest is not None and not latest.outdated and utc(latest.created_at) >= cutoff
 
@@ -507,7 +533,7 @@ class Warmer:
         if stale_only and await self.from_snapshot(repo):
             return
         if self.dry_run:
-            self.say(f"would analyse {repo}")
+            self.would(f"would analyse {repo}")
             self.result.reports_run += 1
             return
         key = repos.key(repo)
@@ -573,6 +599,30 @@ class Warmer:
         self.result.skipped_failed = len(due) - len(back)
         return front + back
 
+    async def unreported_first(self, seeds: list[str]) -> list[str]:
+        """`seeds` in their order, but those with no report at all ahead of
+        every report that is only due again (counted in `never_reported`).
+        The ones `failed_last` put at the back stay there."""
+        missing = await unreported(self.svc, seeds)
+        self.result.never_reported = sum(repos.key(r) in missing for r in seeds)
+        cut = len(seeds) - self.result.failed_last
+        head = seeds[:cut]
+        return ([r for r in head if repos.key(r) in missing]
+                + [r for r in head if repos.key(r) not in missing] + seeds[cut:])
+
+    def would(self, line: str) -> None:
+        """A dry run's line for one report: the first DRY_RUN_LINES are said."""
+        self._would += 1
+        if self._would <= DRY_RUN_LINES:
+            self.say(line)
+
+    def plan(self) -> str:
+        """What a dry run found, in one line."""
+        r = self.result
+        return (f"plan: {r.never_reported} never reported; {r.reports_run - r.never_reported} "
+                f"with a report older than {age(self.max_age_hours)} or from an older engine; "
+                f"{r.reports_fresh} fresh; {r.skipped_failed} skipped as recently failed")
+
     async def note_failure(self, repo: str, code: str) -> None:
         """Remember that `repo`'s report failed, and when it may be tried again."""
         key, at = repos.key(repo), now()
@@ -603,9 +653,8 @@ class Warmer:
         s = self.svc.settings
         if s.evidence_reuse_hours <= 0:
             return 0
-        tier = (s.refresh_weekly_hours if repos.key(repo) in self._weekly
-                else s.refresh_monthly_hours)
-        return max(s.evidence_reuse_hours, tier)
+        tier = "weekly" if repos.key(repo) in self._weekly else "monthly"
+        return max(s.evidence_reuse_hours, tier_age(s, tier)[0])
 
     async def from_snapshot(self, repo: str) -> bool:
         """Make `repo`'s outdated report again from its newest kept evidence,
@@ -624,7 +673,7 @@ class Warmer:
         if snap.cutoff < now() - timedelta(hours=hours) or snap.cutoff < made - SNAPSHOT_SLACK:
             return False
         if self.dry_run:
-            self.say(f"would make {repo} again from its evidence of {snap.cutoff:%Y-%m-%d}")
+            self.would(f"would make {repo} again from its evidence of {snap.cutoff:%Y-%m-%d}")
             self.result.reports_rederived += 1
             return True
         try:
@@ -723,19 +772,28 @@ class Warmer:
                   max_profiles: int | None = None, stale_only: bool = False,
                   tier: str | None = None) -> Result:
         """`stale_only`: only re-run seeds whose report an older engine made;
-        `tier`: only the reports of that refresh tier, oldest first. Either
-        way the other passes are skipped."""
+        `tier`: only the reports of that refresh tier, oldest first, fresh
+        while younger than the tier's age. Either way the other passes are
+        skipped."""
         if stale_only or tier:
             starter = meta = finds = False
         if tier:
+            self.max_age_hours, self.max_age_setting = tier_age(self.svc.settings, tier)
             seeds = await oldest_first(self.svc, await tier_repos(self.svc, tier, seeds))
-            self.say(f"{tier} tier: {len(seeds)} repos")
         if stale_only:
             self._weekly = {repos.key(r) for r in await tier_repos(self.svc, "weekly", seeds)}
+        elif reports:
+            self.say((f"{tier} tier: {len(seeds)} repos; " if tier else "")
+                     + f"reports older than {age(self.max_age_hours)} are read again "
+                     f"({self.max_age_setting})")
         total = len(seeds)
         if reports:
             seeds, self.result.quiet_last = await quiet_last(self.svc, seeds)
             seeds = await self.failed_last(seeds)
+            if not stale_only:  # that pass leaves seeds with no report alone
+                seeds = await self.unreported_first(seeds)
+            if self.result.never_reported:
+                self.say(f"{self.result.never_reported} seeds have no report yet and go first")
             if self.result.skipped_failed or self.result.failed_last:
                 self.say(f"{self.result.skipped_failed} seeds skipped as recently failed; "
                          f"{self.result.failed_last} that failed before go last")
@@ -755,6 +813,10 @@ class Warmer:
         except OutOfBudget as stop:
             self.result.stopped = str(stop)
             self.say(f"stopping: {stop}")
+        if self._would > DRY_RUN_LINES:
+            self.say(f"... and {self._would - DRY_RUN_LINES} more, in that order")
+        if self.dry_run and reports and not stale_only:
+            self.say(self.plan())
         if reports:
             r = self.result
             made = r.reports_fresh + r.reports_rederived + (0 if self.dry_run else r.reports_run)
@@ -831,6 +893,24 @@ async def tier_repos(svc, tier: str, seeds: list[str]) -> list[str]:
     return [r for r in seeds if repos.key(r) not in weekly]
 
 
+def tier_age(settings, tier: str) -> tuple[float, str]:
+    """The hours a report of refresh tier `tier` stays fresh, and the setting
+    that says so."""
+    if tier == "weekly":
+        return settings.refresh_weekly_hours, "HOLT_REFRESH_WEEKLY_HOURS"
+    return settings.refresh_monthly_hours, "HOLT_REFRESH_MONTHLY_HOURS"
+
+
+async def unreported(svc, names: list[str]) -> set[str]:
+    """The repo keys of `names` that have no 7-day rules report at all."""
+    keys = {repos.key(r) for r in names}
+    async with svc.db.session() as s:
+        have = set((await s.execute(
+            select(Report.repo_key).where(Report.mode == "rules", Report.days == DAYS,
+                                          Report.repo_key.in_(list(keys))).distinct())).scalars())
+    return keys - have
+
+
 async def oldest_first(svc, names: list[str]) -> list[str]:
     """`names` by their newest 7-day rules report, oldest first; never
     reported ones first of all, in the order given."""
@@ -876,12 +956,15 @@ async def warm_once(svc, *, seeds: list[str] | None = None, dry_run: bool = Fals
                     say: Callable[[str], None] = log.info, parallel: int | None = None,
                     wait_for_budget: bool = False, **passes) -> Result | None:
     """One pass. On Postgres, only one process warms at a time (advisory lock);
-    returns None if another holds it."""
+    returns None if another holds it. A dry run changes nothing, so it
+    doesn't take the lock and runs beside a pass that holds it."""
     seeds = seeds if seeds is not None else load_seeds(svc.settings.warm_seeds_file or None)
 
     def warmer() -> Warmer:
         return Warmer(svc, say, dry_run, parallel=parallel, wait_for_budget=wait_for_budget)
 
+    if dry_run:
+        return await warmer().run(seeds, **passes)
     async with svc.db.advisory_lock(LOCK_ID) as got:
         if not got:
             say("another process is warming; skipped")
@@ -917,10 +1000,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-find", action="store_true")
     parser.add_argument("--profiles", type=int, help="only the first N find profiles")
     parser.add_argument("--dry-run", action="store_true",
-                        help="list what would run; no GitHub calls, no jobs")
+                        help="print the plan: how many seeds were never reported, are "
+                             "due again, are fresh; no GitHub calls, no jobs, and no "
+                             "waiting for a pass that is running")
     parser.add_argument("--tier", choices=TIERS,
-                        help="only the reports of this refresh tier, oldest first: weekly "
-                             "(saved or recently viewed repos) or monthly (the other seeds)")
+                        help="only the reports of this refresh tier, the never reported "
+                             "first, then the oldest: weekly (saved or recently viewed "
+                             "repos, read again after HOLT_REFRESH_WEEKLY_HOURS) or monthly "
+                             "(the other seeds, after HOLT_REFRESH_MONTHLY_HOURS)")
     parser.add_argument("--parallel", type=int,
                         help="report jobs in flight at once (default HOLT_WARM_PARALLEL, 3)")
     parser.add_argument("--wait-for-budget", action="store_true",
