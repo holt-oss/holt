@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { EXAMPLES, isExample } from "./examples.ts";
-import { arrivalGate, findGate, needsAccount, pasteHref, pasteTarget, reportAccess, signedInGate, signInHref, startGate } from "./gate.ts";
+import { arrivalGate, findReads, needsAccount, pasteHref, pasteTarget, reportAccess, signedInGate, signInHref, startGate } from "./gate.ts";
 import { afterSignIn } from "./home.ts";
 
 const back = (href: string) => new URL(href, "https://holt.test").searchParams.get("callbackUrl");
@@ -76,19 +76,18 @@ test("signed in: pasting a repo opens its report, as before", () => {
   assert.equal(pasteHref("octo/project", true), "/octo/project");
 });
 
-test("signed out: starting a check or a search is refused with a sign-in error", () => {
-  for (const gate of [startGate, findGate]) {
-    const refused = gate(null);
-    assert.ok(refused);
-    assert.equal(refused.status, 401);
-    assert.equal(refused.error.code, "unauthorized");
-    assert.match(refused.error.message, /sign in/i);
-  }
+test("signed out: starting a check is refused with a sign-in error, and Find reads the index alone", () => {
+  const refused = startGate(null);
+  assert.ok(refused);
+  assert.equal(refused.status, 401);
+  assert.equal(refused.error.code, "unauthorized");
+  assert.match(refused.error.message, /sign in/i);
+  for (const nobody of [null, undefined, ""]) assert.equal(findReads(nobody), "index");
 });
 
 test("signed in: starting a check or a search goes through", () => {
   assert.equal(startGate("user-1"), null);
-  assert.equal(findGate("user-1"), null);
+  assert.equal(findReads("user-1"), "search");
 });
 
 test("the extension's public API stays open: it never reads the session or the gate", () => {
@@ -183,21 +182,21 @@ test("every account page asks the server who is signed in before it loads anythi
 test("Find and Browse are open: no page or part of a list asks for an account", () => {
   const src = join(import.meta.dirname, "..");
   for (const file of ["app/find/page.tsx", "app/discover/page.tsx", "app/discover/[language]/page.tsx", "components/discover/discover-view.tsx", "app/api/discover/route.ts", "app/api/find/more/route.ts"]) {
-    assert.doesNotMatch(readFileSync(join(src, file), "utf-8"), /requireUser|signedInGate|findGate/, file);
+    assert.doesNotMatch(readFileSync(join(src, file), "utf-8"), /requireUser|signedInGate/, file);
   }
   // The parts a list loads as it is scrolled read what Holt has checked, and never search GitHub or start a check.
   assert.match(readFileSync(join(src, "app/api/find/more/route.ts"), "utf-8"), /await findIndex\(/);
   for (const route of ["discover", "find/more"]) {
     assert.doesNotMatch(readFileSync(join(src, "app/api", route, "route.ts"), "utf-8"), /cachedFind|\bfind\(|startAnalysis|@\/lib\/session/, route);
   }
-  // Signed out, Find shows the search every visitor shares, and other filters wait for sign-in instead of searching.
-  assert.match(readFileSync(join(src, "app/find/page.tsx"), "utf-8"), /const searched = user \? picks : \{ \.\.\.defaultPicks\(/);
-  const view = readFileSync(join(src, "components/find/find-view.tsx"), "utf-8");
-  assert.match(view, /if \(!pending \|\| !signedIn\) return;/);
-  assert.match(view, /const locked = pending && !signedIn \? /);
-  // A search from the page itself is still refused signed out.
-  const post = readFileSync(join(src, "app/api/find/route.ts"), "utf-8");
-  assert.ok(post.indexOf("findGate(who.userId)") >= 0 && post.indexOf("findGate(who.userId)") < post.search(/cachedFind\(/));
+  // Signed out, Find shows the search every visitor shares, and other filters are answered from the index alone: no search starts.
+  assert.match(readFileSync(join(src, "app/find/page.tsx"), "utf-8"), /user \|\| shared \? await cachedFind\(.*\) : await indexFind\(picks\)/);
+  assert.match(readFileSync(join(src, "app/api/find/route.ts"), "utf-8"), /findReads\(who\.userId\) === "search" \? await cachedFind\(.*\) : await indexFind\(picks\)/);
+  const index = readFileSync(join(src, "lib/find-index.ts"), "utf-8");
+  assert.match(index, /await findIndex\(/);
+  assert.doesNotMatch(index, /cachedFind|\bfind\(|startAnalysis/);
+  // The filters never swap the list for a sign-in box.
+  assert.doesNotMatch(readFileSync(join(src, "components/find/find-view.tsx"), "utf-8"), /locked|data-signin-card/);
 });
 
 test("signed out: the data routes behind account pages answer 401 before reading anything", () => {
@@ -236,9 +235,9 @@ test("crawlers are sent to Find and the boards, and kept off the boards' facets"
   }
   assert.match(sitemap, /\/discover\/\$\{languageSlug\(/);
   const disallow: string[] = readFileSync(join(app, "robots.ts"), "utf-8").match(/"\/[^"]*"/g) ?? [];
-  assert.ok(disallow.includes('"/discover?"') && disallow.includes('"/discover/*?"'));
+  assert.ok(disallow.includes('"/discover?"') && disallow.includes('"/discover/*?"') && disallow.includes('"/find?"'));
   // Nothing that would cover /find, /discover or /discover/python themselves.
-  for (const rule of disallow) assert.doesNotMatch(rule, /^"\/(find|discover\$|discover\/?")/, rule);
+  for (const rule of disallow) assert.doesNotMatch(rule, /^"\/(find[$\/"]|discover\$|discover\/?")/, rule);
 });
 
 // A signed-out page that asks a gated route logs a 401 in the visitor's console.

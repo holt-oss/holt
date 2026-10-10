@@ -9,7 +9,6 @@ import { personalise, type Fit } from "@/lib/profile";
 import type { ApiError, FindResult, FindStart, Result } from "@/lib/types";
 import type { Prefs } from "@/lib/profile-flow";
 import { saveFromFind } from "@/app/profile/actions";
-import { CatFace } from "../cat-face";
 import { ErrorPanel } from "../error-panel";
 import { EmptyState } from "../shell/app-page";
 import { FindFilters } from "./find-filters";
@@ -26,13 +25,11 @@ type Shown = { key: string; result: Result<FindStart> };
  * /find after the first paint: the filters apply as they're tapped. Experience
  * and work type only reorder what's already here; languages, time, topics and
  * the Hacktoberfest switch start a new (cached) search once the taps settle.
- * Signed out, `initial` is the shared default search (`searched`), and any
- * other search asks for sign-in instead of running.
+ * Signed out, the same filters are answered from Holt's index alone
+ * (app/api/find/route.ts), and a search of GitHub waits for sign-in.
  */
-export function FindView({ initialPicks, searched = initialPicks, initial, source, hf, saved, signedIn = true, profile = null, notice }: {
+export function FindView({ initialPicks, initial, source, hf, saved, signedIn = true, profile = null, notice }: {
   initialPicks: Picks;
-  /** The picks `initial` was searched with, when not `initialPicks`. */
-  searched?: Picks;
   initial: Result<FindStart>;
   source: PicksSource;
   hf: { note: string; on: boolean } | null;
@@ -44,14 +41,14 @@ export function FindView({ initialPicks, searched = initialPicks, initial, sourc
   notice?: React.ReactNode;
 }) {
   const [picks, setPicks] = useState(initialPicks);
-  const [shown, setShown] = useState<Shown>({ key: searchKey(searched), result: initial });
+  const [shown, setShown] = useState<Shown>({ key: searchKey(initialPicks), result: initial });
   const [retry, setRetry] = useState(0);
   // A new server render (a link to /find with other picks) starts over from it.
   const [from, setFrom] = useState({ initialPicks, initial });
   if (from.initialPicks !== initialPicks || from.initial !== initial) {
     setFrom({ initialPicks, initial });
     setPicks(initialPicks);
-    setShown({ key: searchKey(searched), result: initial });
+    setShown({ key: searchKey(initialPicks), result: initial });
   }
 
   const key = searchKey(picks);
@@ -76,7 +73,7 @@ export function FindView({ initialPicks, searched = initialPicks, initial, sourc
   }, [q, source]);
 
   useEffect(() => {
-    if (!pending || !signedIn) return;
+    if (!pending) return;
     const ctl = new AbortController();
     const t = setTimeout(async () => {
       track("find-run");
@@ -96,7 +93,7 @@ export function FindView({ initialPicks, searched = initialPicks, initial, sourc
       ctl.abort();
     };
     // `retry` re-runs a failed search with the same picks.
-  }, [pending, key, q, retry, signedIn]);
+  }, [pending, key, q, retry]);
 
   const retryNow = () => {
     setShown((s) => ({ ...s, key: "" }));
@@ -105,7 +102,6 @@ export function FindView({ initialPicks, searched = initialPicks, initial, sourc
   const fit = { level: picks.level, contributions: picks.types };
   const isDefault = q === picksQuery(defaultPicks(hf?.on ?? false));
   const untouched = picks === initialPicks;
-  const locked = pending && !signedIn ? `/find?${q}` : null;
 
   // The search's state.
   const r = shown.result;
@@ -141,8 +137,8 @@ export function FindView({ initialPicks, searched = initialPicks, initial, sourc
 
   return (
     <>
-      <FindFilters picks={picks} onChange={setPicks} hf={hf} busy={pending && !locked} />
-      <p role="status" className="sr-only">{pending && !locked ? "Updating…" : ""}</p>
+      <FindFilters picks={picks} onChange={setPicks} hf={hf} busy={pending} />
+      <p role="status" className="sr-only">{pending ? "Updating…" : ""}</p>
       {aside && (
         <p className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[0.8rem] text-faint">
           {fromProfile && (
@@ -168,7 +164,7 @@ export function FindView({ initialPicks, searched = initialPicks, initial, sourc
       )}
       {notice}
       {/* The list carries on into the index once the search has settled on these picks; a search still running, or about to, keeps to its own results. */}
-      <Results pending={pending} locked={locked} list={list} raw={raw ?? []} fit={fit} more={searching || pending ? null : picksQuery({ ...picks, level: "experienced", types: [] })} searching={searching} error={error} progress={job.stage.progress} days={picks.days} saved={saved} picks={picks} setPicks={setPicks} onRetry={retryNow} />
+      <Results pending={pending} signIn={signedIn ? null : signInHref(`/find?${q}`)} list={list} raw={raw ?? []} fit={fit} more={searching || pending ? null : picksQuery({ ...picks, level: "experienced", types: [] })} searching={searching} error={error} progress={job.stage.progress} days={picks.days} saved={saved} picks={picks} setPicks={setPicks} onRetry={retryNow} />
     </>
   );
 }
@@ -178,10 +174,10 @@ function sameAsProfile(p: Picks, prof: Pick<Prefs, "languages" | "topics" | "day
   return same(p.langs, prof.languages) && same(p.topics, prof.topics) && same(p.types, prof.contributions) && p.days === prof.days && p.level === prof.level;
 }
 
-function Results({ pending, locked, list, raw, fit, more, searching, error, progress, days, saved, picks, setPicks, onRetry }: {
+function Results({ pending, signIn, list, raw, fit, more, searching, error, progress, days, saved, picks, setPicks, onRetry }: {
   pending: boolean;
-  /** Signed out and the picks changed: where to come back to after signing in. */
-  locked: string | null;
+  /** Signed out: sign-in and back to these picks, offered when the index has nothing for them. */
+  signIn: string | null;
   /** The personalised results, or null while the search runs with nothing to show yet. */
   list: FindResult[] | null;
   /** The same results before they were fitted to the reader, and what fits them. */
@@ -200,9 +196,7 @@ function Results({ pending, locked, list, raw, fit, more, searching, error, prog
   onRetry: () => void;
 }) {
   let body: React.ReactNode;
-  if (locked) {
-    body = <SignInToSearch back={locked} />;
-  } else if (error) {
+  if (error) {
     body = <ErrorPanel error={error} onRetry={onRetry} />;
   } else if (!list) {
     body = (
@@ -213,7 +207,7 @@ function Results({ pending, locked, list, raw, fit, more, searching, error, prog
       </>
     );
   } else if (!list.length) {
-    body = <Empty picks={picks} setPicks={setPicks} />;
+    body = <Empty picks={picks} setPicks={setPicks} signIn={signIn} />;
   } else {
     body = (
       <>
@@ -224,8 +218,8 @@ function Results({ pending, locked, list, raw, fit, more, searching, error, prog
   }
 
   return (
-    <section aria-label="Results" aria-busy={!locked && (pending || (!list && !error))} className="mt-5">
-      <div className={`transition-opacity duration-200 ${pending && !locked ? "pointer-events-none opacity-40" : ""}`}>{body}</div>
+    <section aria-label="Results" aria-busy={pending || (!list && !error)} className="mt-5">
+      <div className={`transition-opacity duration-200 ${pending ? "pointer-events-none opacity-40" : ""}`}>{body}</div>
     </section>
   );
 }
@@ -239,19 +233,7 @@ function SearchProgress({ progress }: { progress: number }) {
   );
 }
 
-function SignInToSearch({ back }: { back: string }) {
-  return (
-    <div className="border border-dashed border-line-strong p-6 text-center sm:p-8" data-signin-card>
-      <CatFace mood="ready" className="text-[1.6rem]" />
-      <p className="mt-4 text-[1.1rem] font-semibold">Sign in to search with these filters.</p>
-      <Link href={signInHref(back)} prefetch={false} className="btn-primary mt-5">
-        sign in to search <span aria-hidden="true">→</span>
-      </Link>
-    </div>
-  );
-}
-
-function Empty({ picks, setPicks }: { picks: Picks; setPicks: (p: Picks) => void }) {
+function Empty({ picks, setPicks, signIn }: { picks: Picks; setPicks: (p: Picks) => void; signIn: string | null }) {
   const fixes = widen(picks);
   return (
     <EmptyState title={fixes.length ? "No repos match all of that." : "No repos match that. Try another language."}>
@@ -260,6 +242,11 @@ function Empty({ picks, setPicks }: { picks: Picks; setPicks: (p: Picks) => void
           {f.label}
         </button>
       ))}
+      {signIn && (
+        <Link href={signIn} prefetch={false} className="text-link text-[0.9rem]">
+          sign in to search GitHub <span aria-hidden="true">→</span>
+        </Link>
+      )}
     </EmptyState>
   );
 }
