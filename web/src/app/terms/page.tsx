@@ -72,7 +72,7 @@ export default function TermsPage() {
 
       <h2>6. Free and paid features</h2>
       <p>
-        Rules reports, finding and comparing projects, badges and share images are free, and we intend to keep them free.
+        Reports, finding and comparing projects, badges and share images are free, and we intend to keep them free.
         Signed-in users also get free merge plans, as described in section 5. Some features are paid, or will be:
         Pro, sold as a pass that covers a set period, with more merge plans and alerts.
       </p>

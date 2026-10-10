@@ -72,8 +72,8 @@ test("days and topics fall back safely", () => {
 
 test("describe reads as plain English", () => {
   assert.equal(describe({ languages: ["python", "c++"], days: 3, level: "newcomer", contributions: ["docs"] }),
-    "Python, C++ · a weekend · first-timer issues only, docs first");
-  assert.equal(describe({ languages: [], days: 7, level: "experienced", contributions: [] }), "any language · a week · all starter issues");
+    "Python, C++ · replies within a weekend · first-timer issues only, docs first");
+  assert.equal(describe({ languages: [], days: 7, level: "experienced", contributions: [] }), "any language · replies within a week · all starter issues");
 });
 
 test("a typed-in language shows with GitHub's spelling, else a leading capital", () => {

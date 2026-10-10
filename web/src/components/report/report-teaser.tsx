@@ -35,7 +35,7 @@ export function ReportTeaser({ repo, report, back }: { repo: string; report: Rep
               ) : (
                 <h1 className="text-[1.05rem] font-semibold tracking-tight [overflow-wrap:anywhere] sm:text-[1.2rem]">Is {repo} worth your time?</h1>
               )}
-              <span className="text-[0.78rem] uppercase tracking-[0.08em] text-faint">{report ? "rules report" : "not checked yet"}</span>
+              {!report && <span className="text-[0.78rem] uppercase tracking-[0.08em] text-faint">not checked yet</span>}
             </div>
             <CatFace mood={report ? TONE_MOOD[report.tone] : "thinking"} blink className="text-[1rem] normal-case tracking-normal sm:text-[1.2rem]" />
           </div>
