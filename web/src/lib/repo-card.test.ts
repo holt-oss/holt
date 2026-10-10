@@ -84,6 +84,6 @@ test("a card's last line is what the repo does best on its board, when the serve
   assert.equal(fromDiscover({ ...board, standout: "A first reply typically comes within 3 hours." }).reason, "A first reply typically comes within 3 hours.");
   assert.equal(fromDiscover({ ...board, standout: null }).reason, card.reason);
   const pick = { ...card, why: [], numbers_line: "", odds: null, checked_at: null } as unknown as Recommendation;
-  assert.equal(fromPick({ ...pick, standout: "95% of outside pull requests were merged." }).reason, "95% of outside pull requests were merged.");
+  assert.equal(fromPick({ ...pick, standout: "Merges typically land within 2 days." }).reason, "Merges typically land within 2 days.");
   assert.equal(fromPick({ ...pick, standout: null }).reason, card.reason);
 });

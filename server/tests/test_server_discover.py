@@ -105,14 +105,15 @@ def test_card_reason_does_not_point_at_starter_issues(h):
 def test_a_welcoming_card_leads_with_the_number_it_ranks_best_on(h):
     add(h,
         report("octo/quick", outsider_merged=8, median_first_response_hours=1.0),
-        report("octo/merges", outsider_merged=19, median_first_response_hours=30.0),
+        report("octo/second", outsider_merged=19, median_first_response_hours=30.0),
         report("octo/newcomers", outsider_merged=8, median_first_response_hours=40.0,
                first_time_merged_authors=9),
         report("octo/plain", outsider_merged=8, median_first_response_hours=50.0))
     lines = {c["repo"]: c["standout"] for c in get(h)["repos"]}
     assert lines == {
         "octo/quick": "A first reply typically comes within an hour.",
-        "octo/merges": "95% of outside pull requests were merged.",
+        # The share merged is the card's bar, never its line.
+        "octo/second": "A first reply typically comes within 2 days.",
         "octo/newcomers": "9 people got their first pull request merged here.",
         # Last on every number: reply time, the first one, is what it says.
         "octo/plain": "A first reply typically comes within 3 days.",

@@ -642,8 +642,9 @@ one every "Worth your time" repo shares ("Outside contributors get real
 replies here, and their work gets merged."): the number where this repo
 stands best among the repos on this board (this sort and these filters, the
 whole board, not the part), as a sentence. The numbers are the first reply
-time, the share merged, first-timers merged, the typical days to merge and
-the date of the last outside merge, all from `stats`. A repo in the better
+time, first-timers merged, the typical time to merge and the date of the
+last outside merge, all from `stats` (not the share merged: the card's bar
+draws it and the welcoming board is in its order). A repo in the better
 half of the board on none of them gets the reply time. `null` when the reason
 already says something of its own, when the report has none of the numbers,
 and on a card sent anywhere but a board.

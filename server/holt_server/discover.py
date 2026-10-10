@@ -62,7 +62,7 @@ from holt_server.deps import internal, services
 from holt_server.errors import ApiError
 from holt_server.github import DETAILS_BATCH
 from holt_server.schema import (
-    WELCOMING_LINE, Model, StarterIssue, Stats, VerdictView, _date, _pct, odds_for,
+    WELCOMING_LINE, Model, StarterIssue, Stats, VerdictView, _date, odds_for,
     verdict_line, wait_phrase,
 )
 from holt_server.services import Services
@@ -459,14 +459,13 @@ def _days_ago(day: str | None) -> int | None:
 
 # What a card can lead with: (the number, smaller is better; its sentence).
 # Reply time is first: it wins a tie, and it is what a card says when the repo
-# is in the better half of the board on nothing. Only numbers the report
-# counted, never a model.
+# is in the better half of the board on nothing. The share merged isn't one:
+# the card's bar marks it and the welcoming board is in its order, so every
+# card at the top would lead with it. Only numbers the report counted, never
+# a model.
 STANDOUTS: tuple[tuple[Callable[[Stats], Any], Callable[[Stats], str | None]], ...] = (
     (lambda s: s.median_first_response_hours,
      lambda s: f"A first reply typically comes within {wait_phrase(s.median_first_response_hours)}."),
-    (lambda s: -merged_share(s) if s.outsider_attempts else None,
-     lambda s: f"{_pct(s.outsider_merged, s.outsider_attempts)}% of outside pull requests "
-               "were merged."),
     (lambda s: -s.first_time_merged_authors or None,
      lambda s: _first_timers(s.first_time_merged_authors)),
     (lambda s: s.timing.merge_typical_days if s.timing else None,
