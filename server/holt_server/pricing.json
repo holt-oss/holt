@@ -27,19 +27,19 @@
     "pro_1m": {
       "name": "1 month",
       "days": 30,
-      "on_sale": false,
+      "on_sale": true,
       "price": {"inr_paise": 9900, "usd_cents": 700}
     },
     "pro_3m": {
       "name": "3 months",
       "days": 90,
-      "on_sale": false,
+      "on_sale": true,
       "price": {"inr_paise": 24900, "usd_cents": 1500}
     },
     "pro_12m": {
       "name": "12 months",
       "days": 365,
-      "on_sale": false,
+      "on_sale": true,
       "price": {"inr_paise": 79900, "usd_cents": 3900}
     }
   }

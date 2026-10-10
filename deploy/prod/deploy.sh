@@ -39,7 +39,7 @@ log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*"; }
 die() { log "ERROR: $*"; exit 1; }
 busy() { log "ERROR: $*"; exit 75; }   # not a failure of the commit: nothing was changed
 # shellcheck source=env.sh
-. "$here/env.sh"   # STATE, PROJECT, SECRETS, load_prod_env
+. "$here/env.sh"   # STATE, PROJECT, SECRETS, load_prod_env, env_value
 # shellcheck source=../edge.sh
 . "$here/../edge.sh"   # edge_seed, edge_apply, edge_revert
 # shellcheck source=../swap.sh
@@ -64,11 +64,6 @@ flock -n 9 || busy "another deploy is in progress"
 # --- env and secrets ---------------------------------------------------------
 [[ -f "$STATE/.env" ]] || "$here/make-env.sh"
 port="$(sed -n 's/^HOLT_PROD_PORT=//p' "$STATE/.env")"; port="${port:-8310}"
-env_value() {   # KEY DEFAULT: the environment, else .env, else the default
-    local v="${!1:-}"
-    [[ -n "$v" ]] || v="$(sed -n "s/^$1=//p" "$STATE/.env" | tail -1 | tr -d "\"'")"
-    echo "${v:-$2}"
-}
 # How many web containers (compose.yml, `deploy.replicas`). Three at most:
 # the db's max_connections is sized for that many.
 replicas="$(env_value HOLT_WEB_REPLICAS 2)"
@@ -98,6 +93,10 @@ elif [[ "${HOLT_PROD_AI_BUDGET_OWNER_OK:-}" != 1 ]]; then
 else
     log "AI budget: \$$HOLT_PROD_AI_BUDGET_USD (owner-approved)"
 fi
+# Pass sales (README.md, "Selling passes"): off unless HOLT_PROD_PAYMENTS=1,
+# and then only with live Razorpay keys.
+(( PAYMENTS_OK )) || die "$PAYMENTS_MSG; nothing was changed (README.md, \"Selling passes\")"
+log "$PAYMENTS_MSG"
 for k in CONTACT_EMAIL CONTACT_CITY; do
     v="NEXT_PUBLIC_$k"
     [[ -n "${!v}" && "${!v}" != "$k" ]] || die "$k is not set in $SECRETS; the policy pages (/terms, /privacy, /refunds, /contact) would show the placeholder"

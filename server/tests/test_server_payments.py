@@ -182,13 +182,31 @@ def test_passes_on_sale_come_from_the_pricing_file(hp):
     ]
 
 
-def test_the_packaged_pricing_file_sells_nothing(make_harness):
-    h = make_harness(HOLT_PAYMENTS_ENABLED=True)
-    h.svc.razorpay = rz = FakeRazorpay()
-    assert h.get("/v1/passes").json() == OFF
-    for pid in ("pro_1m", "pro_3m", "pro_12m"):
-        assert h.post("/v1/me/orders", {"pass": pid}, user="u").status_code == 400
-    assert rz.calls == []
+def test_the_packaged_pricing_file_sells_nothing_until_payments_are_switched_on(make_harness):
+    """Production as it is deployed without HOLT_PROD_PAYMENTS: every pass is
+    marked on sale in the packaged file, and none is offered or can be ordered."""
+    for overrides in ({}, {"HOLT_PAYMENTS_ENABLED": True},
+                      {"RAZORPAY_KEY_ID": "rzp_live_fake", "RAZORPAY_KEY_SECRET": SECRET,
+                       "RAZORPAY_WEBHOOK_SECRET": HOOK_SECRET}):
+        h = make_harness(HOLT_ENV="production", **overrides)
+        if h.svc.razorpay is not None:
+            h.svc.razorpay = FakeRazorpay()
+        assert all(p.on_sale for p in entitlements.catalogue(h.svc).passes.values())
+        assert h.get("/v1/passes").json() == OFF
+        for pid in ("pro_1m", "pro_3m", "pro_12m"):
+            r = h.post("/v1/me/orders", {"pass": pid}, user="u")
+            assert r.status_code == 403 and r.json()["error"]["code"] == "payments_off"
+        assert rows(h, Order) == []
+        if h.svc.razorpay is not None:
+            assert h.svc.razorpay.calls == []
+        assert payments.startup_line(h.svc)[1].startswith("passes: off")
+
+
+def test_the_packaged_pricing_file_sells_its_three_passes_with_payments_on(make_harness):
+    h = make_harness(HOLT_ENV="production", HOLT_PAYMENTS_ENABLED=True)
+    h.svc.razorpay = FakeRazorpay()
+    body = h.get("/v1/passes").json()
+    assert body["on_sale"] is True and body["passes"] == PACKAGED
 
 
 @pytest.mark.parametrize("enabled,keys", [(False, True), (True, False), (False, False)])
@@ -221,11 +239,17 @@ PACKAGED = [
 
 
 @pytest.fixture
-def make_staging(make_harness):
-    """The packaged pricing file (no pass on sale in it) on staging's settings."""
+def make_staging(make_harness, tmp_path):
+    """The packaged pricing file with no pass on sale in it, on staging's settings."""
+    raw = json.loads(pricing.DEFAULT_FILE.read_text(encoding="utf-8"))
+    for p in raw["passes"].values():
+        p["on_sale"] = False
+    nothing_on_sale = tmp_path / "nothing-on-sale.json"
+    nothing_on_sale.write_text(json.dumps(raw), encoding="utf-8")
+
     def build(env: str = "staging", **overrides):
         values = {"HOLT_ENV": env, "HOLT_PAYMENTS_ENABLED": True, "HOLT_PASSES_ON_SALE": True,
-                  "HOLT_PR_WATCH": True, **overrides}
+                  "HOLT_PR_WATCH": True, "HOLT_PRICING_FILE": str(nothing_on_sale), **overrides}
         h = make_harness(**values)
         h.rz = h.svc.razorpay = FakeRazorpay()
         return h
@@ -312,22 +336,24 @@ def test_the_switch_is_off_and_the_environment_is_production_by_default(monkeypa
     s = Settings(_env_file=None)
     assert (s.env, s.passes_on_sale, s.payments_enabled, s.sell_every_pass) == (
         "production", False, False, False)
-    # Production's own settings (deploy/prod/compose.yml sets HOLT_ENV and none
-    # of the payment switches): a pass is on sale only if the pricing file says so.
+    # Production's own settings: the pricing file marks the passes on sale,
+    # and HOLT_PAYMENTS_ENABLED (deploy/prod: HOLT_PROD_PAYMENTS) stays off.
     prod = Settings(_env_file=None, HOLT_ENV="production")
     cat = pricing.cached(prod.pricing_file, prod.sell_every_pass)
-    assert [pid for pid, p in cat.passes.items() if p.on_sale] == []
+    assert [pid for pid, p in cat.passes.items() if p.on_sale] == ["pro_1m", "pro_3m", "pro_12m"]
+    assert prod.payments_enabled is False and payments.build(prod) is None
 
 
-def test_productions_compose_never_sets_the_payment_switches():
+def test_productions_scripts_never_set_the_staging_switch():
+    """HOLT_PASSES_ON_SALE is staging's. What production may set is checked
+    in tests/test_prod_payments.py."""
     prod = Path(__file__).resolve().parents[2] / "deploy" / "prod"
     if not prod.is_dir():
         pytest.skip("no deploy/ next to the server (an installed package)")
     for path in sorted(prod.iterdir()):
-        if path.is_file():
-            text = path.read_text(encoding="utf-8")
-            for name in ("HOLT_PASSES_ON_SALE", "HOLT_PAYMENTS_ENABLED", "RAZORPAY"):
-                assert name not in text, f"{path.name} mentions {name}"
+        if path.is_file() and path.suffix in (".sh", ".yml"):
+            assert "HOLT_PASSES_ON_SALE=" not in path.read_text(encoding="utf-8"), path.name
+            assert "HOLT_PASSES_ON_SALE:" not in path.read_text(encoding="utf-8"), path.name
 
 
 def test_passes_need_the_internal_key(hp):
