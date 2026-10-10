@@ -5,7 +5,9 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { after } from "next/server";
 import { ErrorPanel } from "@/components/error-panel";
+import { Alternatives, AlternativesSkeleton } from "@/components/report/alternatives";
 import { AnalysisRunner } from "@/components/report/analysis-runner";
+import { nextAction } from "@/components/report/next-action";
 import { MergePlanPanel } from "@/components/report/merge-plan-panel";
 import { PartialReport } from "@/components/report/partial-report";
 import { ReportTeaser } from "@/components/report/report-teaser";
@@ -29,7 +31,6 @@ import { PageTransition } from "@/components/motion/page-transition";
 import { BackLink } from "@/components/your-repos/back-link";
 import { SaveButton } from "@/components/save-button";
 import { ReportStickyBar, StickySentinel } from "@/components/report/report-sticky-bar";
-import { ShareMenu } from "@/components/report/share-bar";
 import { BackButton } from "@/components/report/back-button";
 import { HOME } from "@/lib/home";
 import { ReportBackLink, ReportModeLink } from "@/components/report/report-tabs";
@@ -52,6 +53,8 @@ function describe(report: Report | null, name: string): string {
   if (!report) return `Do outsiders get replies and get merged at ${name}? Holt checks its recent PRs and tells you.`;
   const s = report.stats;
   const reply = s.median_first_response_hours == null ? "" : `, and the typical first reply takes ${humanHours(s.median_first_response_hours)}`;
+  // No outside PR to count (pull requests off, say): the verdict's own reason, not "0 of 0".
+  if (!s.outsider_attempts) return `${report.headline}. ${report.verdict_line}`;
   return `${report.headline}. ${s.outsider_merged} of ${s.outsider_attempts} outside PRs got merged${reply}. See the evidence and starter issues.`;
 }
 
@@ -131,10 +134,11 @@ export default async function RepoPage({ params, searchParams }: Props) {
   return (
     <PageTransition>
       <div className="relative">
-      <div className="report-wide relative py-8 sm:py-12">
+      <div className="report-wide relative py-5 sm:py-12">
         {mode === "rules" && <JsonLd report={report.ok ? report.data : null} name={display} />}
         <BackLink repo={display} />
-        <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+        {/* On a phone this is one row (back, name, save), so the verdict starts high. */}
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-3 sm:mb-6 sm:gap-x-4">
           {/* The plan goes back to its report; the report, to wherever you came from. */}
           {mode === "ai" ? <ReportBackLink href={reportHref(display, days)} /> : <BackButton fallback={user ? HOME : "/"} />}
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -147,7 +151,7 @@ export default async function RepoPage({ params, searchParams }: Props) {
             fetchPriority="low"
             decoding="async"
             // Level with the name, not the middle of a tall details block.
-            className="size-10 self-start rounded-md border border-line-strong bg-panel-2"
+            className="hidden size-10 self-start rounded-md border border-line-strong bg-panel-2 sm:block"
           />
           {report.ok && report.data.about ? (
             <div className="min-w-0 flex-1">
@@ -166,18 +170,18 @@ export default async function RepoPage({ params, searchParams }: Props) {
           )}
           {/* A failed lookup shows "save"; saving again is harmless. Keyed so
               moving to another repo's report starts from that repo's state. */}
-          {/* Save, and under it share: two quiet icons, the bookmark's right edge shared. */}
-          <div className="flex w-full shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 sm:w-auto sm:flex-col sm:items-end sm:justify-start">
-            <div className="flex items-center gap-3">
+          {/* Sharing is under the verdict (ReportView, PartialReport). On a phone the report offers
+              the merge plan there too; the plan's own page keeps its way back up here. */}
+          <div className={`flex shrink-0 items-center gap-3 self-start ${mode === "ai" ? "w-full justify-between sm:w-auto" : ""}`}>
+            <span className={mode === "ai" ? "contents" : "hidden sm:contents"}>
               <ReportModeLink
                 mode={mode}
                 rulesHref={reportHref(display, days)}
                 plan={planCta(display, { available: mergePlans, signedIn })}
                 hint
               />
-              <SaveButton small compact key={display} repo={display} saved={user ? Boolean(saved?.ok && saved.data.saved) : null} />
-            </div>
-            <ShareMenu url={`${SITE_URL}/${display}`} text={report.ok ? `${display} on Holt: ${report.data.headline}.` : `${display} on Holt.`} />
+            </span>
+            <SaveButton small compact key={display} repo={display} saved={user ? Boolean(saved?.ok && saved.data.saved) : null} />
           </div>
         </div>
         <StickySentinel />
@@ -218,6 +222,13 @@ export default async function RepoPage({ params, searchParams }: Props) {
                 report={report.data}
                 signedIn={signedIn}
                 mergePlans={mergePlans}
+                alternatives={
+                  nextAction(report.data.verdict) === "alternatives" && (
+                    <SkeletonReveal fallback={<AlternativesSkeleton />}>
+                      <Alternatives repo={report.data.repo} language={report.data.about?.languages[0]?.name ?? null} verdict={report.data.verdict} />
+                    </SkeletonReveal>
+                  )
+                }
                 issues={
                   <SkeletonReveal fallback={<StarterIssuesSkeleton />}>
                     <IssuesSlot repo={report.data.repo} user={user} />
@@ -240,12 +251,13 @@ export default async function RepoPage({ params, searchParams }: Props) {
 /** Above an example report, for signed-out visitors: what this is, and the way to their own. */
 function ExampleNote() {
   return (
-    <p className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 border border-line-strong bg-panel-2 px-4 py-3 font-sans text-[0.9rem] text-muted" data-example-note>
-      <span className="border border-blue px-2 py-0.5 font-mono text-[0.85rem] text-blue">Example report</span>
-      <span className="min-w-0 flex-1">Sign in to check any repo you like.</span>
+    // One line on a phone: the tag and the two links.
+    <p className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border border-line-strong bg-panel-2 px-3 py-1 font-sans text-[0.9rem] text-muted sm:mb-6 sm:px-4 sm:py-3" data-example-note>
+      <span className="border border-blue px-2 py-0.5 font-mono text-[0.78rem] text-blue sm:text-[0.85rem]">Example report</span>
+      <span className="hidden min-w-0 flex-1 sm:inline">Sign in to check any repo you like.</span>
       <span className="flex flex-wrap gap-x-4 gap-y-5">
         <Link href="/signin" prefetch={false} className="text-link tap">sign in</Link>
-        <Link href={EXAMPLES_PATH} className="text-link tap">more examples</Link>
+        <Link href={EXAMPLES_PATH} className="text-link tap"><span className="hidden sm:inline">more </span>examples</Link>
       </span>
     </p>
   );

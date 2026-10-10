@@ -37,7 +37,7 @@ test("signed out: an example report is shown in full, any other repo as a teaser
 // A card on Find or Browse links to the report page, so this is all a signed-out visitor gets from one.
 test("signed out: the teaser is rendered on the server from the verdict, its reason and the counts, and the page gives the report to nothing else", () => {
   const dir = join(import.meta.dirname, "../components/report");
-  for (const [file, fields] of [["partial-report.tsx", ["generated_at", "headline", "stats", "tone", "verdict_line"]], ["report-teaser.tsx", ["generated_at", "headline", "tone", "verdict_line"]]] as const) {
+  for (const [file, fields] of [["partial-report.tsx", ["generated_at", "headline", "repo", "stats", "tone", "verdict_line"]], ["report-teaser.tsx", ["generated_at", "headline", "tone", "verdict_line"]]] as const) {
     const src = readFileSync(join(dir, file), "utf-8");
     // A client component's props are sent to the browser whole.
     assert.doesNotMatch(src, /^["']use client["']/m, file);
