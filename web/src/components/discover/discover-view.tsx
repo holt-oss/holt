@@ -32,7 +32,7 @@ export async function DiscoverView({ sort, language, topic }: { sort: DiscoverSo
                 href={boardHref({ sort: s.id, language, topic })}
                 scroll={false}
                 aria-current={s.id === sort ? "page" : undefined}
-                className={`relative flex h-10 items-center justify-center border px-2 text-center text-[0.78rem] leading-tight sm:whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue sm:h-8 sm:px-3.5 sm:text-[0.8rem] ${s.id === sort ? "picked z-10" : "border-line-strong text-muted hover:border-blue hover:text-ink"}`}
+                className={`relative flex h-10 items-center justify-center border px-2 text-center font-sans text-[0.8rem] leading-tight sm:whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue sm:h-8 sm:px-3.5 sm:text-[0.84rem] ${s.id === sort ? "picked z-10" : "border-line-strong text-muted hover:border-blue hover:text-ink"}`}
               >
                 {s.label}
               </Link>
