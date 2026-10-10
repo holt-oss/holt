@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createContext, Suspense, use, useEffect, useRef, useState } from "react";
 import { neighbours, type CardRepo } from "@/lib/repo-card";
 import { savedSet, withSaved } from "@/lib/saved";
+import { CompareTick } from "../compare-picks/compare-picks";
 import { useReducedMotion } from "../motion/use-seen";
 import { pauseSmoothScroll } from "../motion/smooth-scroll";
 import { SaveButton } from "../save-button";
@@ -122,7 +123,7 @@ function ListCard({ r, report, actions, faded, verdict, why }: { r: CardRepo; re
   const open = use(OpenFocus);
   return (
     <div className={`h-full transition-opacity duration-300 ${faded ? "opacity-55 focus-within:opacity-100 hover:opacity-100" : ""}`}>
-      <RepoCard r={r} report={report} focusHref={`?${PARAM}=${encodeURIComponent(r.repo)}`} onOpen={open ? () => open(r.repo) : undefined} actions={actions} verdict={verdict} why={why} />
+      <RepoCard r={r} report={report} onOpen={open ? () => open(r.repo) : undefined} actions={actions} tick={<CompareTick repo={r.repo} />} verdict={verdict} why={why} />
     </div>
   );
 }

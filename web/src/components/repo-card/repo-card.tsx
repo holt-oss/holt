@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { compact } from "@/lib/discover";
 import { issueSkill, issueTaken, NONE_FREE } from "@/lib/format";
 import { issueSummary, langColor, statPills, type CardRepo } from "@/lib/repo-card";
@@ -9,13 +8,16 @@ import { LangDot, RepoAvatar } from "./repo-avatar";
 /**
  * A repo in a list, about a third of the old height: who, the verdict, the
  * marked odds bar, two more numbers and one issue to start with. Everything else is in
- * the focus view (`focusHref`), which `onOpen` shows without a page load.
+ * the focus view, which `onOpen` shows without a page load.
  * `verdict={false}` leaves the verdict out, for a list where every repo has
  * the same one; the starter issues' summary takes its place. `why` adds the
  * line that says why this repo for this person (a pick's first reason). A
- * click anywhere on the card that isn't a link or a button opens the focus view.
+ * click anywhere on the card that isn't a link or a button opens the focus
+ * view, which leads with the report. The name is the card's one link to the
+ * report (`report`): followed as it is without JS, by a crawler or in a new
+ * tab. `tick` is the list's compare tick, beside the numbers.
  */
-export function RepoCard({ r, report, focusHref, onOpen, actions, verdict = true, why = false }: { r: CardRepo; report: string; focusHref: string; onOpen?: () => void; actions?: React.ReactNode; verdict?: boolean; why?: boolean }) {
+export function RepoCard({ r, report, onOpen, actions, tick, verdict = true, why = false }: { r: CardRepo; report: string; onOpen?: () => void; actions?: React.ReactNode; tick?: React.ReactNode; verdict?: boolean; why?: boolean }) {
   const [owner, name] = r.repo.split("/");
   // Free issues come first, so a taken one here means every one is taken.
   const issue = r.issues[0];
@@ -46,7 +48,7 @@ export function RepoCard({ r, report, focusHref, onOpen, actions, verdict = true
         <div className="min-h-[5.5rem] min-w-0 flex-1">
           {/* The whole name, wrapping after the owner first. */}
           <h2 className="text-[1rem] font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]">
-            <a href={focusHref} onClick={open} className="hover:text-blue">
+            <a href={report} onClick={open} className="hover:text-blue">
               <span className="text-muted">{owner}/</span>
               <wbr />
               {name}
@@ -99,13 +101,13 @@ export function RepoCard({ r, report, focusHref, onOpen, actions, verdict = true
       <div className="mt-3">
         <OddsMeter stats={r.stats} />
       </div>
-      {/* The reply time and first-timers, one per line, with the report link beside them. */}
+      {/* The reply time and first-timers, one per line, with the compare tick beside them. */}
       <div className="mt-2.5 flex items-center justify-between gap-3">
         <div className="min-w-0 font-sans text-[0.88rem] leading-snug text-muted">
           {/* Reply time in blue, so it stands out from the first-timers count. */}
           {rest.map((p) => <p key={p} className={p.startsWith("replies") ? "text-blue" : undefined}>{p}</p>)}
         </div>
-        <Link href={report} className="shrink-0 border border-line-strong px-3 py-1.5 font-sans text-[0.85rem] font-semibold text-ink transition-colors hover:border-blue hover:text-blue">report →</Link>
+        {tick}
       </div>
 
       {issue ? (

@@ -1,42 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { track } from "@/lib/analytics";
 import { EXAMPLES, EXAMPLES_PATH } from "@/lib/examples";
-import { NOT_A_REPO, pasteTarget } from "@/lib/gate";
+import { NOT_A_REPO, pasteHref } from "@/lib/gate";
 import { parseRepoInput } from "@/lib/repo";
 
-/** Does github.com/{repo} exist? Any doubt (offline, rate limited) says yes. */
-export async function askExists(repo: string): Promise<boolean> {
-  const r = await fetch(`/api/repo-exists?repo=${encodeURIComponent(repo)}`);
-  if (!r.ok) return true;
-  const d = await r.json().catch(() => null);
-  return d?.exists !== false;
-}
-
 /**
- * "Opening…" until the page changes. Reset when it does, so coming back (the
- * footer stays mounted across pages; Back restores the landing) never finds
- * the button stuck.
+ * Opens a page from a repo box: [opening, open]. `opening` is true from the
+ * submit until the next screen shows (the report's loading screen counts), and
+ * drops by itself, so the button is never left stuck, the same page included.
  */
-export function useBusy(): [boolean, (on: boolean) => void] {
-  const path = usePathname();
-  const [busy, setBusy] = useState(false);
-  // A new page drops it (adjusting state during render, not in an effect).
-  const [at, setAt] = useState(path);
-  if (at !== path) {
-    setAt(path);
-    setBusy(false);
-  }
-  return [busy, setBusy];
+export function useOpen(): [boolean, (href: string) => void] {
+  const router = useRouter();
+  const [opening, start] = useTransition();
+  return [opening, (href) => start(() => router.push(href))];
 }
 
 // `id` and `label` let a page hold a second box: ids stay unique, and the
 // smoke test's getByLabel("GitHub repository or URL") still finds one input.
-// Signed out, a repo goes through sign-in and lands on its report (the check
-// starts then); the "try" row holds the example reports, which open directly.
+// A repo opens its report, signed in or not (pasteHref); the "try" row holds
+// the example reports.
 export function PasteBox({
   autoFocus = false,
   examples = true,
@@ -53,22 +39,20 @@ export function PasteBox({
   /** From the server's session. Signed-in pages (/me) can leave it out. */
   signedIn?: boolean;
 }) {
-  const router = useRouter();
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useBusy();
+  const [busy, open] = useOpen();
 
-  async function go(input: string) {
+  function go(input: string) {
     const ref = parseRepoInput(input);
     if (!ref) {
       setError(NOT_A_REPO);
       return;
     }
     setError("");
-    setBusy(true);
     const repo = `${ref.owner}/${ref.repo}`;
     track("paste-submit", { repo, signedIn: signedIn ? "yes" : "no" });
-    router.push(await pasteTarget(repo, signedIn, askExists));
+    open(pasteHref(repo));
   }
 
   return (
@@ -76,7 +60,7 @@ export function PasteBox({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void go(value);
+          go(value);
         }}
         className="group relative grid grid-cols-1 border border-line-strong bg-panel transition-colors focus-within:border-blue sm:grid-cols-[1fr_auto]"
       >
@@ -94,7 +78,7 @@ export function PasteBox({
             if (parseRepoInput(text)) {
               e.preventDefault();
               setValue(text.trim());
-              void go(text);
+              go(text);
             }
           }}
           autoFocus={autoFocus}
@@ -129,7 +113,7 @@ export function PasteBox({
             <button
               key={repo}
               type="button"
-              onClick={() => void go(repo)}
+              onClick={() => go(repo)}
               className="min-h-11 border-b border-dashed border-line-strong text-muted transition-colors hover:border-blue hover:text-ink"
             >
               {repo}

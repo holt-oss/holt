@@ -29,12 +29,14 @@ test("landing: pasting an example's GitHub URL ends on the report with a verdict
   await expect(page.getByText(VERDICT).first()).toBeVisible({ timeout: 180_000 });
 });
 
-test("landing, signed out: pasting any other repo goes to sign-in, then back to its report", async ({ page }) => {
+test("landing, signed out: pasting any other repo opens its report, with sign-in for the rest", async ({ page }) => {
   await page.goto("/");
   const box = page.getByLabel("GitHub repository or URL");
   await box.fill("octocat/Hello-World");
   await page.locator("form").filter({ has: box }).getByRole("button", { name: /check this repo/i }).click();
-  await expect(page).toHaveURL(/\/signin\?callbackUrl=%2Foctocat%2FHello-World$/);
+  await expect(page).toHaveURL(/\/octocat\/Hello-World$/);
+  // Under the verdict (from the index or the free check), or in its place for a test browser: sign in, and back here.
+  await expect(page.locator("a[href='/signin?callbackUrl=%2Foctocat%2FHello-World']").first()).toBeVisible({ timeout: 180_000 });
 });
 
 test("URL trick: /github.com/owner/repo redirects to the report", async ({ page, request }) => {
