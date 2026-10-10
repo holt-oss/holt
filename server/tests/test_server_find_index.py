@@ -47,10 +47,10 @@ def finder(monkeypatch):
     return state
 
 
-def issue(number, title="Fix a thing"):
+def issue(number, title="Fix a thing", people=0, open_prs=0):
     return {"number": number, "title": title, "url": f"https://github.com/o/r/issues/{number}",
             "labels": ["good first issue"], "created_at": None, "comments": 0, "why": [],
-            "people": 0, "open_prs": 0}
+            "people": people, "open_prs": open_prs}
 
 
 def add(h, *items):
@@ -262,6 +262,51 @@ def test_a_search_reads_issues_for_the_first_few_only(h, finder):
     got = h.client.portal.call(find_mod.unlisted, h.svc,
                                {"languages": ["python"], "days": 7}, 2)
     assert len(got) == 2
+
+
+def test_a_search_reads_again_the_first_listed_whose_issues_have_aged(h, finder):
+    indexed(h, "py/fresh")
+    add(h, report("py/aged"), meta("py/aged"), starters("py/aged", issue(1), age_hours=7))
+    add(h, report("py/gone"), meta("py/gone"), starters("py/gone", issue(2), age_hours=30))
+    finder.issues = {"py/aged": [issue(8)]}  # #1 was closed; py/gone has none left
+
+    async def canonical(repo):
+        return repo
+
+    h.svc.canonical = canonical
+    r = find(h, languages=["python"])
+    assert sorted(names(r.json()["results"])) == ["py/aged", "py/fresh", "py/gone"]
+    done = h.wait(r.json()["job_id"], kind="find")
+    assert sorted(finder.read) == ["py/aged", "py/gone"]
+    listed = {x["repo"]: [i["number"] for i in x["issues"]] for x in done["results"]}
+    assert listed == {"py/aged": [8], "py/fresh": [1]}
+
+
+def test_only_the_first_listed_are_read_again(h, finder):
+    for i in range(4):
+        add(h, report(f"py/r{i}"), meta(f"py/r{i}"), starters(f"py/r{i}", issue(1), age_hours=9))
+    got = h.client.portal.call(find_mod.aged, h.svc, {"languages": ["python"], "days": 7}, 2)
+    assert len(got) == 2
+
+
+def test_repos_whose_issues_are_all_taken_are_listed_last(h, finder):
+    # Better odds, but someone is on its only issue.
+    add(h, report("py/taken", outsider_merged=12, no_reply=1), meta("py/taken"),
+        starters("py/taken", issue(1, open_prs=1, people=1)))
+    add(h, report("py/free", outsider_merged=3, no_reply=2), meta("py/free"),
+        starters("py/free", issue(2, people=1), issue(3)))
+    results = find(h, languages=["python"]).json()["results"]
+    assert names(results) == ["py/free", "py/taken"]
+    # Nobody-on-it first within a repo.
+    assert [i["number"] for i in results[0]["issues"]] == [3, 2]
+    assert results[1]["issues"][0]["on_it"] == "1 open pull request"
+
+
+def test_taken_issues_are_left_out_when_enough_are_free(h, finder):
+    add(h, report("py/busy"), meta("py/busy"),
+        starters("py/busy", issue(1, people=1), issue(2), issue(3), issue(4)))
+    (result,) = find(h, languages=["python"]).json()["results"]
+    assert [i["number"] for i in result["issues"]] == [2, 3, 4]
 
 
 # --- the rest of the index, in parts ------------------------------------------------
