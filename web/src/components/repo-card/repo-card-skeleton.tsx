@@ -23,12 +23,9 @@ export function RepoCardSkeleton({ verdict = true }: { verdict?: boolean }) {
       )}
       <span className="mt-3 flex h-5 items-center"><Skeleton className="h-2.5 w-20" /></span>
       <Skeleton className="h-2 w-full" />
-      <div className="mt-2.5 flex items-center justify-between">
-        <div>
-          <span className="flex h-5 items-center"><Skeleton className="h-2.5 w-28" /></span>
-          <span className="flex h-5 items-center"><Skeleton className="h-2.5 w-36" /></span>
-        </div>
-        <Skeleton className="h-8 w-28" />
+      <div className="mt-2.5">
+        <span className="flex h-5 items-center"><Skeleton className="h-2.5 w-28" /></span>
+        <span className="flex h-5 items-center"><Skeleton className="h-2.5 w-36" /></span>
       </div>
       <div className="mt-3 border-t border-dashed border-line pt-2.5">
         <Skeleton className="h-2.5 w-16" />

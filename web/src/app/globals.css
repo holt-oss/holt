@@ -3787,3 +3787,127 @@
     border-bottom-color: var(--line);
   }
 }
+
+/* ── Compare picks: the tick on a repo card and the bar that holds the picks
+   (components/compare-picks). Unlayered, and all of it in this block.
+   No :has() and no :checked here: with the page's other :has() rules, either
+   one restyles the whole list on every tick. ── */
+.compare-tick {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  /* A 44px target that takes only its text's room in the card. */
+  min-height: 44px;
+  margin: -12px -8px -12px 0;
+  padding: 0 8px;
+  color: var(--faint);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.compare-tick-box {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+}
+.compare-tick-box::after {
+  width: 9px;
+  height: 5px;
+  margin-top: -2px;
+  border: solid var(--on-accent);
+  border-width: 0 0 2px 2px;
+  rotate: -45deg;
+  scale: 0;
+  content: "";
+}
+.compare-tick[aria-pressed="true"] {
+  color: var(--blue);
+}
+.compare-tick[aria-pressed="true"] .compare-tick-box {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+.compare-tick[aria-pressed="true"] .compare-tick-box::after {
+  scale: 1;
+}
+.compare-tick:focus-visible {
+  outline: none;
+}
+.compare-tick:focus-visible .compare-tick-box {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.compare-tick[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.55;
+}
+@media (hover: hover) {
+  .compare-tick:hover:not([aria-disabled="true"]) {
+    color: var(--ink);
+  }
+  .compare-tick:hover:not([aria-disabled="true"]) .compare-tick-box {
+    border-color: var(--blue);
+  }
+  .compare-pick:hover > span {
+    border-color: var(--blue);
+  }
+}
+
+.compare-bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px calc(6px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line-strong);
+  background: var(--panel);
+}
+/* Room under the page for the bar, so the last card and the footer scroll
+   clear of it, and a tick reached with Tab is never brought in under it. */
+:root[data-compare-bar] {
+  scroll-padding-bottom: calc(69px + env(safe-area-inset-bottom, 0px));
+}
+:root[data-compare-bar] body {
+  padding-bottom: calc(57px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 640px) {
+  .compare-bar {
+    right: auto;
+    bottom: 16px;
+    left: 50%;
+    width: max-content;
+    max-width: min(46rem, calc(100vw - 2rem));
+    padding: 6px 6px 6px 10px;
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--shadow);
+    translate: -50% 0;
+  }
+  :root[data-compare-bar] {
+    scroll-padding-bottom: 94px;
+  }
+  :root[data-compare-bar] body {
+    padding-bottom: 82px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .compare-bar {
+    animation: compare-bar-in var(--dur-fast) var(--ease-out);
+  }
+}
+@keyframes compare-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}

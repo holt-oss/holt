@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CatFace } from "@/components/cat-face";
+import { ComparePicks } from "@/components/compare-picks/compare-picks";
 import { ChipRow } from "@/components/find/chip-row";
 import { FindFrame } from "@/components/find/find-frame";
 import { ErrorPanel } from "@/components/error-panel";
@@ -163,10 +164,14 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
         <section aria-label={`Welcoming Hacktoberfest projects: ${tab.label}`} className="mt-6">
           {!result.ok ? (
             <ErrorPanel error={result.error} retryHref={here} />
-          ) : result.data.status === "queued" ? (
-            <FindRunner key={tab.id} jobId={result.data.job_id} index={result.data.results} days={days} retryHref={here} fit={fit} saved={saved} empty={empty} more={more} />
           ) : (
-            <FindList key={tab.id} results={result.data.results} fit={fit} more={more} auto={false} days={days} saved={saved} empty={empty} />
+            <ComparePicks signedIn={Boolean(user)}>
+              {result.data.status === "queued" ? (
+                <FindRunner key={tab.id} jobId={result.data.job_id} index={result.data.results} days={days} retryHref={here} fit={fit} saved={saved} empty={empty} more={more} />
+              ) : (
+                <FindList key={tab.id} results={result.data.results} fit={fit} more={more} auto={false} days={days} saved={saved} empty={empty} />
+              )}
+            </ComparePicks>
           )}
         </section>
 

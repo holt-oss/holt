@@ -9,6 +9,7 @@ import { personalise, type Fit } from "@/lib/profile";
 import type { ApiError, FindResult, FindStart, Result } from "@/lib/types";
 import type { Prefs } from "@/lib/profile-flow";
 import { saveFromFind } from "@/app/profile/actions";
+import { ComparePicks } from "../compare-picks/compare-picks";
 import { ErrorPanel } from "../error-panel";
 import { EmptyState } from "../shell/app-page";
 import { FindFilters } from "./find-filters";
@@ -164,7 +165,9 @@ export function FindView({ initialPicks, initial, source, hf, saved, signedIn = 
       )}
       {notice}
       {/* The list carries on into the index once the search has settled on these picks; a search still running, or about to, keeps to its own results. */}
-      <Results pending={pending} signIn={signedIn ? null : signInHref(`/find?${q}`)} list={list} raw={raw ?? []} fit={fit} more={searching || pending ? null : picksQuery({ ...picks, level: "experienced", types: [] })} searching={searching} error={error} progress={job.stage.progress} days={picks.days} saved={saved} picks={picks} setPicks={setPicks} onRetry={retryNow} />
+      <ComparePicks signedIn={signedIn}>
+        <Results pending={pending} signIn={signedIn ? null : signInHref(`/find?${q}`)} list={list} raw={raw ?? []} fit={fit} more={searching || pending ? null : picksQuery({ ...picks, level: "experienced", types: [] })} searching={searching} error={error} progress={job.stage.progress} days={picks.days} saved={saved} picks={picks} setPicks={setPicks} onRetry={retryNow} />
+      </ComparePicks>
     </>
   );
 }
