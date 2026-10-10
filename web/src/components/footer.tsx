@@ -43,7 +43,15 @@ function isReportPath(path: string | null): boolean {
   return parts.length === 2 && !SITE_ROUTES.has(parts[0].toLowerCase());
 }
 
-/** The footer under a report: one line of what Holt does and doesn't do, then the links. */
+/** Find a project's tabs: pages used every day, where the list is the point. */
+const WORKING_ROUTES = new Set(["find", "discover", "hacktoberfest"]);
+
+/** Reports and the working pages get the slim footer. */
+function isSlimPath(path: string | null): boolean {
+  return isReportPath(path) || WORKING_ROUTES.has((path ?? "").split("/").filter(Boolean)[0]?.toLowerCase() ?? "");
+}
+
+/** The footer under a report or a working page: one line of what Holt does and doesn't do, then the links. */
 function ReportFooter({ signedIn }: { signedIn: boolean }) {
   return (
     <footer className="site-footer mt-auto border-t border-line bg-panel">
@@ -83,8 +91,8 @@ export function Footer({ signedIn = false }: { signedIn?: boolean }) {
   // already has its own action, so only the landing ends on the form.
   const path = usePathname();
   const onLanding = path === "/";
-  // A report (/owner/repo) gets a slim footer: the page is long, and the big sign-off is for the landing.
-  const onReport = isReportPath(path);
+  // A report (/owner/repo) and the working pages get a slim footer: the page is long, and the big sign-off is for the landing.
+  const slim = isSlimPath(path);
   const root = useRef<HTMLElement>(null);
   const cat = useRef<HTMLButtonElement>(null);
   const frame = useRef(0);
@@ -171,7 +179,7 @@ export function Footer({ signedIn = false }: { signedIn?: boolean }) {
     onBlur: () => setHover(null),
   });
 
-  if (onReport) return <ReportFooter signedIn={signedIn} />;
+  if (slim) return <ReportFooter signedIn={signedIn} />;
 
   return (
     <footer ref={root} onPointerMove={onMove} className="site-footer mt-auto overflow-clip border-t border-line bg-panel">

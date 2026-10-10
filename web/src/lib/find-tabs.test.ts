@@ -16,3 +16,9 @@ test("discovery destinations keep the same names before and after sign-in", () =
     assert.deepEqual(tabs.map(({ label }) => label), ["Find a project", "Browse projects"]);
   }
 });
+
+test("a tab's phone label is the start of its full name", () => {
+  const tabs = findTabs({ signedIn: false, season: true, current: "find" });
+  assert.deepEqual(tabs.map((t) => t.short ?? t.label), ["Find", "Browse", "Hacktoberfest"]);
+  for (const t of tabs) assert.ok(t.label.startsWith(t.short ?? t.label));
+});
