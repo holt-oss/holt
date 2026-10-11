@@ -7,7 +7,7 @@ import { PageTransition } from "./motion/page-transition";
 // The frame every policy page shares: the PageHead band with a rail, the
 // "Last updated" line, a prose column (styles: .legal in globals.css) with
 // "On this page" beside it on wide screens, and links to the other policies.
-// Static: no loading.tsx, no skeleton.
+// Static: nothing of its own to wait for; each page's loading.tsx is the plain page head.
 export function LegalPage({
   rail,
   title,
