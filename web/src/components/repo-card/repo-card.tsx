@@ -15,7 +15,8 @@ import { LangDot, RepoAvatar } from "./repo-avatar";
  * click anywhere on the card that isn't a link or a button opens the focus
  * view, which leads with the report. The name is the card's one link to the
  * report (`report`): followed as it is without JS, by a crawler or in a new
- * tab. `tick` is the list's compare tick, beside the numbers.
+ * tab. `tick` is the list's compare tick, beside the numbers; ticked, it draws
+ * the card's ink edge (globals.css), which is why the card is `relative`.
  */
 export function RepoCard({ r, report, onOpen, actions, tick, verdict = true, why = false }: { r: CardRepo; report: string; onOpen?: () => void; actions?: React.ReactNode; tick?: React.ReactNode; verdict?: boolean; why?: boolean }) {
   const [owner, name] = r.repo.split("/");
@@ -41,7 +42,7 @@ export function RepoCard({ r, report, onOpen, actions, tick, verdict = true, why
     onOpen();
   });
   return (
-    <article onClick={openFromCard} className={`app-card flex h-full flex-col border border-line-strong bg-panel p-4 shadow-soft hover:border-blue/60 ${onOpen ? "cursor-pointer" : ""}`}>
+    <article onClick={openFromCard} className={`app-card relative flex h-full flex-col border border-line-strong bg-panel p-4 shadow-soft hover:border-blue/60 ${onOpen ? "cursor-pointer" : ""}`}>
       <div className="flex items-start gap-3">
         <RepoAvatar repo={r.repo} />
         {/* Tall enough for a name, two lines of description and the language, so the rows below line up across the grid. */}

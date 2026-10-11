@@ -39,7 +39,7 @@ export default async function ProfileSettings({ searchParams }: PageProps<"/sett
       {p && (
         <p className="mt-8 border-t border-line pt-5 font-sans text-[0.87rem] text-faint">
           {p.updated_at && <>Last saved {shortDate(p.updated_at)}. </>}
-          To delete it, go to <Link href={PRIVACY_SETTINGS} className="text-green transition-opacity hover:opacity-75">Privacy and data</Link>.
+          To delete it, go to <Link href={PRIVACY_SETTINGS} className="text-link">Privacy and data</Link>.
         </p>
       )}
     </section>

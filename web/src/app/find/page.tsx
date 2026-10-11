@@ -36,7 +36,7 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
       <FindFrame tab="find" title="Find a project" signedIn={Boolean(user)}>
         <FindView
           notice={sp.profile === "saved" && (
-            <p role="status" className="mt-5 border border-green/50 bg-green/10 px-4 py-2.5 font-sans text-[0.9rem] text-green">Profile saved.</p>
+            <p role="status" className="mt-5 border border-line-strong bg-ink/5 px-4 py-2.5 font-sans text-[0.9rem] text-ink">Profile saved.</p>
           )}
           initialPicks={picks} initial={result} source={source} hf={hf} saved={saved} signedIn={Boolean(user)} profile={profile} />
       </FindFrame>

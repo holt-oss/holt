@@ -246,7 +246,7 @@ export default async function Home() {
                 <code className="min-w-0 overflow-x-auto whitespace-nowrap px-2 py-4 text-[0.8rem] sm:px-3 sm:text-[0.95rem]">
                   uv tool install holt-cli<span aria-hidden="true" className="ls-caret" />
                 </code>
-                <CopyButton text="uv tool install holt-cli" className="self-stretch border-l border-line-strong px-3 text-[0.89rem] text-muted sm:px-4 transition-colors hover:bg-green hover:text-on-accent" />
+                <CopyButton text="uv tool install holt-cli" className="self-stretch border-l border-line-strong px-3 text-[0.89rem] text-muted sm:px-4 transition-colors hover:bg-ink hover:text-on-accent" />
               </div>
               <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-4" data-reveal>
                 <a className="bracket-link" href={`${GITHUB_REPO_URL}/blob/main/CONTRIBUTING.md`}>[ start contributing → ]</a>

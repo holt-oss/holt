@@ -136,7 +136,7 @@ function WebMode({ replay, at, animate, hidden }: { replay: Replay; at: number; 
           const now = at === i + 1 && at < 4;
           return (
             <li key={s} className={`flex gap-3 ${show(at > i)} ${now ? "text-ink" : "text-muted"}`}>
-              <span className={`w-4 text-center ${now ? "text-blue" : "text-green"}`}>{now ? "▸" : "✓"}</span>
+              <span className={`w-4 text-center ${now ? "text-blue" : "text-ink"}`}>{now ? "▸" : "✓"}</span>
               {s}
             </li>
           );

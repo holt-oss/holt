@@ -121,7 +121,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
 
 function LockIcon() {
   return (
-    <svg viewBox="0 0 16 16" className="mt-[0.3em] size-3.5 shrink-0 text-green" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+    <svg viewBox="0 0 16 16" className="mt-[0.3em] size-3.5 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
       <rect x="3" y="7" width="10" height="7" />
       <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
     </svg>

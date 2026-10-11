@@ -26,7 +26,7 @@ export default async function Image() {
           </div>
           <div style={{ display: "flex", marginTop: "auto", justifyContent: "space-between", fontSize: 26, color: "#a3a39b" }}>
             <span>Repos that merge outside work, by language. Free.</span>
-            <span style={{ color: "#69c7a6" }}>{SITE_HOST}/hacktoberfest</span>
+            <span style={{ color: "#e7e5dc" }}>{SITE_HOST}/hacktoberfest</span>
           </div>
         </div>
       </div>
