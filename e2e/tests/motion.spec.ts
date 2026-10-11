@@ -39,7 +39,7 @@ test.describe("no layout shift", () => {
     });
   }
 
-  test("client navigation to a report (skeleton, then content)", async ({ page }) => {
+  test("client navigation to a report", async ({ page }) => {
     await watchShifts(page);
     await page.goto("/");
     await openReportFromLanding(page, 0);
@@ -53,16 +53,19 @@ interface Timeline {
   committed: number | null; // skeleton in the DOM
   visible: number | null; // skeleton at least half visible
   maxOpacity: number;
-  content: number | null; // skeleton gone, report in place
+  content: number | null; // no skeleton, and the page in place
   response: number | null;
   viaFallback: boolean; // the layout's RouteFallback rendered the skeleton (the router had committed nothing)
+  line: number | null; // the pending line along the top of the window
+  emptyMain: number; // frames in which <main> held no element at all
 }
 
 /**
- * Clicks the landing page's link to the sample report (SAMPLE) after it has been
- * prefetched (so the loading skeleton can show at once) and records, frame by
- * frame, when the skeleton appears and when the report replaces it.
- * `delay` holds the navigation's server response back by that many ms.
+ * Clicks a link on the landing page after it has been prefetched and records,
+ * frame by frame, what the visitor gets until the page it leads to is in
+ * place. By default the link is the one to the sample report (SAMPLE), under
+ * the replay in section 02. `delay` holds the navigation's server response
+ * back by that many ms.
  *
  * `racePrefetch` reproduces the production race: the prefetch is held for
  * 800ms (a slow tunnel), and the click follows its response within 30ms,
@@ -72,9 +75,13 @@ interface Timeline {
  * window is about 100ms wide after the response and only opens when the
  * prefetch was slow, so `viaFallback` says whether the click landed in it.
  */
-async function openReportFromLanding(page: Page, delay: number, { racePrefetch = false } = {}): Promise<Timeline> {
+async function openFromLanding(
+  page: Page,
+  delay: number,
+  { racePrefetch = false, path = SAMPLE, link: linkSelector = `main a[href="${SAMPLE}"]`, arrived = VERDICT }: { racePrefetch?: boolean; path?: string; link?: string; arrived?: RegExp } = {},
+): Promise<Timeline> {
   let response: number | null = null;
-  await page.route((u) => u.pathname === SAMPLE && u.searchParams.has("_rsc"), async (route) => {
+  await page.route((u) => u.pathname === path && u.searchParams.has("_rsc"), async (route) => {
     const h = route.request().headers();
     if (h["next-router-prefetch"]) {
       if (racePrefetch) await new Promise((r) => setTimeout(r, 800));
@@ -86,51 +93,60 @@ async function openReportFromLanding(page: Page, delay: number, { racePrefetch =
     response = Date.now() - sent - delay;
     await route.fulfill({ response: res });
   });
-  const link = page.locator(`main a[href="${SAMPLE}"]`).first();
-  const prefetched = page.waitForRequest((r) => r.url().includes(`${SAMPLE}?_rsc=`) && Boolean(r.headers()["next-router-prefetch"]), { timeout: 15_000 }).catch(() => null);
+  const link = page.locator(linkSelector).first();
+  const prefetched = page.waitForRequest((r) => r.url().includes(`${path}?_rsc=`) && Boolean(r.headers()["next-router-prefetch"]), { timeout: 15_000 }).catch(() => null);
   await link.scrollIntoViewIfNeeded();
   const prefetchRequest = await prefetched;
-  test.skip(!prefetchRequest, "the report link was never prefetched");
+  test.skip(!prefetchRequest, "the link was never prefetched");
   if (racePrefetch) {
     await prefetchRequest!.response();
     await page.waitForTimeout(30);
   } else {
     await page.waitForTimeout(500);
   }
-  await page.evaluate(() => {
+  await page.evaluate(({ path, arrived }) => {
     const w = window as unknown as { __tl: Timeline; __t0: number };
-    w.__tl = { committed: null, visible: null, maxOpacity: 0, content: null, response: null, viaFallback: false };
+    w.__tl = { committed: null, visible: null, maxOpacity: 0, content: null, response: null, viaFallback: false, line: null, emptyMain: 0 };
     w.__t0 = performance.now();
+    const there = new RegExp(arrived);
     const tick = () => {
       const t = Math.round(performance.now() - w.__t0);
-      const sk = document.querySelector("main [data-skeleton]");
+      const main = document.querySelector("main");
+      if (main && !main.firstElementChild) w.__tl.emptyMain++;
+      if (document.querySelector("[data-nav-pending]")) w.__tl.line ??= t;
+      // The page's loading screen, not a section's own skeleton inside a page that has arrived.
+      const sk = document.querySelector("main [data-route-loading] [data-skeleton]");
       if (sk) {
         w.__tl.committed ??= t;
         if (sk.closest("[data-route-fallback]")) w.__tl.viaFallback = true;
         const o = Number(getComputedStyle(sk).opacity);
         w.__tl.maxOpacity = Math.max(w.__tl.maxOpacity, o);
         if (o >= 0.5) w.__tl.visible ??= t;
-      } else if (w.__tl.committed != null && document.querySelector("main h1")?.textContent?.match(/worth|evidence/i)) {
+      } else if (location.pathname === path && there.test(document.querySelector("main h1")?.textContent ?? "")) {
         w.__tl.content = t;
         return;
       }
       if (t < 10_000) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
-  });
+  }, { path, arrived: arrived.source });
   // A script click: the link is below the fold on phones, and scrolling would move it.
   await link.evaluate((a: HTMLAnchorElement) => a.click());
-  await expect(page).toHaveURL(new RegExp(`${SAMPLE}$`));
-  await expect(page.locator("main h1").filter({ hasText: VERDICT })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${path}$`));
+  await expect(page.locator("main h1").filter({ hasText: arrived })).toBeVisible();
   await page.waitForTimeout(300);
   const tl = await page.evaluate(() => (window as unknown as { __tl: Timeline }).__tl);
   return { ...tl, response };
 }
+const openReportFromLanding = openFromLanding;
+// A page that has a loading.tsx, from the link in the landing page's last section.
+const LOADING_PAGE = { path: "/how-it-works", link: 'main a[href="/how-it-works"]', arrived: /\S/ };
 
-test.describe("skeletons", () => {
-  test("show for a slow page, and stay until the content replaces them", async ({ page }) => {
+test.describe("loading", () => {
+  test("a slow page with a loading screen shows its skeleton, and keeps it until the content replaces it", async ({ page }) => {
     await page.goto("/");
-    const tl = await openReportFromLanding(page, 600);
+    // Held long enough for the skeleton's 300ms wait after a slow commit (the landing page is a big snapshot).
+    const tl = await openFromLanding(page, 1200, LOADING_PAGE);
     const why = JSON.stringify(tl);
     expect(tl.committed, why).not.toBeNull();
     expect(tl.visible, `the skeleton never became visible: ${why}`).not.toBeNull();
@@ -139,28 +155,57 @@ test.describe("skeletons", () => {
     expect(tl.content! - tl.committed!, why).toBeGreaterThanOrEqual(300);
   });
 
-  test("don't flash for a fast page", async ({ page }) => {
+  // A report has no loading screen to commit at the click (one would hold a
+  // ready verdict back 300ms): the answer goes out as the page itself.
+  test("a report that answers quickly shows no loading screen at all", async ({ page }) => {
     await page.goto("/");
     const tl = await openReportFromLanding(page, 0);
     test.skip(tl.response == null || tl.response > 100, `the server took ${tl.response}ms; this needs an answer under 100ms`);
-    expect(tl.maxOpacity, JSON.stringify(tl)).toBeLessThan(0.1);
+    const why = JSON.stringify(tl);
+    expect(tl.committed, why).toBeNull();
+    expect(tl.emptyMain, why).toBe(0);
+  });
+
+  test("a report slow to arrive: the page you were on stays up under the pending line, and <main> is never empty", async ({ page }) => {
+    await page.goto("/");
+    const tl = await openReportFromLanding(page, 600);
+    const why = JSON.stringify(tl);
+    expect(tl.line, `the pending line never showed: ${why}`).not.toBeNull();
+    expect(tl.line!, why).toBeLessThan(600);
+    expect(tl.emptyMain, why).toBe(0);
+    expect(tl.content, why).not.toBeNull();
+    await expect(page.locator("[data-nav-pending]")).toHaveCount(0);
   });
 
   // The production bug behind #57: a click while the prefetch is still being
   // applied made the router commit the route as nothing, so no skeleton showed
   // and the footer jumped up under the header and back down (CLS 0.19 / 0.38).
-  test("show even when the router commits the route as nothing (a click mid-prefetch), and nothing moves", async ({ page }) => {
+  test("a click mid-prefetch, when the router commits the route as nothing: the skeleton still shows, and nothing moves", async ({ page }) => {
     await watchShifts(page);
     // The window is narrow; a click can miss it on a busy host. Three tries.
     let tl!: Timeline;
     for (let attempt = 0; attempt < 3 && !tl?.viaFallback; attempt++) {
       await page.unrouteAll();
       await page.goto("/");
-      tl = await openReportFromLanding(page, 1200, { racePrefetch: true });
+      tl = await openFromLanding(page, 2000, { racePrefetch: true, ...LOADING_PAGE });
     }
     const why = JSON.stringify(tl);
     expect(tl.viaFallback, `the click missed the race window three times, so the layout's fallback never rendered: ${why}`).toBe(true);
     expect(tl.visible, `the skeleton never became visible: ${why}`).not.toBeNull();
+    expect(tl.content, why).not.toBeNull();
+    await page.waitForTimeout(1500);
+    const s = await shifts(page);
+    expect(s.cls, s.list.join(" | ")).toBeLessThan(0.01);
+  });
+
+  // The same click on a report link. With no loading boundary the router keeps
+  // the page you were on; if it ever commits nothing here too, the fallback must cover it.
+  test("a click mid-prefetch on a report: <main> is never left empty, and nothing moves", async ({ page }) => {
+    await watchShifts(page);
+    await page.goto("/");
+    const tl = await openReportFromLanding(page, 1200, { racePrefetch: true });
+    const why = JSON.stringify(tl);
+    expect(tl.emptyMain === 0 || tl.viaFallback, why).toBe(true);
     expect(tl.content, why).not.toBeNull();
     await page.waitForTimeout(1500);
     const s = await shifts(page);

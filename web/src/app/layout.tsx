@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { Footer } from "@/components/footer";
 import { MarketingHeader } from "@/components/header";
 import { MenuAutoClose } from "@/components/motion/menu-autoclose";
+import { NavPending } from "@/components/motion/nav-pending";
 import { RouteFallback } from "@/components/motion/route-fallback";
 import { SmoothScroll } from "@/components/motion/smooth-scroll";
 import { CheckWatch } from "@/components/check-watch";
@@ -87,6 +88,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <RouteFallback />
         </ShellFrame>
         {user && <CheckWatch />}
+        <NavPending />
         <MenuAutoClose />
         <CheckLinks />
         <SmoothScroll />

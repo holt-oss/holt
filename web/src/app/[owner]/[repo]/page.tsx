@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ViewTransition } from "react";
+import { Suspense, ViewTransition } from "react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { after } from "next/server";
@@ -10,6 +10,7 @@ import { AnalysisRunner } from "@/components/report/analysis-runner";
 import { nextAction } from "@/components/report/next-action";
 import { MergePlanPanel } from "@/components/report/merge-plan-panel";
 import { PartialReport } from "@/components/report/partial-report";
+import { ReportLoading } from "@/components/report/report-skeleton";
 import { ReportTeaser } from "@/components/report/report-teaser";
 import { ReportView } from "@/components/report/report-view";
 import { RepoAbout } from "@/components/report/repo-about";
@@ -93,7 +94,44 @@ function JsonLd({ report, name }: { report: Report | null; name: string }) {
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: json }} />;
 }
 
-export default async function RepoPage({ params, searchParams }: Props) {
+/** How long the page waits for its data before it sends the loading screen instead. */
+const LOADING_AFTER_MS = 120;
+const SLOW = Symbol("slow");
+
+/** What `work` resolves to (or throws), or SLOW if it takes longer than `ms`. */
+function within<T>(work: Promise<T>, ms: number): Promise<T | typeof SLOW> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const slow = new Promise<typeof SLOW>((resolve) => {
+    timer = setTimeout(resolve, ms, SLOW);
+  });
+  return Promise.race([work, slow]).finally(() => clearTimeout(timer));
+}
+
+// This route has no loading.tsx, on purpose. With one, every visit commits the
+// loading screen first, and React keeps a shown one up for 300ms (then waits
+// for the pictures of the page replacing it), so a report Holt already has
+// painted its verdict half a second after the server had it. Here the page
+// waits a moment for its data: an answer in time goes out as the page itself,
+// verdict in the first paint; a slow one gets the loading screen, already
+// visible, and streams in behind it as before. On a click the page you were on
+// stays up until one of the two arrives (the pending line says so, nav-pending.tsx).
+export default async function RepoPage(props: Props) {
+  const page = Report(props);
+  // A not-found or a redirect thrown in time leaves from here, with its real status.
+  const first = await within(page, LOADING_AFTER_MS);
+  if (first !== SLOW) return first;
+  return (
+    <Suspense fallback={<ReportLoading immediate />}>
+      <Late page={page} />
+    </Suspense>
+  );
+}
+
+async function Late({ page }: { page: Promise<React.ReactNode> }) {
+  return page;
+}
+
+async function Report({ params, searchParams }: Props): Promise<React.ReactNode> {
   const { owner, repo } = await params;
   if (!isValidRepo(owner, repo)) notFound();
   const sp = await searchParams;
@@ -147,8 +185,10 @@ export default async function RepoPage({ params, searchParams }: Props) {
             alt=""
             width={40}
             height={40}
-            // Decorative and small: don't compete with the CSS and fonts the verdict needs.
+            // Decorative and small: don't compete with the CSS and fonts the verdict needs,
+            // and (lazy) don't hold the page back: React waits for a new page's other pictures before showing it.
             fetchPriority="low"
+            loading="lazy"
             decoding="async"
             // Level with the name, not the middle of a tall details block.
             className="hidden size-10 self-start rounded-md border border-line-strong bg-panel-2 sm:block"

@@ -1,7 +1,8 @@
 // PageHead's shape while a page loads: the rail, a display headline and a
 // lead paragraph, at their real line heights.
+import { LoadingTransition } from "./motion/page-transition";
 import { PageHead } from "./page-head";
-import { Skeleton, SkeletonText } from "./skeleton";
+import { Skeleton, SkeletonRegion, SkeletonText } from "./skeleton";
 
 export function PageHeadSkeleton({
   narrow = false,
@@ -31,5 +32,16 @@ export function PageHeadSkeleton({
       {lead > 0 && <SkeletonText lines={lead} lineHeight="1.785rem" bar="0.9rem" className="mt-5 max-w-2xl" />}
       {children}
     </PageHead>
+  );
+}
+
+/** The loading screen of a page that is a head and some text: its loading.tsx, and route-fallback.tsx. */
+export function PageLoading() {
+  return (
+    <LoadingTransition>
+      <SkeletonRegion>
+        <PageHeadSkeleton />
+      </SkeletonRegion>
+    </LoadingTransition>
   );
 }

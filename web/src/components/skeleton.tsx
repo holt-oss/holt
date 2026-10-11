@@ -55,7 +55,8 @@ export function SkeletonCard({ compact = false, className = "" }: { compact?: bo
 
 /**
  * The wrapper every skeleton sits in: busy for assistive tech, and invisible
- * for its first 300ms (--sk-delay) so fast loads never flash.
+ * for its first 300ms (--sk-delay) so fast loads never flash (LoadingTransition's
+ * `immediate` drops the wait for a loading screen sent only once a page is known to be slow).
  */
 export function SkeletonRegion({
   label = "Loading…",
