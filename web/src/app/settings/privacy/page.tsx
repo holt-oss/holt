@@ -24,7 +24,7 @@ export default async function PrivacySettings({ searchParams }: PageProps<"/sett
       <SectionHead id="privacy">
         <p>
           Holt keeps little: your sign-in details, the reports you ran, and what you chose to save here. The{" "}
-          <Link href="/privacy" className="text-green transition-opacity hover:opacity-75">privacy policy</Link> has the full list.
+          <Link href="/privacy" className="text-link">privacy policy</Link> has the full list.
         </p>
       </SectionHead>
 
@@ -38,7 +38,7 @@ export default async function PrivacySettings({ searchParams }: PageProps<"/sett
             <StatsSwitch acct={acct} />
           ) : (
             <p className="font-sans text-[0.9rem] text-muted">
-              Only counts once you <Link href={CONNECT_GITHUB} className="text-green transition-opacity hover:opacity-75">connect GitHub</Link>. Nothing of yours is in any statistics now.
+              Only counts once you <Link href={CONNECT_GITHUB} className="text-link">connect GitHub</Link>. Nothing of yours is in any statistics now.
             </p>
           )}
         </div>
@@ -47,7 +47,7 @@ export default async function PrivacySettings({ searchParams }: PageProps<"/sett
       <Block title="Your profile" className="mt-8">
         <div className="app-row flex flex-wrap justify-between">
           <p className="min-w-0 flex-1 basis-56 font-sans text-[0.9rem] text-muted">
-            {p ? "Your languages, time, experience and topics. Deleting it doesn't touch your history." : <>No profile saved. <Link href={PROFILE_SETTINGS} className="text-green transition-opacity hover:opacity-75">Set one up</Link> for picks.</>}
+            {p ? "Your languages, time, experience and topics. Deleting it doesn't touch your history." : <>No profile saved. <Link href={PROFILE_SETTINGS} className="text-link">Set one up</Link> for picks.</>}
           </p>
           {p && (
             <form action={remove}>

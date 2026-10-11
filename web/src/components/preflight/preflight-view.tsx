@@ -337,7 +337,7 @@ export function ResultView({ p, example = false }: { p: Preflight; example?: boo
         </p>
         {p.note && <p className="mt-3 border border-dashed border-line-strong px-3 py-2 font-sans text-[0.9rem] text-muted">{p.note}</p>}
         {p.archived && <p className="mt-3 font-sans text-[0.9rem] text-orange">This repo is archived. It doesn&apos;t take PRs any more.</p>}
-        {p.free_recheck && <p className="mt-3 font-sans text-[0.89rem] text-green">Same commit as your last check, so this one was free.</p>}
+        {p.free_recheck && <p className="mt-3 font-sans text-[0.89rem] text-muted">Same commit as your last check, so this one was free.</p>}
       </div>
 
       {p.summary && p.summary.sentences.length > 0 && (

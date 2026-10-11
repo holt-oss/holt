@@ -34,7 +34,7 @@ import { dismissAlertsCard, refresh, setCounted } from "./actions";
 export const metadata: Metadata = { title: "Your pull requests", robots: { index: false } };
 
 const NOTICES: Record<string, { tone: string; text: string }> = {
-  done: { tone: "text-green border-green/50 bg-green/10", text: "Updated from GitHub." },
+  done: { tone: "text-ink border-line-strong bg-ink/5", text: "Updated from GitHub." },
   wait: { tone: "text-muted border-line-strong", text: "Already up to date: we checked GitHub a few minutes ago." },
   limited: { tone: "text-orange border-orange/50 bg-orange/10", text: "GitHub is asking us to slow down. Your list below is from the last check; try again in a few minutes." },
   error: { tone: "text-orange border-orange/50 bg-orange/10", text: "We couldn't reach GitHub just now. Your list below is from the last check; try again in a minute." },

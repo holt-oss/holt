@@ -87,10 +87,10 @@ export function MergeAccountsForm() {
 export function GitHubConnectionRow({ acct }: { acct: NonNullable<Account> }) {
   return (
     <>
-      <div className="app-row flex flex-wrap justify-between" data-rule style={{ "--rule": "var(--green)" } as React.CSSProperties}>
+      <div className="app-row flex flex-wrap justify-between" data-rule style={{ "--rule": "var(--ink)" } as React.CSSProperties}>
         <div className="min-w-0 pl-2 text-[0.9rem]">
           <p>
-            <span className="text-green">connected as </span>
+            <span className="text-muted">connected as </span>
             <a href={`https://github.com/${acct.login}`} target="_blank" rel="noopener noreferrer" className="font-semibold [overflow-wrap:anywhere] hover:underline">
               @{acct.login}
             </a>
