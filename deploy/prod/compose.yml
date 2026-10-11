@@ -148,6 +148,25 @@ services:
       # owner sets HOLT_PROD_ACCOUNT_EMAILS=1 the same way (staging's
       # HOLT_ACCOUNT_EMAILS never reaches here).
       HOLT_ACCOUNT_EMAILS: ${HOLT_PROD_ACCOUNT_EMAILS:-0}
+      # Pass sales (README.md, "Selling passes"): off until the owner sets
+      # HOLT_PROD_PAYMENTS=1 and the live keys the same way. Only the
+      # prod-named variables are read, so staging's HOLT_PAYMENTS_ENABLED,
+      # RAZORPAY_* test keys and HOLT_PASSES_ON_SALE never reach here.
+      # deploy.sh refuses to start with the switch on and anything but live
+      # Razorpay keys, or with Dodo half set (env.sh, check_prod_payments).
+      # The keys stay set while the switch is off, so a payment made just
+      # before it still gives its pass. Without the Dodo values USD is not
+      # offered.
+      HOLT_PAYMENTS_ENABLED: ${HOLT_PROD_PAYMENTS:-0}
+      RAZORPAY_KEY_ID: ${PROD_RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${PROD_RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${PROD_RAZORPAY_WEBHOOK_SECRET:-}
+      DODO_ENV: live
+      DODO_API_KEY: ${PROD_DODO_API_KEY:-}
+      DODO_WEBHOOK_SECRET: ${PROD_DODO_WEBHOOK_SECRET:-}
+      DODO_PRODUCT_PRO_1M: ${PROD_DODO_PRODUCT_PRO_1M:-}
+      DODO_PRODUCT_PRO_3M: ${PROD_DODO_PRODUCT_PRO_3M:-}
+      DODO_PRODUCT_PRO_12M: ${PROD_DODO_PRODUCT_PRO_12M:-}
       # Six people's jobs at once, plus three background workers for badges
       # and warm passes (each takes a waiting person's job first); a warm
       # pass keeps HOLT_WARM_PARALLEL reports in flight. Each job is a thread

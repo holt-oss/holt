@@ -154,7 +154,7 @@ def test_anyone_can_ask_and_nothing_is_written_yet(hp):
     s = state(hp)
     assert s["available"] is True
     assert s["teaser"] is None and s["playbook"] is None and s["access"] is None
-    assert s["on_sale"] is False  # nothing is on sale in the shipped catalogue
+    assert s["on_sale"] is False  # no pass in the shipped catalogue unlocks it
 
 
 def test_signed_in_state_says_what_unlocking_would_cost(hp):
