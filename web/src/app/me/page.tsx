@@ -40,7 +40,7 @@ import { dismissNudge } from "./actions";
 export const metadata: Metadata = { title: "Your home", robots: { index: false } };
 
 const NOTICES: Record<string, { tone: string; text: string }> = {
-  saved: { tone: "text-green border-green/50 bg-green/10", text: "Profile saved. Your picks are below." },
+  saved: { tone: "text-ink border-line-strong bg-ink/5", text: "Profile saved. Your picks are below." },
   adult: { tone: "text-orange border-orange/50 bg-orange/10", text: "Please confirm you're 18 or older to save a profile." },
   error: { tone: "text-orange border-orange/50 bg-orange/10", text: "We couldn't save your profile just now. Try again in a minute." },
 };
@@ -320,7 +320,7 @@ export default async function HomePage({ searchParams }: PageProps<"/me">) {
                     <ul className="space-y-2 font-sans text-[0.86rem] leading-snug text-muted">
                       {CONNECTED.map((line) => (
                         <li key={line} className="flex gap-2">
-                          <span aria-hidden="true" className="text-green">+</span>
+                          <span aria-hidden="true" className="text-blue">+</span>
                           <span>{line}</span>
                         </li>
                       ))}

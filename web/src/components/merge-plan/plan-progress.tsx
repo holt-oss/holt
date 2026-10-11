@@ -85,7 +85,7 @@ export function PlanProgress({ repo, stage, progress }: { repo: string; stage: s
               const took = (live ? elapsed : shown[i + 1].at) - l.at;
               return (
                 <li key={l.title} className={`plog-line flex gap-3 ${live ? "text-ink" : "text-muted"}`}>
-                  <span aria-hidden="true" className={`w-4 shrink-0 text-center ${live ? "text-blue" : "text-green"}`}>{live ? "▸" : "✓"}</span>
+                  <span aria-hidden="true" className={`w-4 shrink-0 text-center ${live ? "text-blue" : "text-ink"}`}>{live ? "▸" : "✓"}</span>
                   <span className="min-w-0 flex-1 truncate">
                     {l.title}
                     <span className="sr-only">{live ? " (in progress)" : " (done)"}</span>
@@ -120,7 +120,7 @@ export function PlanProgress({ repo, stage, progress }: { repo: string; stage: s
                       <span className="sk h-1 w-1/4" />
                     </span>
                   </span>
-                  <span className={`w-4 shrink-0 text-center text-[0.8rem] ${state === "done" ? "text-green" : "text-blue"}`}>
+                  <span className={`w-4 shrink-0 text-center text-[0.8rem] ${state === "done" ? "text-ink" : "text-blue"}`}>
                     {state === "done" ? "✓" : state === "live" ? <span className="plan-dot" /> : ""}
                   </span>
                 </li>

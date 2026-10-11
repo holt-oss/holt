@@ -56,12 +56,12 @@ export default function HowItWorks() {
             {TRACE.map((t) => (
               <div
                 key={t.name}
-                className={`relative grid grid-cols-[40px_1fr_auto] items-baseline gap-x-4 gap-y-1 border-b border-line py-4 md:grid-cols-[62px_170px_1fr_96px] ${t.decision ? "bg-green/[0.06]" : ""}`}
+                className={`relative grid grid-cols-[40px_1fr_auto] items-baseline gap-x-4 gap-y-1 border-b border-line py-4 md:grid-cols-[62px_170px_1fr_96px] ${t.decision ? "bg-ink/[0.04]" : ""}`}
               >
                 <span className="text-[0.82rem] text-blue">{t.i}</span>
                 <span className="text-ink">{t.name}</span>
                 <span className="col-span-2 col-start-2 row-start-2 font-sans text-[0.9rem] text-muted md:col-span-1 md:col-start-3 md:row-start-1">{t.copy}</span>
-                <span className={`text-right text-[0.8rem] uppercase ${t.owner === "no model" ? "text-green" : "text-faint"}`}>{t.owner}</span>
+                <span className={`text-right text-[0.8rem] uppercase ${t.owner === "no model" ? "text-ink" : "text-faint"}`}>{t.owner}</span>
               </div>
             ))}
           </div>
@@ -89,8 +89,8 @@ export default function HowItWorks() {
           </ul>
           <p className="mt-6 text-[0.88rem] text-faint">
             That 55/55 is from Holt&apos;s competition days. Treat it as history, not a promise.{" "}
-            <a className="text-green transition-opacity hover:opacity-75" href={`${GITHUB_REPO_URL}/blob/main/docs/research/REPRODUCTION.md`}>[ reproduce it → ]</a>{" "}
-            <a className="text-green transition-opacity hover:opacity-75" href={`${GITHUB_REPO_URL}/blob/main/docs/research/EVALUATION.md`}>[ full evaluation ]</a>
+            <a className="text-link" href={`${GITHUB_REPO_URL}/blob/main/docs/research/REPRODUCTION.md`}>[ reproduce it → ]</a>{" "}
+            <a className="text-link" href={`${GITHUB_REPO_URL}/blob/main/docs/research/EVALUATION.md`}>[ full evaluation ]</a>
           </p>
         </Block>
 
@@ -105,7 +105,7 @@ export default function HowItWorks() {
               <div className="grid max-w-[760px] grid-cols-[auto_1fr_auto] items-center border border-line-strong bg-panel">
                 <span aria-hidden="true" className="pl-4 text-amber">$</span>
                 <code className="min-w-0 overflow-x-auto whitespace-nowrap px-3 py-4 text-[0.9rem]">uv tool install holt-cli</code>
-                <CopyButton text="uv tool install holt-cli" className="self-stretch border-l border-line-strong px-4 text-[0.89rem] text-muted transition-colors hover:bg-green hover:text-on-accent" />
+                <CopyButton text="uv tool install holt-cli" className="self-stretch border-l border-line-strong px-4 text-[0.89rem] text-muted transition-colors hover:bg-ink hover:text-on-accent" />
               </div>
               <p className="mt-8">
                 <Link href="/" className="bracket-link">[ or just paste a repo → ]</Link>
@@ -114,7 +114,7 @@ export default function HowItWorks() {
             <figure className="m-0 border border-line-strong bg-[#101010]">
               <div className="flex min-h-10 items-center justify-between border-b border-[#292b29] px-4 text-[0.78rem] text-[#8a8a83]">
                 <span>holt / terminal app</span>
-                <span className="text-[#69c7a6]">● read-only</span>
+                <span className="text-[#e7e5dc]">● read-only</span>
               </div>
               <Image src={tui} alt="Holt terminal interface listing assessed repositories and their verdicts" sizes="(min-width: 1120px) 540px, (min-width: 1024px) 50vw, 100vw" className="h-auto w-full" placeholder="blur" />
             </figure>

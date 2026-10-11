@@ -23,7 +23,7 @@ export function ShowMore({ count, children }: { count: number; children: React.R
         aria-expanded={open}
         aria-controls={id}
         onClick={flip}
-        className="flex min-h-11 cursor-pointer items-center gap-2 py-3 text-[0.88rem] text-green"
+        className="flex min-h-11 cursor-pointer items-center gap-2 py-3 text-[0.88rem] text-ink hover:text-blue"
       >
         {open ? "[ show fewer ]" : `[ show ${count} more ]`}
       </button>

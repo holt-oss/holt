@@ -138,7 +138,7 @@ export function RepoFocus({ r, report, actions, topicBase }: { r: CardRepo; repo
         <ul className="mt-2 space-y-0.5 font-sans text-[0.82rem] text-muted">
           {r.why.slice(0, 2).map((w) => (
             <li key={w} className="flex gap-2">
-              <span aria-hidden="true" className="text-green">✓</span>
+              <span aria-hidden="true" className="text-blue">✓</span>
               <span className="line-clamp-1">{w}</span>
             </li>
           ))}

@@ -34,7 +34,7 @@ export function StarterIssueCard({ issue, compact = false }: { issue: StarterIss
           ))}
         </ul>
       )}
-      <p className="mt-3 flex gap-2 border-t border-line pt-3 font-sans text-[0.9rem] text-green">
+      <p className="mt-3 flex gap-2 border-t border-line pt-3 font-sans text-[0.9rem] text-ink">
         <span aria-hidden="true">→</span>
         <span>
           <span className="sr-only">What to do next: </span>
