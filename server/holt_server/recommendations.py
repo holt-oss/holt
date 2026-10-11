@@ -61,7 +61,9 @@ from holt_server.db import (
     utc,
 )
 from holt_server.deps import Caller, caller, services, signed_in
-from holt_server.discover import CARD_META, _latest, counts, merged_share, starter_issues
+from holt_server.discover import (
+    CARD_META, _latest, counts, merged_share, standouts, starter_issues,
+)
 from holt_server.schema import Stats, StarterIssue, odds_for, verdict_line
 from holt_server.services import Services
 
@@ -390,7 +392,11 @@ async def recommend(svc: Services, user_id: str, limit: int = PART, offset: int 
     if b.unknown:
         ranked = spread(ranked)
     ranked = ranked[:MAX_PICKS]
-    return [pick(x) for x in ranked[offset:offset + limit]], b, len(ranked)
+    # What each does best among all the picks, so a later part changes no card.
+    picks = [pick(x) for x in ranked]
+    lines = standouts([(p.reason, p.stats) for p in picks])
+    picks = [p.model_copy(update={"standout": line}) for p, line in zip(picks, lines)]
+    return picks[offset:offset + limit], b, len(ranked)
 
 
 # --- the route ------------------------------------------------------------------------

@@ -626,6 +626,7 @@ people. Reads only the database: no GitHub call and no rate limit.
   "trending_min": 5, "total": 312, "next": "MjQ6b3duZXIvcmVwbw" | null,
   "repos": [ { "repo": "owner/repo", "verdict": "viable", "headline": "Worth your time",
     "tone": "good", "reason": "…the report's verdict_line…", "stats": Stats,
+    "standout": "A first reply typically comes within 3 hours."|null,  // see below
     "description": "…"|null, "language": "Python"|null, "stars": 123|null,
     "open_issues": 57|null, "pull_requests": 4100|null,
     "open_pull_requests": 12|null, "contributors": 812|null,  // as in `about`
@@ -635,6 +636,18 @@ people. Reads only the database: no GitHub call and no rate limit.
     "issues": [StarterIssue] } ],     // cached only; [] when none, see below
   "languages": [ { "name": "Python", "repos": 40 } ] }  // filter chips, most repos first
 ```
+
+`standout` is what a card shows in place of `reason` when the reason is the
+one every "Worth your time" repo shares ("Outside contributors get real
+replies here, and their work gets merged."): the number where this repo
+stands best among the repos on this board (this sort and these filters, the
+whole board, not the part), as a sentence. The numbers are the first reply
+time, first-timers merged, the typical time to merge and the date of the
+last outside merge, all from `stats` (not the share merged: the card's bar
+draws it and the welcoming board is in its order). A repo in the better
+half of the board on none of them gets the reply time. `null` when the reason
+already says something of its own, when the report has none of the numbers,
+and on a card sent anywhere but a board.
 
 `issues` are the repo's starter issues as `GET /v1/repos/{o}/{r}/starter-issues`
 (or the warm pass) last cached them (at most 5, nobody-on-it first), when that
@@ -1429,6 +1442,7 @@ limit. Free for every signed-in user.
 ```jsonc
 { "picks": [ { "repo": "owner/repo", "verdict": "viable", "headline": "Worth your time",
     "tone": "good", "odds": Odds | null, "reason": "…the report's verdict_line…",
+    "standout": "…"|null,         // as on Discover, among all of the user's picks
     "numbers_line": "Of 42 pull requests from outside contributors, 19 were merged (45%). …",
     "why": ["Written in Python, one of your languages.",
             "Maintainers usually reply within 3 hours.",

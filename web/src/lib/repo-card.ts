@@ -40,6 +40,7 @@ export interface CardRepo {
   issues: StarterIssue[];
   topics: string[];
   why: string[];
+  /** The card's last line: what the repo does best on its board when the server says (`standout`), else the report's reason. */
   reason: string | null;
   numbersLine: string | null;
   odds: Odds | null;
@@ -75,14 +76,14 @@ function countsOf(r: Pick<DiscoverRepo, "open_issues" | "pull_requests" | "open_
 export function fromPick(p: Recommendation): CardRepo {
   return {
     repo: p.repo, description: p.description, language: p.language, languageLabel: languageLabel(p.language, p.languages), stars: p.stars, headline: p.headline, tone: p.tone,
-    stats: fullStats(p.stats), issues: p.issues, topics: p.topics, why: p.why, reason: p.reason, numbersLine: p.numbers_line, odds: p.odds, checkedThisWeek: null, counts: countsOf(p),
+    stats: fullStats(p.stats), issues: p.issues, topics: p.topics, why: p.why, reason: p.standout ?? p.reason, numbersLine: p.numbers_line, odds: p.odds, checkedThisWeek: null, counts: countsOf(p),
   };
 }
 
 export function fromDiscover(d: DiscoverRepo): CardRepo {
   return {
     repo: d.repo, description: d.description, language: d.language, languageLabel: languageLabel(d.language, d.languages), stars: d.stars, headline: d.headline, tone: d.tone,
-    stats: fullStats(d.stats), issues: d.issues ?? [], topics: d.topics, why: [], reason: d.reason, numbersLine: null, odds: null, checkedThisWeek: d.checked_this_week,
+    stats: fullStats(d.stats), issues: d.issues ?? [], topics: d.topics, why: [], reason: d.standout ?? d.reason, numbersLine: null, odds: null, checkedThisWeek: d.checked_this_week,
     counts: countsOf(d),
   };
 }

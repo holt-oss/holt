@@ -188,6 +188,15 @@ def test_rank_is_by_points_then_the_discover_order(h):
                        "requests merged in it.", "About cli, a topic you picked."]
 
 
+def test_a_pick_says_what_it_does_best_among_the_picks(h):
+    add(h, profile(languages=("python",)),
+        report("octo/quick", median_first_response_hours=1.0), meta("octo/quick", "Python"),
+        report("octo/newcomers", first_time_merged_authors=9), meta("octo/newcomers", "Python"))
+    assert {p["repo"]: p["standout"] for p in get(h)["picks"]} == {
+        "octo/quick": "A first reply typically comes within an hour.",
+        "octo/newcomers": "9 people got their first pull request merged here."}
+
+
 def test_newcomers_see_beginner_issues_and_skip_long_odds(h):
     add(h, profile(level="newcomer", contributions=("docs",)),
         report("octo/long", outsider_merged=0), meta("octo/long", "Python"),
