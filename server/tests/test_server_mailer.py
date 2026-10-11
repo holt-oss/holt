@@ -601,9 +601,10 @@ def test_an_empty_daily_email_is_skipped_and_marked_done(hm):
 
 
 def test_without_a_provider_key_nothing_is_sent_and_alerts_stay_on_the_bell(make_harness,
-                                                                           caplog):
+                                                                           caplog, monkeypatch):
     h = make_harness(HOLT_PR_WATCH=True)  # no RESEND_API_KEY
     at = ist(14)
+    monkeypatch.setattr(alerts, "now", lambda: at)  # the bell asks if the free days still run
     seed(h, at, ("changes", "pallets/click", 2811, timedelta(minutes=10)))
     mailer._said_off = False
     with caplog.at_level(logging.INFO, logger="holt_server.mailer"):
