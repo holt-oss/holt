@@ -68,6 +68,16 @@
   --hf: #6a3dd1;
   --hf-bg: #ece3fb;
   --hf-line: #c9b5f2;
+  /* A control that is on (the `picked` utility, the sidebar, the tabs): --sel is
+     its firm line, --sel-bg the tint inside. Declared once: both follow --blue
+     into the dark theme. `tint-hf` swaps in Hacktoberfest's purple. */
+  --sel: var(--blue);
+  --sel-bg: color-mix(in srgb, var(--blue) 11%, transparent);
+  /* The primary button (.btn-primary): ink, so the main action can't be read
+     as the good verdict's green; it fills with the brand blue under the
+     pointer. Its text is --on-accent. Declared once, like --sel. */
+  --action: var(--ink);
+  --action-hover: var(--blue);
   color-scheme: light;
 
   /* Motion (the motion plan). Short, decelerating, tiny distances;
@@ -182,6 +192,8 @@
   --color-hf: var(--hf);
   --color-hf-bg: var(--hf-bg);
   --color-hf-line: var(--hf-line);
+  --color-sel: var(--sel);
+  --color-sel-bg: var(--sel-bg);
   /* Every Tailwind `transition-*` utility uses the motion tokens. */
   --default-transition-duration: var(--dur-fast);
   --default-transition-timing-function: var(--ease-out);
@@ -634,16 +646,20 @@
     justify-content: center;
     gap: 0.6ch;
     padding: 0 20px;
-    background: var(--green);
+    background: var(--action);
     color: var(--on-accent);
     font-weight: 600;
     font-size: 0.9rem;
     transition:
+      background-color var(--dur-fast) var(--ease-out),
       filter var(--dur-fast) var(--ease-out),
       scale var(--dur-press) var(--ease-out);
   }
+  /* The fill is for the ink button; one a utility recolours (bg-blue for the
+     paid actions) keeps its colour and only brightens. */
   @media (hover: hover) {
-    .btn-primary:hover {
+    .btn-primary:hover:not(:disabled) {
+      background: var(--action-hover);
       filter: brightness(1.08);
     }
   }
@@ -2628,18 +2644,18 @@
   }
   .side-item[aria-current="page"] {
     color: var(--ink);
-    background: color-mix(in srgb, var(--blue) 11%, transparent);
+    background: var(--sel-bg);
     font-weight: 600;
   }
   .side-item[aria-current="page"] .side-icon {
-    color: var(--blue);
+    color: var(--sel);
   }
   .side-item[aria-current="page"]::before {
     position: absolute;
     inset: 9px auto 9px -8px;
     width: 3px;
     border-radius: 0 3px 3px 0;
-    background: var(--blue);
+    background: var(--sel);
     content: "";
   }
   /* A count that needs you (orange, as on Your pull requests) or a season's mark. */
@@ -3111,19 +3127,30 @@
     background: var(--panel-2);
     color: var(--ink);
   }
+  /* Where you are: ink, semi-bold and the selected line, drawn under the tab
+     on the band's own rule (as .app-tab does). No box: the filters below are
+     the boxed things. */
   .find-tab[aria-current="page"] {
-    border-color: var(--line-strong);
-    background: var(--panel);
+    position: relative;
     color: var(--ink);
     font-weight: 600;
   }
+  .find-tab[aria-current="page"]::after {
+    position: absolute;
+    inset: auto 0 -4px;
+    height: 2px;
+    background: var(--sel);
+    content: "";
+  }
   .find-tab[data-tab="hacktoberfest"] {
+    --sel: var(--hf);
     color: var(--hf);
   }
-  .find-tab[data-tab="hacktoberfest"]:hover,
-  .find-tab[data-tab="hacktoberfest"][aria-current="page"] {
-    border-color: var(--hf-line);
+  .find-tab[data-tab="hacktoberfest"]:hover {
     background: var(--hf-bg);
+  }
+  .find-tab[aria-current="page"]:hover {
+    background: none;
   }
   .find-band + :not(.find-tray) {
     margin-top: 24px;
@@ -3174,7 +3201,7 @@
   .home-section .section-head > span {
     font-size: 0.78rem;
   }
-  /* The home's quiet action: ink, not the site's green. */
+  /* The home's quiet action: the primary button's ink, a size down. */
   .home-btn {
     display: inline-flex;
     min-height: 36px;
@@ -3216,7 +3243,7 @@
     color: var(--ink);
   }
   .app-tab[aria-current="page"] {
-    border-bottom-color: var(--blue);
+    border-bottom-color: var(--sel);
     color: var(--ink);
     font-weight: 600;
   }
@@ -3686,6 +3713,23 @@
   }
 }
 
+/* Selected, one grammar for every control that can be on: ink, semi-bold, a
+   firm line in the accent and a light tint of it inside. The control keeps
+   its own shape: chips are boxes, segments are joined, a switch tints its
+   track, tabs take only the line (underneath) and the sidebar a bar on the
+   left. Never a verdict colour: green, amber and orange say what Holt found. */
+@utility picked {
+  border-color: var(--sel);
+  background-color: var(--sel-bg);
+  color: var(--ink);
+  font-weight: 600;
+}
+/* Hacktoberfest's purple is the season's tint inside that grammar. */
+@utility tint-hf {
+  --sel: var(--hf);
+  --sel-bg: var(--hf-bg);
+}
+
 /* A text link that stands alone gets a 44px tall hit area without moving its
    text or its underline (.text-link draws the underline as a border). Keep
    about 10px clear above and below it. */
@@ -3827,14 +3871,18 @@
   scale: 0;
   content: "";
 }
+/* Ticked, in the selected grammar (`picked`): ink, the --sel line round the
+   box, the --sel-bg tint inside and the mark in --sel. The label keeps its
+   weight, so a tick never moves its neighbours in the card. */
 .compare-tick[aria-pressed="true"] {
-  color: var(--blue);
+  color: var(--ink);
 }
 .compare-tick[aria-pressed="true"] .compare-tick-box {
-  border-color: var(--blue);
-  background: var(--blue);
+  border-color: var(--sel);
+  background: var(--sel-bg);
 }
 .compare-tick[aria-pressed="true"] .compare-tick-box::after {
+  border-color: var(--sel);
   scale: 1;
 }
 .compare-tick:focus-visible {

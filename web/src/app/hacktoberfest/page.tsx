@@ -132,7 +132,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
                   href={l.id === "all" ? (profile ? "/hacktoberfest?lang=all" : "/hacktoberfest") : `/hacktoberfest?lang=${l.id}`}
                   scroll={false}
                   aria-current={l.id === tab.id ? "page" : undefined}
-                  className={`chip min-h-11 gap-2 whitespace-nowrap px-4 text-[0.89rem] transition-colors ${l.id === tab.id ? "border-hf bg-hf text-bg" : "hover:border-hf hover:text-ink"}`}
+                  className={`chip min-h-11 gap-2 whitespace-nowrap px-4 text-[0.89rem] transition-colors ${l.id === tab.id ? "tint-hf picked" : "hover:border-hf hover:text-ink"}`}
                 >
                   {l.langs.length > 0 && <LangDot color={langColor(l.langs[0] ?? null)} />}
                   {l.label}
@@ -147,7 +147,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
                   scroll={false}
                   aria-current="page"
                   aria-label={`${typed.label}, remove`}
-                  className="chip min-h-11 gap-2 whitespace-nowrap border-hf bg-hf px-4 text-[0.89rem] text-bg"
+                  className="chip tint-hf picked min-h-11 gap-2 whitespace-nowrap px-4 text-[0.89rem]"
                 >
                   <LangDot color={langColor(typed.id)} />
                   {typed.label}

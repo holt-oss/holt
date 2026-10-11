@@ -124,9 +124,9 @@ export function StatsSwitch({ acct }: { acct: NonNullable<Account> }) {
         role="switch"
         aria-checked={acct.stats_opt_out}
         aria-labelledby="stats-label"
-        className={`inline-flex min-h-11 items-center gap-2 border px-3 text-[0.87rem] transition-colors ${acct.stats_opt_out ? "border-blue bg-blue/10 text-blue" : "border-line-strong text-muted hover:text-ink"}`}
+        className={`inline-flex min-h-11 items-center gap-2 border px-3 text-[0.87rem] transition-colors ${acct.stats_opt_out ? "picked" : "border-line-strong text-muted hover:text-ink"}`}
       >
-        <span aria-hidden="true" className={`relative h-4 w-7 rounded-full transition-colors ${acct.stats_opt_out ? "bg-blue" : "bg-line-strong"}`}>
+        <span aria-hidden="true" className={`relative h-4 w-7 rounded-full transition-colors ${acct.stats_opt_out ? "bg-sel" : "bg-line-strong"}`}>
           <span className={`absolute top-0.5 size-3 rounded-full bg-bg transition-[left] ${acct.stats_opt_out ? "left-3.5" : "left-0.5"}`} />
         </span>
         {acct.stats_opt_out ? "on" : "off"}

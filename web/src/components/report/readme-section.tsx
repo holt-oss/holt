@@ -245,7 +245,7 @@ export function ReadmeSection({ markdown, repo, contributing }: { markdown: stri
                 onClick={() => setTab(t.id)}
                 data-umami-event={`readme-tab-${t.id}`}
                 className={`-mb-px inline-flex min-h-11 items-center gap-2 border-b-2 px-3 font-sans text-[0.88rem] transition-colors ${
-                  on ? "border-orange font-semibold text-ink" : "border-transparent text-muted hover:text-ink"
+                  on ? "border-sel font-semibold text-ink" : "border-transparent text-muted hover:text-ink"
                 }`}
               >
                 <t.Icon aria-hidden="true" strokeWidth={1.5} className="size-4 shrink-0 text-faint" />
