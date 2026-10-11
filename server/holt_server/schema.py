@@ -1288,14 +1288,23 @@ class PassFeature(Model):
     unlimited: bool
 
 
+class PassPrice(Model):
+    # "INR" (paid through Razorpay) or "USD" (through Dodo Payments).
+    currency: str
+    # Minor units: paise, cents.
+    amount: int
+
+
 class PassOffer(Model):
     id: str
     name: str
     # Days of Pro one payment gives. It never renews.
     days: int
-    # The price in minor units (paise for INR).
+    # The first of `prices`.
     amount: int
     currency: str
+    # Every currency this pass can be bought in now, INR first.
+    prices: list[PassPrice]
 
 
 class Passes(Model):
@@ -1308,13 +1317,17 @@ class Passes(Model):
 
 
 class Checkout(Model):
-    """POST /v1/me/orders: what Razorpay Checkout needs to take the payment."""
+    """POST /v1/me/orders: what Razorpay Checkout needs to take the payment
+    (INR), or the page on Dodo Payments to send the buyer to (USD)."""
 
     order_id: str
-    provider: Literal["razorpay"]
-    # Razorpay's public key id (safe to show the browser).
-    key_id: str
+    provider: Literal["razorpay", "dodo"]
+    # Razorpay's public key id (safe to show the browser); null for Dodo.
+    key_id: str | None
+    # Razorpay's order id, or Dodo's checkout session id.
     provider_order_id: str
+    # Dodo's hosted checkout; null for Razorpay.
+    checkout_url: str | None = None
     amount: int
     currency: str
     # What the payment page shows.
@@ -1337,6 +1350,8 @@ class Order(Model):
     days: int | None
     amount: int
     currency: str
+    # Who took the payment: "razorpay" or "dodo".
+    provider: str
     status: OrderStatus
     created_at: str
     paid_at: str | None
@@ -1347,7 +1362,8 @@ class Orders(Model):
 
 
 class OrderConfirmed(Model):
-    """POST /v1/me/orders/confirm: the order (paid, or still being confirmed) and the plan in force."""
+    """POST /v1/me/orders/confirm and /v1/me/orders/{id}/check: the order
+    (paid, or still being confirmed) and the plan in force."""
 
     order: Order
     plan: str

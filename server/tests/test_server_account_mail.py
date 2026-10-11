@@ -598,7 +598,9 @@ def test_money():
     assert account_mail.money(9900, "INR") == "₹99"
     assert account_mail.money(24950, "INR") == "₹249.50"
     assert account_mail.money(123400, "INR") == "₹1,234"
-    assert account_mail.money(700, "USD") == "7 USD"
+    assert account_mail.money(700, "USD") == "$7"
+    assert account_mail.money(1550, "USD") == "$15.50"
+    assert account_mail.money(700, "EUR") == "7 EUR"
 
 
 def test_samples_go_to_the_users_own_address_and_never_in_production(make_harness):

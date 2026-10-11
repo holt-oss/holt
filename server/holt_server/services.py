@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from holt_server import budget, engine, llm, mailer, payments, pro
+from holt_server import budget, engine, llm, mailer, payments, payments_dodo, pro
 from holt_server.db import Database, Job
 from holt_server.errors import ApiError
 from holt_server.evidence_store import EvidenceStore
@@ -37,6 +37,8 @@ class Services:
         self.pro: pro.ProClient | None = pro.build(settings)
         # Credit-pack checkout: None when the Razorpay keys are not set.
         self.razorpay: payments.Razorpay | None = payments.build(settings)
+        # USD checkout: None without Dodo's key (or with a DODO_ENV it doesn't know).
+        self.dodo: payments_dodo.Dodo | None = payments_dodo.build(settings)
         # Alert and account emails: None (no email sent) without RESEND_API_KEY.
         self.mailer: mailer.Mailer | None = mailer.build(settings, self.http)
         # Work (new analyses, find) and reads (cache misses on starter issues)

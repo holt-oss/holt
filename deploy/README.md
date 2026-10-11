@@ -321,6 +321,14 @@ To take it away: remove `STAGING_HOLT_PRO_KEY`, run `preview.sh` with
   Razorpay's test cards; the Checkout callback gives the pass. Razorpay's
   webhook can't get through Cloudflare Access, so it isn't needed
   (`STAGING_RAZORPAY_WEBHOOK_SECRET` is passed on if you set one up).
+- Passes are also on sale in USD, in Dodo Payments' **test mode**: with
+  `DODO_API_KEY`, `DODO_ENV=test`, `STAGING_DODO_WEBHOOK_SECRET` and at
+  least one of `DODO_PRODUCT_PRO_1M`, `_3M`, `_12M` in the same file. With
+  `DODO_ENV=live` nothing of Dodo's is passed on, and staging's compose
+  fixes the server on Dodo's test host, where a live key doesn't work.
+  Razorpay and Dodo are each on by themselves. Dodo's webhook can't get
+  through Cloudflare Access either: the buyer's return from Dodo's checkout
+  gives the pass. Pay with Dodo's test cards.
 - AI runs on `OPENAI_API_KEY` from the same file (OpenAI's API,
   `gpt-5-mini`), for the server's AI reports and the paid-features service's
   playbooks and pre-flight summaries, under **one hard budget of $1.00 for

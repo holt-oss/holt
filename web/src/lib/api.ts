@@ -486,9 +486,18 @@ export function passes(): Promise<Result<Passes>> {
   return call("/v1/passes");
 }
 
-export function createOrder(userId: string, pass: string): Promise<Result<Checkout>> {
+export function createOrder(userId: string, pass: string, currency: "INR" | "USD" = "INR"): Promise<Result<Checkout>> {
   if (MOCK) return mock.createOrder();
-  return call("/v1/me/orders", { method: "POST", body: JSON.stringify({ pass }), caller: { userId } });
+  return call("/v1/me/orders", { method: "POST", body: JSON.stringify({ pass, currency }), caller: { userId } });
+}
+
+/**
+ * Where an order stands. For a Dodo order not settled yet, the server asks
+ * Dodo first: this is how the buyer's return from Dodo's checkout gives Pro.
+ */
+export function checkOrder(userId: string, orderId: string): Promise<Result<OrderConfirmed>> {
+  if (MOCK) return mock.createOrder();
+  return call(`/v1/me/orders/${encodeURIComponent(orderId)}/check`, { method: "POST", caller: { userId } });
 }
 
 export function confirmOrder(userId: string, paid: RazorpaySuccess): Promise<Result<OrderConfirmed>> {
@@ -510,15 +519,28 @@ export function orders(userId: string, limit = 50): Promise<Result<{ orders: Ord
  * Razorpay's webhook, passed to the server byte for byte: the server checks
  * the signature over the exact body. Returns the upstream status and body.
  */
-export async function forwardRazorpayWebhook(body: ArrayBuffer, signature: string): Promise<{ status: number; body: unknown }> {
+export function forwardRazorpayWebhook(body: ArrayBuffer, signature: string): Promise<{ status: number; body: unknown }> {
+  return forwardWebhook("/v1/payments/razorpay/webhook", body, { "X-Razorpay-Signature": signature });
+}
+
+/** The headers a Dodo webhook is signed with (Standard Webhooks). */
+export const DODO_WEBHOOK_HEADERS = ["webhook-id", "webhook-timestamp", "webhook-signature"] as const;
+
+/** Dodo's webhook, passed on the same way: the body byte for byte, its three headers as they came. */
+export function forwardDodoWebhook(body: ArrayBuffer, signed: Record<(typeof DODO_WEBHOOK_HEADERS)[number], string>): Promise<{ status: number; body: unknown }> {
+  return forwardWebhook("/v1/payments/dodo/webhook", body, signed);
+}
+
+async function forwardWebhook(path: string, body: ArrayBuffer, signed: Record<string, string>): Promise<{ status: number; body: unknown }> {
   if (MOCK) return { status: 404, body: { error: { code: "payments_off", message: "Payments are off." } } };
   try {
-    const res = await fetch(`${BASE}/v1/payments/razorpay/webhook`, {
+    const res = await fetch(`${BASE}${path}`, {
       method: "POST",
       body,
-      headers: { ...headers(), "Content-Type": "application/json", "X-Razorpay-Signature": signature },
+      headers: { ...headers(), "Content-Type": "application/json", ...signed },
       cache: "no-store",
-      signal: AbortSignal.timeout(20_000),
+      // Under the 30 seconds Dodo waits; the server may ask Dodo about the payment first.
+      signal: AbortSignal.timeout(25_000),
     });
     return { status: res.status, body: await res.json().catch(() => null) };
   } catch {

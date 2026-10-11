@@ -93,6 +93,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
                 await svc.pro.aclose()
             if svc.razorpay is not None:
                 svc.razorpay.close()
+            if svc.dodo is not None:
+                svc.dodo.close()
 
     dev = svc.settings.env == "dev"
     app = FastAPI(title="Holt API", version=__version__, lifespan=lifespan,

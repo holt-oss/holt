@@ -78,10 +78,14 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | `HOLT_SIGNUP_AI_CREDITS` | `0` | Free AI reports every signed-in user gets once, on their first visit. 0 since the 3 free merge plans replaced them: new accounts get none and no weekly claim; accounts welcomed before keep theirs. |
 | `HOLT_CLAIM_EVERY_DAYS` | `7` | After that, one more can be claimed each time this many days have passed since the last claim (or the welcome grant). |
 | `HOLT_PRICING_FILE` | the catalogue shipped in the package (`holt_server/pricing.json`) | Features, plans and Pro passes, with prices in INR and USD. See [Credits, plans and passes](#credits-plans-and-passes). A file that doesn't parse stops startup. |
-| `HOLT_PAYMENTS_ENABLED` | `0` | `1` switches the pass checkout on (it also needs the Razorpay keys and a pass on sale). See [Pass checkout](#pass-checkout). |
+| `HOLT_PAYMENTS_ENABLED` | `0` | `1` switches the pass checkout on (it also needs a processor set up, Razorpay for INR or Dodo Payments for USD, and a pass on sale). See [Pass checkout](#pass-checkout). |
 | `HOLT_PASSES_ON_SALE` | `0` | `1` puts every pass in the catalogue on sale, whatever its `on_sale` says. For staging with Razorpay test keys; **ignored when `HOLT_ENV=production`** (the server logs an error), where only the pricing file puts a pass on sale. |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | *(empty)* | Razorpay API keys (`rzp_test_…` for test mode). Empty: no checkout. |
 | `RAZORPAY_WEBHOOK_SECRET` | *(empty)* | The secret set on the webhook in the Razorpay dashboard. Empty: webhooks are refused. |
+| `DODO_API_KEY` | *(empty)* | Dodo Payments API key, for USD. Empty: no USD checkout (INR is unaffected). |
+| `DODO_ENV` | `test` | `test` or `live`: which of Dodo's hosts the key belongs to (`test.dodopayments.com`, `live.dodopayments.com`). Anything else leaves Dodo off. |
+| `DODO_WEBHOOK_SECRET` | *(empty)* | The `whsec_…` signing secret of the webhook endpoint in Dodo's dashboard. Empty or unreadable: no USD checkout, and webhooks are refused. |
+| `DODO_PRODUCT_PRO_1M` / `DODO_PRODUCT_PRO_3M` / `DODO_PRODUCT_PRO_12M` | *(empty)* | The Dodo product (`pdt_…`) that sells each pass: one-time, in USD, at the pass's `usd_cents`. A pass without one isn't sold in USD. |
 | `HOLT_ADMIN_USERS` | *(empty)* | Comma-separated user ids that may read `/v1/admin/*`. Empty means nobody. |
 | `HOLT_ANON_RATE_PER_HOUR` | `10` | Work bucket: new analyses and find per hour per IP for anonymous callers (`X-Holt-Client-Ip`). Cached answers are free. |
 | `HOLT_USER_RATE_PER_HOUR` | `60` | The same, per signed-in user. |
@@ -238,12 +242,14 @@ Reading is `/v1/admin/*` (API.md), for users in `HOLT_ADMIN_USERS`.
 
 ## Pass checkout
 
-`holt_server/payments.py`: Razorpay, INR, one-time payments for the passes in
-the catalogue. **Off by default**: it needs `HOLT_PAYMENTS_ENABLED=1`, the
-Razorpay keys, and a pass with `on_sale: true` and an `inr_paise` price.
+`holt_server/payments.py`: one-time payments for the passes in the catalogue,
+in INR through Razorpay and in USD through Dodo Payments
+([below](#usd-through-dodo-payments)). **Off by default**: it needs
+`HOLT_PAYMENTS_ENABLED=1`, a processor's settings, and a pass with
+`on_sale: true` and a price in that processor's currency (`inr_paise`,
+`usd_cents`). Either processor works without the other.
 Outside production, `HOLT_PASSES_ON_SALE=1` stands in for `on_sale: true` on
-every pass (staging runs that way, on Razorpay test keys;
-`deploy/README.md`). The server logs one `passes:` line at startup saying
+every pass (staging runs that way, on test keys; `deploy/README.md`). The server logs one `passes:` line at startup saying
 what is on sale. The flow and the endpoints are in API.md ("Passes"); the
 short version:
 
@@ -273,6 +279,55 @@ Trying it locally in test mode: use `rzp_test_` keys, `HOLT_ENV=dev`,
 `HOLT_PASSES_ON_SALE=1` and `HOLT_PAYMENTS_ENABLED=1`. Razorpay can't reach
 a local webhook (or staging's, behind Cloudflare Access), so the callback
 does the giving.
+
+### USD through Dodo Payments
+
+Dodo is the merchant of record for USD: the buyer pays on Dodo's hosted
+checkout and comes back. The client and what it relies on in Dodo's API are
+in `holt_server/payments_dodo.py`.
+
+Set up, in Dodo's dashboard (in test mode first, then the same in live mode;
+the two modes share nothing):
+
+1. Three **one-time** products priced in **USD** at exactly the catalogue's
+   `usd_cents`: $7.00, $15.00, $39.00. No discount, no pay-what-you-want, no
+   purchasing power parity, no localized prices. Their ids (`pdt_…`) go in
+   `DODO_PRODUCT_PRO_1M`, `DODO_PRODUCT_PRO_3M`, `DODO_PRODUCT_PRO_12M`.
+   Whether the price includes tax is yours to choose: the server accepts
+   both.
+2. An API key with write access, in `DODO_API_KEY`, and its mode in
+   `DODO_ENV`.
+3. A webhook endpoint at `https://<site>/api/billing/dodo/webhook` (served
+   by `web/`, which forwards it here) for `payment.succeeded`,
+   `payment.failed`, `payment.cancelled`, `payment.processing`,
+   `refund.succeeded` and every `dispute.*`. Its signing secret (`whsec_…`)
+   goes in `DODO_WEBHOOK_SECRET`.
+
+Then check it, from where the server runs (it only reads from Dodo):
+
+```sh
+python -m holt_server.payments_dodo   # the key, the webhook secret, each product against the catalogue
+```
+
+What the server holds to:
+
+- Dodo charges what its product says, not what a request says. So before a
+  checkout is opened the server fetches the product and refuses (502, with
+  the reason logged as an error) unless it is a one-time USD product at the
+  catalogue's price. The checkout is for one of that product, in USD, with
+  discount codes and other currencies switched off.
+- Pro is given only for a payment fetched from Dodo with the API key: on the
+  buyer's return (`POST /v1/me/orders/{id}/check`, which reads nothing from
+  the return address) or after a signed webhook says which payment to fetch.
+  It must be `succeeded`, for exactly one of the pass's product, in USD, for
+  the order's price (the total, or the total less tax). Anything else puts
+  the order on `held`.
+- The return and the webhooks give a pass once between them, through the
+  same transaction as Razorpay's.
+- A refund or a dispute (`refund.succeeded`, `dispute.*`) is appended to the
+  order's `note` and logged as an error. Nothing else happens: the order
+  stays `paid` and Pro stays on until you take it away
+  (`python -m holt_server.credits plan set`).
 
 Monthly subscriptions were replaced by passes. Their tables
 (`subscriptions`, `subscription_charges`) are still in the schema, unused,

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { me, orders } from "@/lib/api";
+import { checkOrder, me, orders } from "@/lib/api";
 import { shortDate } from "@/lib/format";
-import { formatPrice, isOrderId } from "@/lib/payments";
+import { formatPrice, processor, returnedOrder } from "@/lib/payments";
 import { currentUser } from "@/lib/session";
 import { PLAN_SETTINGS } from "@/lib/settings";
 import { CONTACT_EMAIL } from "@/lib/site";
@@ -15,15 +15,20 @@ export const metadata: Metadata = { title: "Thank you", robots: { index: false }
 
 // After a pass checkout: paid (thank you), still being confirmed (wait
 // here), declined, or held for a person to check. Only the buyer's own orders.
+// Dodo Payments sends the buyer straight here from its checkout, so the
+// server is asked to check the order with Dodo first; nothing Dodo adds to
+// the address is read.
 export default async function ThanksPage({ searchParams }: PageProps<"/pricing/thanks">) {
   const sp = await searchParams;
-  const id = isOrderId(sp.order) ? sp.order : null;
+  const id = returnedOrder(sp.order);
   const user = await currentUser();
   if (!user) redirect(`/signin?callbackUrl=${encodeURIComponent(id ? `/pricing/thanks?order=${id}` : PLAN_SETTINGS)}`);
   if (!id) redirect(`${PLAN_SETTINGS}#purchases`);
 
+  const checked = await checkOrder(user.id, id);
   const [list, account] = await Promise.all([orders(user.id), me(user.id)]);
-  const order = list.ok ? list.data.orders.find((o) => o.id === id) : undefined;
+  const order = (list.ok ? list.data.orders.find((o) => o.id === id) : undefined) ?? (checked.ok ? checked.data.order : undefined);
+  const by = processor(order);
   const until = account.ok && account.data.plan === "pro" ? account.data.plan_expires_at : null;
 
   let heading: React.ReactNode;
@@ -32,7 +37,7 @@ export default async function ThanksPage({ searchParams }: PageProps<"/pricing/t
     heading = <>Thank you. <span className="text-green">{order.days ? "Pro is on." : "Paid."}</span></>;
     body = (
       <p className="prose-sans text-[1.05rem]">
-        You paid {formatPrice(order.amount, order.currency)} for {order.name}. Razorpay emails you a receipt.
+        You paid {formatPrice(order.amount, order.currency)} for {order.name}. {by} emails you a receipt.
         {until && <> Pro runs until <strong className="text-ink">{shortDate(until)}</strong>.</>}
       </p>
     );
@@ -43,7 +48,7 @@ export default async function ThanksPage({ searchParams }: PageProps<"/pricing/t
     heading = <>We&apos;re checking your payment.</>;
     body = (
       <p className="prose-sans text-[1.05rem]">
-        Razorpay reported a payment that didn&apos;t match the order, so Pro hasn&apos;t started yet. We check these by hand. Not sorted
+        {by} reported a payment that didn&apos;t match the order, so Pro hasn&apos;t started yet. We check these by hand. Not sorted
         within a day? Write to{" "}
         <a href={`mailto:${CONTACT_EMAIL}`} className="text-link">{CONTACT_EMAIL}</a> and mention order <code className="text-[0.85em]">{id.slice(0, 12)}</code>.
       </p>
@@ -53,7 +58,7 @@ export default async function ThanksPage({ searchParams }: PageProps<"/pricing/t
     body = (
       <>
         <p className="prose-sans text-[1.05rem]">Confirming your payment. This usually takes a few seconds.</p>
-        <OrderWaiter orderId={id} />
+        <OrderWaiter orderId={id} by={by} ask={order?.provider === "dodo"} />
       </>
     );
   }

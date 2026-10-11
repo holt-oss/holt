@@ -53,7 +53,7 @@ n=$(cat "$STUB_DIR/containers" 2>/dev/null || echo 0)
 case " $* " in
     *" up "*)
         case " $* " in *" --scale "*) echo $((n + 1)) > "$STUB_DIR/containers" ;; esac
-        cp "$HOLT_STAGE_HOME/now.json" "$STUB_DIR/now-while-starting"; env | grep -E '^(STAGING_HOST|HOLT_WEB_URL|AUTH_|NEXT_PUBLIC_|GITHUB_TOKENS=|GITHUB_APP_|HOLT_GITHUB_APP_KEY_GID=|OPENROUTER_|HOLT_AI_|HOLT_PRO_MODEL_|HOLT_PRO_PLAYBOOK_|RAZORPAY_|HOLT_PAYMENTS_|HOLT_PASSES_|RESEND_API_KEY=)' | sort > "$STUB_DIR/compose.env" ;;
+        cp "$HOLT_STAGE_HOME/now.json" "$STUB_DIR/now-while-starting"; env | grep -E '^(STAGING_HOST|HOLT_WEB_URL|AUTH_|NEXT_PUBLIC_|GITHUB_TOKENS=|GITHUB_APP_|HOLT_GITHUB_APP_KEY_GID=|OPENROUTER_|HOLT_AI_|HOLT_PRO_MODEL_|HOLT_PRO_PLAYBOOK_|RAZORPAY_|DODO_|HOLT_PAYMENTS_|HOLT_PASSES_|RESEND_API_KEY=)' | sort > "$STUB_DIR/compose.env" ;;
     *" ps "*) i=1; while [ "$i" -le "$n" ]; do echo "c$i"; i=$((i + 1)); done ;;
     *" config --hash "*) echo "$last stub-hash" ;;
     *" config "*)
@@ -422,8 +422,88 @@ def test_passes_stay_off_without_razorpay_test_keys(sandbox: Sandbox) -> None:
 
 def test_staging_compose_hands_the_server_the_payment_settings() -> None:
     compose = (STAGING / "compose.yml").read_text(encoding="utf-8")
-    for name in PASSES_OFF:
+    for name in (*PASSES_OFF, *DODO_OFF):
         assert f"{name}: ${{{name}:-" in compose, name
+    # Dodo's mode is written into the file, never taken from the environment.
+    assert "DODO_ENV: test\n" in compose and "${DODO_ENV" not in compose
+
+
+DODO_OFF = {"DODO_API_KEY": "", "DODO_WEBHOOK_SECRET": "", "DODO_PRODUCT_PRO_1M": "",
+            "DODO_PRODUCT_PRO_3M": "", "DODO_PRODUCT_PRO_12M": ""}
+DODO_SECRETS = {"DODO_API_KEY": "dodo-key-value", "DODO_ENV": "test",
+                "STAGING_DODO_WEBHOOK_SECRET": "whsec_c3RhZ2luZw==",
+                "DODO_PRODUCT_PRO_1M": "pdt_one", "DODO_PRODUCT_PRO_3M": "pdt_three",
+                "DODO_PRODUCT_PRO_12M": "pdt_twelve"}
+SWITCHES_ON = {"HOLT_PAYMENTS_ENABLED": "1", "HOLT_PASSES_ON_SALE": "1"}
+SWITCHES_OFF = {"HOLT_PAYMENTS_ENABLED": "0", "HOLT_PASSES_ON_SALE": "0"}
+
+
+def dodo_env(started: dict[str, str]) -> dict[str, str]:
+    return {k: started[k] for k in (*DODO_OFF, *SWITCHES_ON)}
+
+
+def test_dodo_in_test_mode_puts_passes_on_sale_in_usd_and_nothing_logs_it(sandbox: Sandbox) -> None:
+    sandbox.write_secrets(**DODO_SECRETS, DODO_WEBHOOK_SECRET="whsec_production")
+    done = sandbox.run()
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "passes in USD: on sale (Dodo test mode)" in done.stdout
+    env = dict(line.split("=", 1) for line in
+               (sandbox.stub_dir / "compose.env").read_text(encoding="utf-8").splitlines())
+    # Without Razorpay keys: Dodo alone switches checkout on.
+    assert dodo_env(env) == {
+        "DODO_API_KEY": "dodo-key-value", "DODO_WEBHOOK_SECRET": "whsec_c3RhZ2luZw==",
+        "DODO_PRODUCT_PRO_1M": "pdt_one", "DODO_PRODUCT_PRO_3M": "pdt_three",
+        "DODO_PRODUCT_PRO_12M": "pdt_twelve", **SWITCHES_ON}
+    assert payment_env(env) == {**PASSES_OFF, **SWITCHES_ON}
+    assert "DODO_ENV" not in env  # compose.yml says test; nothing is passed
+    logs = "".join(p.read_text(encoding="utf-8") for p in (sandbox.state / "logs").glob("*.log"))
+    for value in ("dodo-key-value", "whsec_c3RhZ2luZw==", "whsec_production"):
+        assert value not in done.stdout + done.stderr + logs
+
+
+def test_dodo_stays_off_on_staging_in_live_mode_or_half_set_up(sandbox: Sandbox) -> None:
+    off = {**DODO_OFF, **SWITCHES_OFF}
+    # Nothing set.
+    assert dodo_env(sandbox.live()) == off
+
+    # Live mode: refused, and neither the key nor anything else reaches staging.
+    for mode in ("live", "LIVE", "production"):
+        sandbox.write_secrets(**{**DODO_SECRETS, "DODO_ENV": mode})
+        done = sandbox.run()
+        assert done.returncode == 0, done.stdout + done.stderr
+        assert "DODO_ENV is not test" in done.stdout
+        assert dodo_env(sandbox.live()) == off
+
+    # Production's webhook secret is not staging's.
+    secrets = {k: v for k, v in DODO_SECRETS.items() if k != "STAGING_DODO_WEBHOOK_SECRET"}
+    sandbox.write_secrets(**secrets, DODO_WEBHOOK_SECRET="whsec_production")
+    assert dodo_env(sandbox.live()) == off
+
+    # No product, or no key.
+    sandbox.write_secrets(**{k: v for k, v in DODO_SECRETS.items() if "PRODUCT" not in k})
+    assert dodo_env(sandbox.live()) == off
+    sandbox.write_secrets(**{k: v for k, v in DODO_SECRETS.items() if k != "DODO_API_KEY"})
+    assert dodo_env(sandbox.live()) == off
+
+    # Exported by whoever runs the script, or left in .env: ignored.
+    sandbox.write_secrets()
+    assert dodo_env(sandbox.live(DODO_API_KEY="live-key", DODO_ENV="live",
+                                 DODO_WEBHOOK_SECRET="whsec_x", DODO_PRODUCT_PRO_1M="pdt_x",
+                                 HOLT_PAYMENTS_ENABLED="1")) == off
+
+
+def test_razorpay_and_dodo_are_each_on_by_themselves(sandbox: Sandbox) -> None:
+    sandbox.write_secrets(RAZORPAY_KEY_ID="rzp_test_abc", RAZORPAY_KEY_SECRET="rzp-secret-value",
+                          **{**DODO_SECRETS, "DODO_ENV": "live"})
+    env = sandbox.live()
+    assert env["RAZORPAY_KEY_ID"] == "rzp_test_abc" and dodo_env(env) == {**DODO_OFF, **SWITCHES_ON}
+
+    # No DODO_ENV at all is test, the server's own default.
+    sandbox.write_secrets(RAZORPAY_KEY_ID="rzp_live_abc", RAZORPAY_KEY_SECRET="live-secret",
+                          **{k: v for k, v in DODO_SECRETS.items() if k != "DODO_ENV"})
+    env = sandbox.live()
+    assert env["RAZORPAY_KEY_ID"] == "" and env["DODO_API_KEY"] == "dodo-key-value"
+    assert (env["HOLT_PAYMENTS_ENABLED"], env["HOLT_PASSES_ON_SALE"]) == ("1", "1")
 
 
 def test_the_smoke_run_gets_the_access_token_and_nothing_logs_it(sandbox: Sandbox) -> None:
