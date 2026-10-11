@@ -3885,6 +3885,22 @@
   border-color: var(--sel);
   scale: 1;
 }
+/* A ticked card's edge: a firm ink line drawn over the card's own border, so
+   nothing moves when it toggles. Ink, because the card's hover edge and the
+   focus ring are both blue. Drawn from the tick (the card is its containing
+   block), since :has() is out (above). */
+.compare-tick::before {
+  position: absolute;
+  inset: -1px;
+  border: 1px solid color-mix(in srgb, var(--ink) 62%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+  content: "";
+}
+.compare-tick[aria-pressed="true"]::before {
+  opacity: 1;
+}
 .compare-tick:focus-visible {
   outline: none;
 }
