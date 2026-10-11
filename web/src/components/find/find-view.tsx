@@ -148,7 +148,7 @@ export function FindView({ initialPicks, initial, source, hf, saved, signedIn = 
             </span>
           )}
           {lastSearch && <span>Your last search.</span>}
-          {saving === "saved" && !differs && <span role="status" className="text-green">Saved as your profile.</span>}
+          {saving === "saved" && !differs && <span role="status" className="text-ink">Saved as your profile.</span>}
           {saving === "adult" && <Link href="/settings/profile" className="text-link">finish your profile in settings</Link>}
           {saving === "error" && <span role="status" className="text-orange">Couldn&apos;t save. Try again.</span>}
           {canSave && (

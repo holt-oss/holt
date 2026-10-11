@@ -402,16 +402,21 @@
     line-height: 1.7;
   }
 
+  /* A link in running text: ink and underlined, never the good verdict's
+     green; the brand blue under the pointer, like the primary button. */
   .text-link {
-    color: var(--green);
-    border-bottom: 1px solid color-mix(in oklab, var(--green) 40%, transparent);
-    transition: border-color var(--dur-fast) var(--ease-out);
+    color: var(--ink);
+    border-bottom: 1px solid color-mix(in oklab, var(--ink) 50%, transparent);
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out);
   }
   .text-link:focus-visible {
     border-color: currentColor;
   }
   @media (hover: hover) {
     .text-link:hover {
+      color: var(--action-hover);
       border-color: currentColor;
     }
   }
@@ -424,8 +429,8 @@
     justify-content: center;
     gap: 0.5ch;
     padding: 0 16px;
-    border: 1px solid var(--green);
-    color: var(--green);
+    border: 1px solid var(--ink);
+    color: var(--ink);
     font-size: 0.88rem;
     transition:
       color var(--dur-fast) var(--ease-out),
@@ -437,12 +442,12 @@
   }
   .bracket-link:focus-visible {
     color: var(--on-accent);
-    background: var(--green);
+    background: var(--ink);
   }
   @media (hover: hover) {
     .bracket-link:hover {
       color: var(--on-accent);
-      background: var(--green);
+      background: var(--ink);
     }
     .bracket-link--orange:hover {
       color: var(--on-accent);
@@ -533,20 +538,10 @@
     font-weight: 600;
     color: var(--ink);
   }
-  /* Links in the prose: green, no underline (the green says it's a link). */
-  .legal .text-link {
-    border-bottom: 0;
-    transition: opacity var(--dur-fast) var(--ease-out);
-  }
-  @media (hover: hover) {
-    .legal .text-link:hover {
-      opacity: 0.75;
-    }
-  }
-  /* The short version: a green rule at its side and a tick per point, no box. */
+  /* The short version: an ink rule at its side and a tick per point, no box. */
   .legal .summary {
     margin-bottom: 0.5rem;
-    border-left: 3px solid var(--green);
+    border-left: 3px solid var(--ink);
     padding: 0.1rem 0 0.1rem 1.25rem;
   }
   .legal .summary p:first-child {
@@ -564,7 +559,7 @@
     content: "✓";
     position: absolute;
     left: 0;
-    color: var(--green);
+    color: var(--ink);
   }
 
   /* "On this page", sticky beside the policy text. */
@@ -599,7 +594,7 @@
     color: var(--ink);
   }
   .legal-toc a[aria-current] {
-    border-left-color: var(--green);
+    border-left-color: var(--sel);
     color: var(--ink);
   }
 
@@ -1192,7 +1187,7 @@
     opacity: 1;
   }
   .plan-shape[data-state="done"] .plan-shape-lines .sk {
-    background: color-mix(in oklab, var(--green) 35%, transparent);
+    background: color-mix(in oklab, var(--ink) 30%, transparent);
   }
   .plan-shape[data-state="done"] .plan-shape-lines .sk::after {
     display: none;
@@ -1894,7 +1889,7 @@
 }
 .swap-to,
 .swap-on {
-  background: var(--green);
+  background: var(--ink);
   color: var(--on-accent);
 }
 .swap-on {
@@ -2554,7 +2549,7 @@
     font-size: 0;
   }
   :root[data-rail="collapsed"] .rail-panel .side-badge[data-tone="leaf"] {
-    background: var(--green);
+    background: var(--hf);
   }
   :root[data-rail="collapsed"] .rail-panel .side-badge svg {
     display: none;
@@ -2677,7 +2672,7 @@
     color: var(--on-accent);
   }
   .side-badge[data-tone="leaf"] {
-    color: var(--green);
+    color: var(--hf);
   }
   .side-group-label {
     padding: 0 12px 6px;
@@ -3273,7 +3268,7 @@
     }
   }
 
-  /* The home's "Find a project": a card-like button, the icon in the accent, a line on what you'll find. */
+  /* The home's "Find a project": a card-like button, the icon on ink, a line on what you'll find. */
   .find-cta {
     display: inline-flex;
     max-width: 100%;
@@ -3295,7 +3290,7 @@
     width: 44px;
     height: 44px;
     place-items: center;
-    background: var(--green);
+    background: var(--ink);
     color: var(--on-accent);
   }
   .find-cta-title {
@@ -3313,13 +3308,13 @@
   }
   .find-cta-arrow {
     margin-left: 6px;
-    color: var(--green);
+    color: var(--ink);
     font-size: 1.1rem;
     transition: translate var(--dur-fast) var(--ease-out);
   }
   @media (hover: hover) {
     .find-cta:hover {
-      border-color: var(--green);
+      border-color: var(--blue);
     }
     .find-cta:hover .find-cta-arrow {
       translate: 3px 0;
@@ -3333,7 +3328,7 @@
     outline-offset: 2px;
   }
   /* The loop (find a repo, pick an issue, open a PR, get it merged) as one
-     slim bar of four segments: done in green, yours in blue, the rest grey,
+     slim bar of four segments: done in ink, yours in blue, the rest grey,
      each with its name under it. Under the text on phones; from 768px, at the
      right of the line under the headline. */
   .loop-bar {
@@ -3385,10 +3380,10 @@
     color: var(--muted);
   }
   .loop-step[data-s="done"] .loop-seg {
-    background: var(--green);
+    background: var(--ink);
   }
   .loop-step[data-s="done"] .loop-n {
-    color: var(--green);
+    color: var(--ink);
   }
   .loop-step[data-s="now"] {
     color: var(--ink);

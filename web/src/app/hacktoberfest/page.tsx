@@ -208,7 +208,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
             <ol className="mt-6 space-y-5">
               {TIPS.map(([title, body]) => (
                 <li key={title} className="flex gap-3">
-                  <span aria-hidden="true" className="text-green">→</span>
+                  <span aria-hidden="true" className="text-hf">→</span>
                   <p className="font-sans text-muted">
                     <strong className="font-semibold text-ink">{title}</strong> {body}
                   </p>
@@ -226,7 +226,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
           <a className="text-link" href="https://hacktoberfest.com" target="_blank" rel="noopener noreferrer">hacktoberfest.com ↗</a>.
         </p>
         <div className="mt-10 flex flex-col items-start gap-4 border-t border-line pt-10">
-          <CatFace mood="adoring" className="text-[1.5rem] text-green" />
+          <CatFace mood="adoring" className="text-[1.5rem] text-hf" />
           <p className="text-[1.2rem] font-semibold tracking-tight">Already have a repo in mind?</p>
           <Link href={user ? CHECK_HREF : "/"} className="bracket-link">[ check any repo → ]</Link>
         </div>

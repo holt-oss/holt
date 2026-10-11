@@ -219,7 +219,7 @@ function LiveCheck({ repo, onLanded }: { repo: string; onLanded: (repo: string, 
       <div className="font-sans text-[0.86rem]" role="alert">
         <p className="text-orange">{state.error.message}</p>
         {(state.error.code === "upstream" || state.error.code === "internal") && (
-          <button type="button" onClick={retry} className="mt-2 min-h-11 text-green hover:underline">try again</button>
+          <button type="button" onClick={retry} className="mt-2 min-h-11 text-link">try again</button>
         )}
       </div>
     );

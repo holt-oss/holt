@@ -16,7 +16,7 @@ function Snippet({ label, code }: { label: string; code: string }) {
       <p className="mb-1.5 text-[0.8rem] uppercase tracking-[0.08em] text-faint">{label}</p>
       <div className="grid grid-cols-[1fr_auto] border border-line-strong bg-bg">
         <code className="min-w-0 overflow-x-auto whitespace-nowrap px-3 py-3 text-[0.82rem] text-muted">{code}</code>
-        <CopyButton text={code} label="copy" className="min-h-11 border-l border-line-strong px-4 text-[0.85rem] text-muted transition-colors hover:bg-green hover:text-on-accent" />
+        <CopyButton text={code} label="copy" className="min-h-11 border-l border-line-strong px-4 text-[0.85rem] text-muted transition-colors hover:bg-ink hover:text-on-accent" />
       </div>
     </div>
   );

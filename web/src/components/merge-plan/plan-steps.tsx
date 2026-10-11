@@ -75,7 +75,7 @@ export function PlanSteps({ repo, steps, show = steps.length }: { repo: string; 
       {/* The track. */}
       <div className="relative">
         <div aria-hidden="true" className="absolute top-5 h-0.5 bg-line-strong" style={{ left: `calc(100% / ${steps.length * 2})`, right: `calc(100% / ${steps.length * 2})` }}>
-          <div className="h-full bg-green transition-[width] duration-500 ease-out" style={{ width: `${fill}%` }} />
+          <div className="h-full bg-ink transition-[width] duration-500 ease-out" style={{ width: `${fill}%` }} />
         </div>
         <ol className="relative grid" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }} role="tablist" aria-label="Steps">
           {steps.map((s, i) => {
@@ -92,7 +92,7 @@ export function PlanSteps({ repo, steps, show = steps.length }: { repo: string; 
                   onClick={() => setPicked(i)}
                   className={`relative grid size-10 place-items-center rounded-full border-2 text-[0.95rem] font-semibold tabular-nums transition-[background-color,border-color,box-shadow] duration-200 disabled:cursor-not-allowed ${
                     done[i]
-                      ? "border-green bg-green text-on-accent"
+                      ? "border-ink bg-ink text-on-accent"
                       : isActive
                         ? "border-blue bg-panel text-blue shadow-[0_0_0_5px_color-mix(in_oklab,var(--blue)_16%,transparent)]"
                         : "border-line-strong bg-panel text-muted hover:border-ink hover:text-ink"
@@ -122,11 +122,11 @@ export function PlanSteps({ repo, steps, show = steps.length }: { repo: string; 
         role="tabpanel"
         className="relative mt-8 overflow-hidden border border-line-strong bg-panel shadow-card"
       >
-        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${done[active] ? "bg-green" : "bg-blue"}`} />
+        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${done[active] ? "bg-ink" : "bg-blue"}`} />
         <div key={active} className="p-5 pl-6 sm:p-8 sm:pl-10">
           <p className="text-[0.8rem] uppercase tracking-[0.08em] text-faint">
             step {active + 1} of {steps.length}
-            {done[active] && <span className="text-green"> · done</span>}
+            {done[active] && <span className="text-ink"> · done</span>}
           </p>
           <h3 className="mt-2 text-[1.3rem] font-semibold leading-snug tracking-tight sm:text-[1.6rem]">
             <PlanText text={step.title} />
@@ -140,7 +140,7 @@ export function PlanSteps({ repo, steps, show = steps.length }: { repo: string; 
             <div className="mt-5 max-w-[760px] border border-line-strong bg-bg">
               <div className="flex items-center justify-between border-b border-line-strong pl-4">
                 <span className="text-[0.75rem] uppercase tracking-[0.08em] text-faint">{step.copy.label}</span>
-                <CopyButton text={step.copy.text} className="self-stretch border-l border-line-strong px-4 py-2 text-[0.85rem] text-muted transition-colors hover:bg-green hover:text-on-accent" />
+                <CopyButton text={step.copy.text} className="self-stretch border-l border-line-strong px-4 py-2 text-[0.85rem] text-muted transition-colors hover:bg-ink hover:text-on-accent" />
               </div>
               <p className="px-4 py-3 font-sans text-[0.98rem] leading-relaxed text-ink">{step.copy.text}</p>
             </div>

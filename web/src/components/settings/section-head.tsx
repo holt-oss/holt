@@ -38,10 +38,10 @@ export function Block({ id, title, note, more, className = "", children }: {
   );
 }
 
-/** A green, orange or plain notice after a form. */
+/** A notice after a form: ink when it worked, orange when it did not, or plain. */
 export function Notice({ tone, children }: { tone: "good" | "bad" | "plain"; children: React.ReactNode }) {
   const cls =
-    tone === "good" ? "text-green border-green/50 bg-green/10"
+    tone === "good" ? "text-ink border-line-strong bg-ink/5"
     : tone === "bad" ? "text-orange border-orange/50 bg-orange/10"
     : "text-muted border-line-strong";
   return <p role="status" className={`mb-6 border px-4 py-3 font-sans text-[0.9rem] ${cls}`}>{children}</p>;
