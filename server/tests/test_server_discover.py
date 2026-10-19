@@ -436,9 +436,10 @@ def test_warm_pass_reads_details_of_reported_repos_once_a_day(h):
     assert fake.calls[1:] == [["octo/gone"]]  # only the one GitHub didn't know
 
 
-def test_details_are_read_a_hundred_at_a_time():
-    items = [f"o/r{i}" for i in range(250)]
-    assert [len(b) for b in discover.batches(items)] == [100, 100, 50]
+def test_details_are_read_ten_at_a_time():
+    items = [f"o/r{i}" for i in range(25)]
+    assert [len(b) for b in discover.batches(items)] == [10, 10, 5] == [
+        github.DETAILS_BATCH, github.DETAILS_BATCH, 5]
 
 
 def test_details_rate_limit_stops_the_pass(h):
@@ -506,7 +507,7 @@ def test_details_query_is_one_request_with_one_alias_per_repo():
     assert out["octo/gone"] is None and out["octo/secret"] is None
 
 
-def test_details_when_every_repo_is_gone():
+def test_details_when_every_repo_is_gone_or_unanswered():
     from holt.evidence.errors import RepoNotFound, UpstreamError
 
     def gone(v):
@@ -518,10 +519,12 @@ def test_details_when_every_repo_is_gone():
     def broken(v):
         raise UpstreamError("HTTP 502")
 
-    lookup, _ = lookup_with(broken)
-    with pytest.raises(ApiError) as err:
-        lookup._details(["octo/one"])
-    assert err.value.code == "upstream"
+    # One GitHub can't answer for, even alone, is left out: not missing, not read.
+    lookup, transport = lookup_with(broken)
+    assert lookup._details(["octo/one", "octo/two"]) == {}
+    assert [v for _, v in transport.sent] == [
+        {"o0": "octo", "n0": "one", "o1": "octo", "n1": "two"},
+        {"o0": "octo", "n0": "one"}, {"o0": "octo", "n0": "two"}]
     with pytest.raises(ValueError):
         lookup._details([f"o/r{i}" for i in range(github.DETAILS_BATCH + 1)])
 

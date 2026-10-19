@@ -6,8 +6,8 @@ A report job reads its own repo's details first (`read_now`, waiting at most
 jobs.META_WAIT_S) so the report reaches the page with them. When that read
 fails or runs out of time, `note` tries again after the report: best effort,
 and a failure is only logged. Reports that
-finish within `DELAY_S` of each other share one query (up to a hundred repos,
-about a point). A repo whose details are younger than
+finish within `DELAY_S` of each other share one query (up to
+github.DETAILS_BATCH repos, about a point). A repo whose details are younger than
 discover.META_MAX_AGE_HOURS is not read again; the daily meta-only warm pass
 (`deploy/prod/warm-meta.sh`) keeps the rest fresh.
 

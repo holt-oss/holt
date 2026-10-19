@@ -88,7 +88,7 @@ from pathlib import Path
 
 from sqlalchemy import delete, func, select
 
-from holt_server import evidence_store, repos, starter
+from holt_server import evidence_store, github, repos, starter
 from holt_server.db import (
     ACTIVE,
     BADGE_PRIORITY,
@@ -146,6 +146,12 @@ NOT_FOUND_RETRY_HOURS = 30 * 24
 # pause the pass this long, however many seeds are left.
 BREAKER_FAILURES = 5
 BREAKER_PAUSE_S = 300
+# This many details queries in a row with nothing read because GitHub couldn't
+# answer end the details pass, and the run exits non-zero (META_FAILED).
+META_FAILURES_IN_A_ROW = 3
+META_FAILED = 1
+# The repos a summary names on one line; the rest are counted.
+NAMES_SHOWN = 30
 # After GitHub says "slow down": wait what it asked (LIMIT_WAIT_S when it
 # named no time, never under LIMIT_WAIT_MIN_S), doubling each time it says so
 # again with no report made in between, up to LIMIT_WAIT_MAX_S; then one
@@ -248,6 +254,13 @@ def minutes(seconds: float) -> str:
     return f"{n} minute{'' if n == 1 else 's'}"
 
 
+def names(repos: list[str]) -> str:
+    """`a/b, c/d and 12 more`: the first NAMES_SHOWN, alphabetically."""
+    shown = sorted(repos, key=str.lower)
+    more = len(shown) - NAMES_SHOWN
+    return ", ".join(shown[:NAMES_SHOWN]) + (f" and {more} more" if more > 0 else "")
+
+
 @dataclass
 class Result:
     reports_run: int = 0
@@ -274,6 +287,12 @@ class Result:
     starter_fresh: int = 0
     meta_run: int = 0
     meta_points: int = 0
+    # Details GitHub says are missing (deleted, or private), and those it
+    # couldn't answer for even one at a time.
+    meta_missing: list[str] = field(default_factory=list)
+    meta_unread: list[str] = field(default_factory=list)
+    # Why the details pass failed, if it did: the run then exits META_FAILED.
+    meta_failed: str | None = None
     finds_run: int = 0
     finds_fresh: int = 0
     stopped: str | None = None
@@ -289,7 +308,8 @@ class Result:
                  f"{self.reports_rederived} made again from kept evidence",
                  f"{self.quiet_last} closed or dormant seeds last",
                  f"starter issues {self.starter_run} run, {self.starter_fresh} fresh",
-                 f"repo details {self.meta_run} read ({self.meta_points} GitHub points)",
+                 f"repo details {self.meta_run} read ({self.meta_points} GitHub points), "
+                 f"{len(self.meta_unread)} not read, {len(self.meta_missing)} not on GitHub",
                  f"finds {self.finds_run} run, {self.finds_fresh} fresh"]
         if self.dry_run:
             parts.append(f"the reports would use about "
@@ -712,7 +732,19 @@ class Warmer:
 
     async def warm_meta(self, seeds: list[str]) -> None:
         """Details (language, stars, topics...) of every reported repo whose
-        copy is missing or a day old, a hundred per query."""
+        copy is missing or a day old, DETAILS_BATCH per query. A repo GitHub
+        says is missing, or couldn't answer for, is listed and the rest are
+        still saved. It fails (`meta_failed`) when GitHub couldn't answer
+        META_FAILURES_IN_A_ROW queries in a row, or nothing could be read."""
+        # Nobody waits on it: two tries a query, and a "slow down" comes back
+        # at once (github.background), as for a warm report.
+        token = github.background.set(True)
+        try:
+            await self._warm_meta(seeds)
+        finally:
+            github.background.reset(token)
+
+    async def _warm_meta(self, seeds: list[str]) -> None:
         from holt_server import discover
 
         stale = await discover.stale_meta(self.svc, seeds)
@@ -722,20 +754,37 @@ class Warmer:
                 self.say(f"would read details of {len(stale)} repos in {len(batches)} "
                          f"quer{'y' if len(batches) == 1 else 'ies'}")
             return
+        r = self.result
+        in_a_row = 0
         for batch in batches:
             await self.check_budget()
             before = getattr(self.svc.lookup, "points_used", 0)
             try:
                 details = await self.svc.lookup.details(batch)
             except ApiError as err:
-                self.result.failures.append(f"repo details: {err.code}")
                 if err.code == "rate_limited":
+                    r.failures.append(f"repo details: {err.code}")
                     raise OutOfBudget("GitHub rate limit reached") from err
-                return
+                log.warning("repository details: %d repos not read (%s)", len(batch), err.code)
+                details = {}
             finally:
-                self.result.meta_points += (
-                    getattr(self.svc.lookup, "points_used", 0) - before)
-            self.result.meta_run += await discover.store_meta(self.svc, details)
+                r.meta_points += getattr(self.svc.lookup, "points_used", 0) - before
+            r.meta_missing += [repo for repo in batch if repo in details and details[repo] is None]
+            unread = [repo for repo in batch if repo not in details]
+            r.meta_unread += unread
+            written = await discover.store_meta(self.svc, details)
+            r.meta_run += written
+            in_a_row = in_a_row + 1 if unread and not written else 0
+            if in_a_row >= META_FAILURES_IN_A_ROW:
+                r.meta_failed = (f"GitHub couldn't answer {in_a_row} details queries in a row; "
+                                 f"stopped with {len(stale) - r.meta_run - len(r.meta_missing)} "
+                                 f"of {len(stale)} repos not read")
+                break
+        if r.meta_failed is None and r.meta_unread and not r.meta_run:
+            r.meta_failed = f"none of the {len(r.meta_unread)} repos GitHub was asked about could be read"
+        if r.meta_failed:
+            r.failures.append(f"repo details: {r.meta_failed}")
+            self.say(f"repo details failed: {r.meta_failed}")
 
     async def warm_find(self, profile: Profile) -> None:
         if await self.find_is_fresh(profile):
@@ -1050,7 +1099,12 @@ def main(argv: list[str] | None = None) -> int:
             if result.not_found:
                 print("  not on GitHub (renamed away or deleted; fix the seed list): "
                       + ", ".join(result.not_found))
-            return 0
+            if result.meta_missing:
+                print("  repo details: not on GitHub (deleted or private; fix the seed list): "
+                      + names(result.meta_missing))
+            if result.meta_unread:
+                print("  repo details: GitHub couldn't answer for " + names(result.meta_unread))
+            return META_FAILED if result.meta_failed else 0
         finally:
             if works_queue:
                 await svc.runner.stop()
