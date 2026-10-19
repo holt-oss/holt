@@ -293,6 +293,9 @@ class Result:
     meta_unread: list[str] = field(default_factory=list)
     # Why the details pass failed, if it did: the run then exits META_FAILED.
     meta_failed: str | None = None
+    # Repos whose details were due but left for the next pass when its time
+    # (HOLT_META_MAX_MINUTES) ran out.
+    meta_due: int = 0
     finds_run: int = 0
     finds_fresh: int = 0
     stopped: str | None = None
@@ -309,7 +312,8 @@ class Result:
                  f"{self.quiet_last} closed or dormant seeds last",
                  f"starter issues {self.starter_run} run, {self.starter_fresh} fresh",
                  f"repo details {self.meta_run} read ({self.meta_points} GitHub points), "
-                 f"{len(self.meta_unread)} not read, {len(self.meta_missing)} not on GitHub",
+                 f"{len(self.meta_unread)} not read, {len(self.meta_missing)} not on GitHub, "
+                 f"{self.meta_due} still due",
                  f"finds {self.finds_run} run, {self.finds_fresh} fresh"]
         if self.dry_run:
             parts.append(f"the reports would use about "
@@ -732,7 +736,9 @@ class Warmer:
 
     async def warm_meta(self, seeds: list[str]) -> None:
         """Details (language, stars, topics...) of every reported repo whose
-        copy is missing or a day old, DETAILS_BATCH per query. A repo GitHub
+        copy is missing or a day old, DETAILS_BATCH per query, the missing and
+        oldest first, for at most HOLT_META_MAX_MINUTES: the rest are still due
+        and wait for the next pass (not a failure). A repo GitHub
         says is missing, or couldn't answer for, is listed and the rest are
         still saved. It fails (`meta_failed`) when GitHub couldn't answer
         META_FAILURES_IN_A_ROW queries in a row, or nothing could be read."""
@@ -756,7 +762,14 @@ class Warmer:
             return
         r = self.result
         in_a_row = 0
-        for batch in batches:
+        limit_s = self.svc.settings.meta_max_minutes * 60
+        started = clock()
+        for done, batch in enumerate(batches):
+            if limit_s and done and clock() - started >= limit_s:
+                r.meta_due = sum(len(b) for b in batches[done:])
+                self.say(f"repo details: {minutes(limit_s)} used (HOLT_META_MAX_MINUTES); "
+                         f"{r.meta_due} repos wait for the next pass")
+                break
             await self.check_budget()
             before = getattr(self.svc.lookup, "points_used", 0)
             try:

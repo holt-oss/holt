@@ -6,12 +6,15 @@
 #
 # The warm pass with everything but details off (`--no-reports --no-starter
 # --no-find`), in the foreground, in a one-off container of the live server
-# image. It works no jobs, so it never takes a person's analysis. Cost: about
-# one GitHub GraphQL point per ten repos (GitHub can't finish more at once),
-# and it stops below HOLT_WARM_MIN_POINTS (1500) left; the summary line says
-# how many it used, and lists repos not on GitHub or not read. It exits
-# non-zero, and the unit shows failed, when GitHub couldn't answer three
-# queries in a row or nothing could be read.
+# image. It works no jobs, so it never takes a person's analysis. It reads
+# the oldest details first, for at most HOLT_META_MAX_MINUTES (15); the rest
+# are still due and go first tomorrow, so the whole list rolls over across
+# several days (raise it to go faster). Cost: about one GitHub GraphQL point per ten repos (GitHub can't
+# finish more at once), and it stops below HOLT_WARM_MIN_POINTS (1500) left.
+# The summary line says how many points it used and how many repos are still
+# due, and lists repos not on GitHub or not read. Running out of time is not
+# a failure. It exits non-zero, and the unit shows failed, when GitHub
+# couldn't answer three queries in a row or nothing could be read.
 # A repo's first report already reads its own details (meta_refresh.py), so a
 # skipped day only means some stars are a day older.
 #
@@ -19,8 +22,8 @@
 #   - a deploy: it holds deploy.sh's lock ($STATE/lock) while it runs, and
 #     waits up to HOLT_META_LOCK_WAIT seconds (45 min) for a deploy to finish,
 #     else skips the day. A deploy that starts meanwhile exits 75 (busy) and
-#     follow.sh tries again two minutes later. For ~10,000 repos the pass
-#     takes over an hour.
+#     follow.sh tries again two minutes later. The pass takes at most
+#     HOLT_META_MAX_MINUTES.
 #   - the nightly backup: 03:30 UTC, and both take $STATE/backup.lock.
 #   - a full warm pass: the pass's own advisory lock; it exits 75 and is
 #     logged as skipped.

@@ -648,7 +648,7 @@ async def discover(request: Request,
 async def stale_meta(svc: Services, extra: list[str] = ()) -> list[str]:
     """Repositories with a rules report, in a find stored in the last
     META_MAX_AGE_HOURS, or in `extra`, whose details are missing or older than
-    that."""
+    that: the missing first, then the oldest."""
     cutoff = now() - timedelta(hours=META_MAX_AGE_HOURS)
     async with svc.db.session() as s:
         reported = (await s.execute(
@@ -667,8 +667,12 @@ async def stale_meta(svc: Services, extra: list[str] = ()) -> list[str]:
     names = {key: repo for key, repo in reported}
     for repo in [*found, *extra]:
         names.setdefault(repos.key(repo), repo)
-    return [repo for key, repo in names.items()
-            if key not in fetched or key in old_shape or utc(fetched[key]) < cutoff]
+    stale = [(key, repo) for key, repo in names.items()
+             if key not in fetched or key in old_shape or utc(fetched[key]) < cutoff]
+    missing = [repo for key, repo in stale if key not in fetched or key in old_shape]
+    old = sorted(((utc(fetched[key]), repo) for key, repo in stale
+                  if key in fetched and key not in old_shape), key=lambda t: t[0])
+    return missing + [repo for _, repo in old]
 
 
 async def with_meta(s, results: list[dict[str, Any]]) -> list[dict[str, Any]]:

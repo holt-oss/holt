@@ -541,3 +541,60 @@ def test_the_details_pass_asks_github_as_background_work(h, monkeypatch):
     # Two tries, as a warm report, not the four a person's check gets.
     assert gh.queries == [["huge/repo"]] * github.BACKGROUND_ATTEMPTS
     assert github.background.get() is False
+
+
+def test_a_pass_reads_details_for_at_most_its_time_and_leaves_the_rest_due(
+        h, monkeypatch, pauses, capsys, tmp_path):
+    gh = DetailsGitHub()
+    details_lookup(h, monkeypatch, gh)
+    h.svc.settings.meta_max_minutes = 10
+    real = gh.__class__.__call__
+
+    def slow(self, request):  # every details query takes five minutes
+        if request.method == "POST":
+            pauses.now += 300
+        return real(self, request)
+
+    monkeypatch.setattr(DetailsGitHub, "__call__", slow)
+    repos = [f"octo/r{i:02}" for i in range(github.DETAILS_BATCH * 5)]
+    lines: list[str] = []
+    result = details_pass(h, repos, say=lines.append)
+
+    assert result.meta_run == github.DETAILS_BATCH * 2 and result.meta_failed is None
+    assert result.meta_due == github.DETAILS_BATCH * 3
+    assert f"{github.DETAILS_BATCH * 3} still due" in result.summary()
+    assert any("10 minutes used (HOLT_META_MAX_MINUTES)" in line for line in lines)
+    assert set(meta_rows(h)) == set(repos[:github.DETAILS_BATCH * 2])
+
+    # Cut short by its time is not a failure: the run exits 0.
+    async def fake_warm_once(svc, **kw):
+        return result
+
+    class FakeServices:
+        def __init__(self, settings):
+            self.settings = settings
+            self.db = type("DB", (), {"migrate": _noop, "dispose": _noop})()
+            self.http = type("HTTP", (), {"close": lambda self: None})()
+
+    monkeypatch.setattr(warm, "warm_once", fake_warm_once)
+    monkeypatch.setattr("holt_server.services.Services", FakeServices)
+    (tmp_path / "seeds.txt").write_text("octo/r00\n", encoding="utf-8")
+    assert warm.main(["--no-reports", "--no-starter", "--no-find",
+                      "--seeds", str(tmp_path / "seeds.txt")]) == 0
+
+
+def test_details_are_read_missing_first_then_oldest(h, monkeypatch):
+    from holt_server import discover
+    from holt_server.db import RepoMeta
+    from sqlalchemy import null
+
+    async def go():
+        async with h.svc.db.session() as s:
+            for repo, days in (("octo/yesterday", 1), ("octo/last-week", 7), ("octo/old-shape", 2)):
+                s.add(RepoMeta(repo_key=repo, repo=repo, fetched_at=now() - timedelta(days=days),
+                               links=null() if repo == "octo/old-shape" else []))
+            await s.commit()
+        return await discover.stale_meta(h.svc, ["octo/yesterday", "octo/new", "octo/old-shape",
+                                                 "octo/last-week"])
+    assert h.client.portal.call(go) == ["octo/new", "octo/old-shape", "octo/last-week",
+                                        "octo/yesterday"]
