@@ -11,6 +11,9 @@
 #   GITHUB_APP_PRIVATE_KEY_FILE            -> the same names (the GitHub App)
 #   CONTACT_EMAIL / CONTACT_CITY           -> NEXT_PUBLIC_CONTACT_EMAIL / _CITY
 # and makes $STATE/evidence (HOLT_EVIDENCE_GID) for the server's snapshots.
+# Pass sales have their own names, read from the secrets file or
+# $STATE/.env and checked by check_prod_payments (below, and README.md,
+# "Selling passes"): HOLT_PROD_PAYMENTS, PROD_RAZORPAY_*, PROD_DODO_*.
 # Exported, so they win over .env for compose. An unset key stays empty and
 # the feature stays off (sign-in hidden, AI reports answer needs_key). The
 # one thing every run needs is a way to read GitHub: the GitHub App, else
@@ -27,6 +30,56 @@ PROJECT="${HOLT_PROD_PROJECT:-holt-prod}"
 
 if ! declare -F log >/dev/null; then log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*"; }; fi
 if ! declare -F die >/dev/null; then die() { log "ERROR: $*"; exit 1; }; fi
+
+env_value() {   # KEY DEFAULT: the environment, else .env, else the default
+    local v="${!1:-}"
+    [[ -n "$v" || ! -f "$STATE/.env" ]] || v="$(sed -n "s/^$1=//p" "$STATE/.env" | tail -1 | tr -d "\"'")"
+    echo "${v:-${2:-}}"
+}
+
+# Pass sales. Production reads only these names, so the unprefixed ones
+# staging uses with test keys (RAZORPAY_KEY_ID, HOLT_PAYMENTS_ENABLED) never
+# reach it; compose.yml maps them to the names the server reads.
+PROD_RAZORPAY_NAMES=(PROD_RAZORPAY_KEY_ID PROD_RAZORPAY_KEY_SECRET PROD_RAZORPAY_WEBHOOK_SECRET)
+PROD_DODO_NAMES=(PROD_DODO_API_KEY PROD_DODO_WEBHOOK_SECRET
+                 PROD_DODO_PRODUCT_PRO_1M PROD_DODO_PRODUCT_PRO_3M PROD_DODO_PRODUCT_PRO_12M)
+
+# check_prod_payments: load_prod_env runs it. Exports HOLT_PROD_PAYMENTS (0
+# or 1) and the names above as compose will see them, and sets PAYMENTS_MSG
+# to one line for the log. Returns 1, with PAYMENTS_MSG saying why, when
+# passes must not go on sale with these settings: load_prod_env then leaves
+# PAYMENTS_OK=0 and deploy.sh stops. Names only, never values.
+check_prod_payments() {
+    local name on missing=() have=0
+    for name in "${PROD_RAZORPAY_NAMES[@]}" "${PROD_DODO_NAMES[@]}"; do
+        export "$name=$(env_value "$name")"
+    done
+    on="$(env_value HOLT_PROD_PAYMENTS 0)"
+    if [[ "$on" != 0 && "$on" != 1 ]]; then
+        PAYMENTS_MSG="HOLT_PROD_PAYMENTS must be 0 or 1"; return 1
+    fi
+    export HOLT_PROD_PAYMENTS="$on"
+    # A test key under a production name is a mistake whether passes are on
+    # or off: with it the server would accept test-mode payments.
+    if [[ -n "$PROD_RAZORPAY_KEY_ID" && "$PROD_RAZORPAY_KEY_ID" != rzp_live_?* ]]; then
+        PAYMENTS_MSG="PROD_RAZORPAY_KEY_ID is not a live key (it must start with rzp_live_)"; return 1
+    fi
+    if [[ "$on" != 1 ]]; then
+        PAYMENTS_MSG="passes: off (HOLT_PROD_PAYMENTS is not 1)"; return 0
+    fi
+    for name in "${PROD_RAZORPAY_NAMES[@]}"; do [[ -n "${!name}" ]] || missing+=("$name"); done
+    if (( ${#missing[@]} )); then
+        PAYMENTS_MSG="HOLT_PROD_PAYMENTS=1 but ${missing[*]} not set"; return 1
+    fi
+    for name in "${PROD_DODO_NAMES[@]}"; do
+        if [[ -n "${!name}" ]]; then have=$((have + 1)); else missing+=("$name"); fi
+    done
+    if (( have && ${#missing[@]} )); then
+        PAYMENTS_MSG="Dodo is only partly set up: ${missing[*]} not set (set all five PROD_DODO_ names, or none)"; return 1
+    fi
+    if (( have )); then PAYMENTS_MSG="passes: on (Razorpay live keys; Dodo set, USD offered)"
+    else PAYMENTS_MSG="passes: on (Razorpay live keys; no Dodo, so no USD)"; fi
+}
 
 load_prod_env() {
     if [[ -f "$SECRETS" ]]; then
@@ -84,4 +137,7 @@ load_prod_env() {
     export HOLT_EVIDENCE_GID
     export NEXT_PUBLIC_CONTACT_EMAIL="${NEXT_PUBLIC_CONTACT_EMAIL:-${CONTACT_EMAIL:-}}"
     export NEXT_PUBLIC_CONTACT_CITY="${NEXT_PUBLIC_CONTACT_CITY:-${CONTACT_CITY:-}}"
+    # Refused settings sell nothing, whatever this run goes on to start.
+    PAYMENTS_OK=1
+    check_prod_payments || { PAYMENTS_OK=0; export HOLT_PROD_PAYMENTS=0; }
 }

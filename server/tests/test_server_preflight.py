@@ -212,7 +212,7 @@ def test_without_the_service_preflight_is_off(h):
 def test_anyone_can_see_it_is_on(hp):
     s = state(hp)
     assert s["available"] is True and s["access"] is None and s["result"] is None
-    assert s["on_sale"] is False  # nothing is on sale in the shipped catalogue
+    assert s["on_sale"] is False  # no pass in the shipped catalogue unlocks it
 
 
 def test_signed_in_state_says_what_a_check_costs(hp):

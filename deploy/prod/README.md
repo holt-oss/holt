@@ -31,6 +31,7 @@ pause it, and `deploy.sh` still works by hand.
 | `TUNNEL.md` | Steps for the user to route githolt.com here. |
 | `umami.sh` | One-time: the analytics service (Umami): its database and role, `.env` keys, first start, admin password. See [Analytics](#analytics). |
 | `stats.sh` | The product numbers from Holt's own database, per day. Read-only, no personal data. |
+| `passes.sh` | What the running server sells: the switch, which keys are set (never their values), the passes on sale and their prices. Read-only. See [Selling passes](#selling-passes). |
 
 State lives in `~/.local/share/holt-prod/` (outside every checkout, so
 removing a worktree can't delete secrets): `.env`, `src/` (a clone at the
@@ -67,6 +68,71 @@ There is never a dev sign-in in production: it exists only with
 `NODE_ENV=development`, and the image runs with `NODE_ENV=production`.
 After changing the file: `FORCE=1 deploy/prod/deploy.sh` (re-ups the live
 tag with the new values; no rebuild).
+
+## Selling passes
+
+Off until the owner switches it on. `pricing.json` marks the three passes on
+sale, and the server offers them only with the switch and live Razorpay keys.
+Production reads these names from `~/.config/holt/secrets.env` (or
+`~/.local/share/holt-prod/.env`), never the unprefixed ones staging uses with
+test keys:
+
+| Name | Becomes | |
+|---|---|---|
+| `HOLT_PROD_PAYMENTS` | `HOLT_PAYMENTS_ENABLED` | the switch: `1` on, `0` or unset off |
+| `PROD_RAZORPAY_KEY_ID`, `PROD_RAZORPAY_KEY_SECRET`, `PROD_RAZORPAY_WEBHOOK_SECRET` | `RAZORPAY_*` | INR. Needed with the switch on; the key id must start with `rzp_live_` |
+| `PROD_DODO_API_KEY`, `PROD_DODO_WEBHOOK_SECRET`, `PROD_DODO_PRODUCT_PRO_1M`, `PROD_DODO_PRODUCT_PRO_3M`, `PROD_DODO_PRODUCT_PRO_12M` | `DODO_*` | USD. All five or none: without them USD is not offered. `DODO_ENV=live` is fixed |
+
+Webhooks, set in each dashboard in live mode:
+
+- Razorpay: `https://githolt.com/api/payments/razorpay/webhook`, events
+  `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`.
+  Its secret is `PROD_RAZORPAY_WEBHOOK_SECRET`.
+- Dodo: `https://githolt.com/api/billing/dodo/webhook`. Its secret is
+  `PROD_DODO_WEBHOOK_SECRET`.
+
+Switch on: put the names in the secrets file with `HOLT_PROD_PAYMENTS=1`, then
+
+```sh
+FORCE=1 deploy/prod/deploy.sh    # swaps in a server with the new settings; no rebuild
+deploy/prod/passes.sh            # what the running server sells
+```
+
+`deploy.sh` logs `passes: on (...)` or `passes: off (...)` on every run. It
+stops before changing anything, naming what is wrong and never a value, when:
+
+- `HOLT_PROD_PAYMENTS` is anything but `0` or `1`;
+- `PROD_RAZORPAY_KEY_ID` is set and is not a `rzp_live_` key (with the switch
+  off too);
+- the switch is on and a Razorpay name is missing, or only some of the Dodo
+  names are set.
+
+The auto-deploy runs the same check: a mistake in the secrets file fails its
+next deploy, and that commit is not tried again (fix the file, then
+`follow.sh --retry` or deploy by hand).
+
+`passes.sh` is read-only and prints no secret:
+
+```
+payments switch: on
+Razorpay: live key, key secret set, webhook secret set
+Dodo: set (DODO_ENV=live)
+passes on sale:
+  pro_1m   1 month     30 days  INR 99.00  USD 7.00
+  ...
+```
+
+Switch off: `HOLT_PROD_PAYMENTS=0`, **keep the keys**, and `FORCE=1
+deploy/prod/deploy.sh`. The pricing page then offers nothing and no new
+order can be made. Someone already in Razorpay's checkout can still pay, and
+gets their pass: the server keeps settling orders that exist, from the
+checkout's return and from the webhook, for as long as it has the keys.
+Without the keys it refuses both, Razorpay retries the webhook for a day, and
+a payment made in that time gives no pass until the keys are back. Leave the
+webhooks in the dashboards.
+
+Rolling back to a release from before this section also switches passes off:
+its `compose.yml` passes none of these.
 
 ## First time
 

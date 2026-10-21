@@ -125,7 +125,7 @@ def ai(h, repo: str, user: str):
 # --- the catalogue --------------------------------------------------------------------
 
 
-def test_the_shipped_catalogue_sells_pro_passes_with_nothing_on_sale():
+def test_the_shipped_catalogue_sells_pro_passes_all_marked_on_sale():
     cat = pricing.load()
     assert "free" in cat.plans and "ai_report" in cat.features
     assert cat.features["ai_report"].free_credits is True
@@ -134,8 +134,9 @@ def test_the_shipped_catalogue_sells_pro_passes_with_nothing_on_sale():
     assert {pid: (p.days, p.price.inr_paise, p.price.usd_cents)
             for pid, p in cat.passes.items()} == {
         "pro_1m": (30, 9900, 700), "pro_3m": (90, 24900, 1500), "pro_12m": (365, 79900, 3900)}
-    assert not any(p.on_sale for p in cat.passes.values())
-    assert not any(cat.sold(f) for f in cat.features)
+    # Marked on sale; offered only once payments are switched on (payments.py).
+    assert all(p.on_sale for p in cat.passes.values())
+    assert {f for f in cat.features if cat.sold(f)} == set(cat.plans["pro"].features)
 
 
 def test_sold_means_a_pass_on_sale_unlocks_it():
