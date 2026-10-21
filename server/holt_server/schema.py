@@ -313,6 +313,10 @@ RUBBER_STAMP_LINE = ("Outside pull requests here get merged without anyone revie
                      "them, so you wouldn't get feedback on yours.")
 
 
+# "Worth your time" with nothing to add. Most repos on a welcoming board have
+# it, so a card there says what the repo does best instead (discover.standouts).
+WELCOMING_LINE = "Outside contributors get real replies here, and their work gets merged."
+
 # Rule codes that say something about the sample and never decide (API.md).
 # The reason under the headline is the last rule that is not one of these.
 INFO_CODES = frozenset({
@@ -364,8 +368,7 @@ def verdict_line(verdict: str, s: Stats, decided_by: list[str], rule_codes: list
                 f"Outside contributors do get merged here, but {' and '.join(buts)}, "
                 "so choose your first change carefully.", decided_by, rule_codes)
         return _with_slow_note(
-            "Outside contributors get real replies here, and their work gets merged."
-            if silent < 0.3 else
+            WELCOMING_LINE if silent < 0.3 else
             "Outside contributors get merged here, though some wait a while for a reply.",
             decided_by, rule_codes)
     if verdict == "long_shot":
@@ -1962,6 +1965,8 @@ class Recommendation(VerdictView):
     topics: list[str] = Field(default_factory=list)
     # The report's one-line reason (the same sentence Discover shows).
     reason: str
+    # What this repo does best among the user's picks, as on a Discover card.
+    standout: str | None = None
     # Why this pick, for this user: plain sentences, most important first.
     why: list[str]
     stats: Stats

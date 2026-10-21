@@ -26,7 +26,7 @@ export function BadgeSnippet({ repo, offered }: { repo: string; offered: boolean
       </div>
       <div className="mt-3 grid grid-cols-[1fr_auto] border border-line-strong bg-bg">
         <code className="min-w-0 overflow-x-auto whitespace-nowrap px-3 py-3 text-[0.82rem] text-muted">{markdown}</code>
-        <CopyButton text={markdown} label="copy" className="border-l border-line-strong px-4 text-[0.85rem] text-muted transition-colors hover:bg-green hover:text-on-accent" />
+        <CopyButton text={markdown} label="copy" className="border-l border-line-strong px-4 text-[0.85rem] text-muted transition-colors hover:bg-ink hover:text-on-accent" />
       </div>
       <p className="mt-2 font-sans text-[0.87rem] text-faint">
         Paste it into your README. The badge updates when the report does. <Link href={more} className="text-link">HTML and more →</Link>

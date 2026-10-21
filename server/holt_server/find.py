@@ -19,11 +19,16 @@ and costs nothing:
 * it must have starter issues Holt knows about (`starter_cache`, at most
   `discover.STARTER_MAX_HOURS` old): a repo whose known issues are none, or
   unknown yet, isn't listed. They are the ones a Discover card carries.
+  Repos with an issue nobody is on come before those whose issues are all
+  taken.
 
 The **search** is the GitHub search `holt.starter.find` runs (jobs.py, cached
 6 h per search in `find_cache`). A search job also reads the starter issues
 of the first `FILL_ISSUES` index matches that have none known yet, so they
-join the list when it finishes.
+join the list when it finishes, and reads again those of the first
+`REREAD_ISSUES` listed whose issues were read more than `REREAD_HOURS` ago:
+in October an issue is taken or closed within hours, and these are the ones
+people are shown first.
 
 Results are the index first, then the search's repos that aren't already
 there. While a search runs, `/v1/find` answers 202 with the index part in
@@ -48,12 +53,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
 
 from holt_server import cache, repos, schema, starter
+from holt_server.db import StarterCache, now
 from holt_server.deps import internal, services
 from holt_server.discover import (
     BREAKDOWN, COUNTS, _latest, card_issues, cursor_for, kept_card, read_cursor, stamp, start_of,
@@ -70,6 +78,12 @@ router = APIRouter(prefix="/v1", responses={"default": {"model": schema.ErrorBod
 # (the web's first page), and how many at a time.
 FILL_ISSUES = 12
 FILL_AT_ONCE = 4
+# The first listed repos (the web's first page) whose issues one search reads
+# again, when they were read longer ago than this. A search runs at most once
+# per `find_cache_hours` for the same filters, so this is at most
+# REREAD_ISSUES one-query reads in that time.
+REREAD_ISSUES = 12
+REREAD_HOURS = 6.0
 # How long a search waits for those reads after its own part is done.
 FILL_WAIT_SECONDS = 20.0
 # The index part of one set of filters is served for this long at most (see
@@ -139,7 +153,10 @@ async def index_results(svc: Services, params: dict[str, Any]) -> list[dict[str,
     async def build() -> list[dict[str, Any]]:
         cards = await matches(svc, params)
         known = await starter_issues(svc, [repos.key(c.repo) for c in cards])
-        return [_result(c, issues) for c in cards if (issues := known.get(repos.key(c.repo)))]
+        results = [_result(c, issues) for c in cards
+                   if (issues := known.get(repos.key(c.repo)))]
+        # Stable: a repo with an issue nobody is on before one with none.
+        return sorted(results, key=lambda r: all(starter.taken(i) for i in r["issues"]))
 
     return await indexes(svc).load(key, stamp(svc), build, lambda r: max(len(r), 1))
 
@@ -194,12 +211,28 @@ async def unlisted(svc: Services, params: dict[str, Any], limit: int = FILL_ISSU
     return [c.repo for c in cards if repos.key(c.repo) not in known][:limit]
 
 
+async def aged(svc: Services, params: dict[str, Any], limit: int = REREAD_ISSUES) -> list[str]:
+    """Of the first `limit` listed repos, those whose starter issues were read
+    more than `REREAD_HOURS` ago: the ones a search reads again."""
+    first = [r["repo"] for r in (await index_results(svc, params))[:limit]]
+    if not first:
+        return []
+    async with svc.db.session() as s:
+        old = set((await s.execute(
+            select(StarterCache.repo_key)
+            .where(StarterCache.repo_key.in_([repos.key(r) for r in first]),
+                   StarterCache.created_at < now() - timedelta(hours=REREAD_HOURS)))).scalars())
+    return [r for r in first if repos.key(r) in old]
+
+
 async def fill_issues(svc: Services, params: dict[str, Any]) -> int:
     """Read and cache the starter issues of the first index matches that have
-    none known. Returns how many were read; a failure is skipped."""
+    none known, and of the first listed whose issues have aged. Returns how
+    many were read; a failure is skipped."""
     from holt_server.api import fetch_starter_issues
 
-    names = await unlisted(svc, params)
+    # The aged ones first: they are on the page already.
+    names = [*await aged(svc, params), *await unlisted(svc, params)]
     gate = asyncio.Semaphore(FILL_AT_ONCE)
 
     async def one(repo: str) -> bool:

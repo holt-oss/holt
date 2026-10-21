@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { compact } from "@/lib/discover";
+import { issueSkill, issueTaken, NONE_FREE } from "@/lib/format";
 import { issueSummary, langColor, statPills, type CardRepo } from "@/lib/repo-card";
 import { VerdictPill } from "../report/verdict-pill";
 import { OddsMeter } from "./odds-bar";
@@ -8,15 +8,22 @@ import { LangDot, RepoAvatar } from "./repo-avatar";
 /**
  * A repo in a list, about a third of the old height: who, the verdict, the
  * marked odds bar, two more numbers and one issue to start with. Everything else is in
- * the focus view (`focusHref`), which `onOpen` shows without a page load.
+ * the focus view, which `onOpen` shows without a page load.
  * `verdict={false}` leaves the verdict out, for a list where every repo has
  * the same one; the starter issues' summary takes its place. `why` adds the
  * line that says why this repo for this person (a pick's first reason). A
- * click anywhere on the card that isn't a link or a button opens the focus view.
+ * click anywhere on the card that isn't a link or a button opens the focus
+ * view, which leads with the report. The name is the card's one link to the
+ * report (`report`): followed as it is without JS, by a crawler or in a new
+ * tab. `tick` is the list's compare tick, beside the numbers; ticked, it draws
+ * the card's ink edge (globals.css), which is why the card is `relative`.
  */
-export function RepoCard({ r, report, focusHref, onOpen, actions, verdict = true, why = false }: { r: CardRepo; report: string; focusHref: string; onOpen?: () => void; actions?: React.ReactNode; verdict?: boolean; why?: boolean }) {
+export function RepoCard({ r, report, onOpen, actions, tick, verdict = true, why = false }: { r: CardRepo; report: string; onOpen?: () => void; actions?: React.ReactNode; tick?: React.ReactNode; verdict?: boolean; why?: boolean }) {
   const [owner, name] = r.repo.split("/");
+  // Free issues come first, so a taken one here means every one is taken.
   const issue = r.issues[0];
+  const taken = issue ? issueTaken(issue) : false;
+  const skill = issue ? issueSkill(issue) : null;
   // The merged share is marked on the bar; the other numbers sit under it as plain text, not tags.
   const pills = statPills(r.stats);
   const rest = r.stats.attempts && r.stats.merged != null ? pills.slice(1) : pills;
@@ -35,14 +42,14 @@ export function RepoCard({ r, report, focusHref, onOpen, actions, verdict = true
     onOpen();
   });
   return (
-    <article onClick={openFromCard} className={`app-card flex h-full flex-col border border-line-strong bg-panel p-4 shadow-soft hover:border-blue/60 ${onOpen ? "cursor-pointer" : ""}`}>
+    <article onClick={openFromCard} className={`app-card relative flex h-full flex-col border border-line-strong bg-panel p-4 shadow-soft hover:border-blue/60 ${onOpen ? "cursor-pointer" : ""}`}>
       <div className="flex items-start gap-3">
         <RepoAvatar repo={r.repo} />
         {/* Tall enough for a name, two lines of description and the language, so the rows below line up across the grid. */}
         <div className="min-h-[5.5rem] min-w-0 flex-1">
           {/* The whole name, wrapping after the owner first. */}
           <h2 className="text-[1rem] font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]">
-            <a href={focusHref} onClick={open} className="hover:text-blue">
+            <a href={report} onClick={open} className="hover:text-blue">
               <span className="text-muted">{owner}/</span>
               <wbr />
               {name}
@@ -95,24 +102,29 @@ export function RepoCard({ r, report, focusHref, onOpen, actions, verdict = true
       <div className="mt-3">
         <OddsMeter stats={r.stats} />
       </div>
-      {/* The reply time and first-timers, one per line, with the report link beside them. */}
+      {/* The reply time and first-timers, one per line, with the compare tick beside them. */}
       <div className="mt-2.5 flex items-center justify-between gap-3">
         <div className="min-w-0 font-sans text-[0.88rem] leading-snug text-muted">
           {/* Reply time in blue, so it stands out from the first-timers count. */}
           {rest.map((p) => <p key={p} className={p.startsWith("replies") ? "text-blue" : undefined}>{p}</p>)}
         </div>
-        <Link href={report} className="shrink-0 border border-line-strong px-3 py-1.5 font-sans text-[0.85rem] font-semibold text-ink transition-colors hover:border-blue hover:text-blue">report →</Link>
+        {tick}
       </div>
 
       {issue ? (
         <p className="relative mt-3 border-t border-dashed border-line pt-2.5 font-sans text-[0.88rem] leading-snug">
-          <span className="block font-sans text-[0.78rem] text-faint">An issue to start with</span>
-          <a href={issue.url} target="_blank" rel="noopener noreferrer" data-umami-event="starter-issue-click" className="mt-0.5 line-clamp-2 font-semibold text-ink after:absolute after:inset-0 hover:text-blue">
+          <span className={`block font-sans text-[0.78rem] ${taken ? "text-amber" : "text-faint"}`}>{taken ? NONE_FREE : "An issue to start with"}</span>
+          <a href={issue.url} target="_blank" rel="noopener noreferrer" data-umami-event="starter-issue-click" className={`mt-0.5 line-clamp-2 after:absolute after:inset-0 hover:text-blue ${taken ? "text-muted" : "font-semibold text-ink"}`}>
             <span className="font-mono text-[0.85rem] font-normal text-blue">#{issue.number}</span> {issue.title}
             <span className="sr-only"> (opens GitHub)</span>
           </a>
-          {/* Only when someone is on it: "unclaimed" above already says when nobody is. */}
-          {issue.on_it && (issue.people || issue.open_prs) ? <span className="mt-0.5 block text-[0.8rem] text-amber">{issue.on_it}</span> : null}
+          {/* Who is on it only when someone is ("unclaimed" above already says when nobody is), then the skill it names. */}
+          {(taken && issue.on_it) || skill ? (
+            <span className="mt-0.5 flex flex-wrap gap-x-2 text-[0.8rem] text-faint">
+              {taken && issue.on_it && <span className="text-amber">{issue.on_it}</span>}
+              {skill && <span>{skill}</span>}
+            </span>
+          ) : null}
         </p>
       ) : r.reason ? (
         <p className="mt-3 line-clamp-2 border-t border-dashed border-line pt-2.5 font-sans text-[0.88rem] leading-snug text-muted">{r.reason}</p>

@@ -3,7 +3,8 @@
 // report: the verdict, the odds and one number, with the rest behind sign-in.
 // Find, Browse and the Hacktoberfest page are open: their lists come from
 // what Holt has already checked, and every card leads to a report (so, signed
-// out, to its teaser). Opening a report with no result yet runs the free
+// out, to its teaser). Find's filters work signed out too, answered from that
+// index alone (findReads): only an account's search goes on to GitHub. Opening a report with no result yet runs the free
 // check (anon-check.ts: the report page only, rate-limited per IP, never for
 // bots); anything else that starts a check or a search needs an account, and
 // so do Compare, pre-flight, the dashboard and settings (ACCOUNT_PAGES):
@@ -70,26 +71,17 @@ export function arrivalGate(pathname: string, search: string, cookies: string[])
   return signInHref(`${pathname}${search}`);
 }
 
-/** Where the paste box sends a repo: its report, through sign-in when signed out (examples need none). */
-export function pasteHref(repo: string, signedIn: boolean): string {
-  const report = `/${repo}`;
-  return reportAccess(repo, signedIn) === "full" ? report : signInHref(report);
+/**
+ * Where every repo box sends a repo: its report, signed in or not, the same
+ * page the URL opens. Signed out that is the teaser, or the free check when
+ * there is no result yet (reportShows); a typo gets the not-found page.
+ */
+export function pasteHref(repo: string): string {
+  return `/${repo}`;
 }
 
 /** What a paste box says when the input can't be a repo. */
 export const NOT_A_REPO = "That doesn't look like a repo. Try owner/name or a github.com link.";
-
-/**
- * Where a paste box goes, like pasteHref, except that before a sign-in wall
- * it asks whether the repo exists: a typo then lands on the not-found page
- * (the report URL, which answers 404) rather than on sign-in. Any doubt (the
- * check failed) keeps the sign-in route.
- */
-export async function pasteTarget(repo: string, signedIn: boolean, exists: (repo: string) => Promise<boolean>): Promise<string> {
-  const href = pasteHref(repo, signedIn);
-  if (href === `/${repo}`) return href;
-  return (await exists(repo).catch(() => true)) ? href : `/${repo}`;
-}
 
 type Refusal = { status: 401; error: ApiError };
 
@@ -105,7 +97,10 @@ export function signedInGate(userId: string | null | undefined): Refusal | null 
   return userId ? null : refuse("Sign in first.");
 }
 
-/** POST /api/find: null when this caller may run a search. */
-export function findGate(userId: string | null | undefined): Refusal | null {
-  return userId ? null : refuse("Sign in to search with your own filters.");
+/**
+ * POST /api/find, what answers this caller's filters. `search`: Holt's index,
+ * then a GitHub search. `index`: the index alone, which calls GitHub for nothing.
+ */
+export function findReads(userId: string | null | undefined): "search" | "index" {
+  return userId ? "search" : "index";
 }

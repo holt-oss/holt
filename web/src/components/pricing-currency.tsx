@@ -95,7 +95,7 @@ function Switch() {
           type="button"
           aria-pressed={c === currency}
           onClick={() => choose(c)}
-          className={`min-h-9 px-3 transition-colors ${c === currency ? "bg-blue text-on-accent" : "text-muted hover:text-ink"}`}
+          className={`min-h-9 border px-3 transition-colors ${c === currency ? "picked" : "border-transparent text-muted hover:text-ink"}`}
         >
           {SIGN[c]} {c}
         </button>
@@ -134,8 +134,8 @@ export function PassSection({ passes, signedIn, prefill, buy }: PassSectionProps
           {sold.map((p) => {
             const top = p.id === featured;
             return (
-              <li key={p.id} className={`relative flex flex-col border bg-panel p-6 ${top ? "border-green shadow-card" : "border-line-strong shadow-soft"}`}>
-                {top && <span className="absolute -top-3 left-6 bg-green px-2 py-0.5 text-[0.78rem] font-semibold text-on-accent">recommended</span>}
+              <li key={p.id} className={`relative flex flex-col border bg-panel p-6 ${top ? "border-ink shadow-card" : "border-line-strong shadow-soft"}`}>
+                {top && <span className="absolute -top-3 left-6 bg-ink px-2 py-0.5 text-[0.78rem] font-semibold text-on-accent">recommended</span>}
                 <p className="text-[0.85rem] uppercase tracking-[0.08em] text-faint">{p.name}</p>
                 <p className="mt-3 text-[2rem] font-semibold leading-none tracking-tight">{formatPrice(p.amount, shown)}</p>
                 <p className="mt-2 min-h-[1.4rem] font-sans text-[0.9rem] text-muted">{perMonth(p.amount, p.days, shown)}</p>
@@ -160,7 +160,7 @@ export function PassSection({ passes, signedIn, prefill, buy }: PassSectionProps
           ) : (
             <>Paid in INR through Razorpay (UPI, cards, netbanking), billed as <span className="text-ink">{PAYMENT_BRAND}</span>.</>
           )}{" "}
-          See the <Link href="/refunds" className="text-green transition-opacity hover:opacity-75">refund policy</Link>.
+          See the <Link href="/refunds" className="text-link">refund policy</Link>.
         </p>
       </div>
     </section>

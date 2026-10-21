@@ -8,7 +8,7 @@ export type Prefs = Omit<ProfilePrefs, "updated_at">;
 
 export const QUESTIONS = [
   { id: "languages", title: "Which languages can you read?", multi: true },
-  { id: "days", title: "How much time do you have for one contribution?", multi: false },
+  { id: "days", title: "How long would you wait for a first reply?", multi: false },
   { id: "level", title: "Have you contributed to open source before?", multi: false },
   { id: "contributions", title: "What would you like to work on?", multi: true },
 ] as const;

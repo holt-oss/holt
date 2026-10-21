@@ -73,12 +73,15 @@ What they check:
 - `/`, `/pallets/flask`, `/find`, `/pricing` and `/how-it-works` log no console errors.
 - Motion (`tests/motion.spec.ts`, see the motion plan): no layout
   shift on `/`, `/pallets/flask`, `/find?go=1…` and `/pricing`, cold and
-  after a client navigation; a slow page (its response held 600ms) shows the
-  loading skeleton and keeps it at least 300ms; a fast one (server under
-  100ms, else skipped) never shows it; a click while the prefetch is still
-  being applied (the router commits the route as nothing, the bug behind
-  #57) still shows the skeleton, through the layout's fallback, and shifts
-  nothing; the phone menu opens and closes on
+  after a client navigation; a slow page with a loading screen (`/how-it-works`,
+  its response held 1.2s) shows the skeleton and keeps it at least 300ms; a
+  report has no loading screen: a fast one (server under 100ms, else skipped)
+  never shows a skeleton, and one held 600ms leaves the page you were on up,
+  under the pending line, with `<main>` never empty; a click while the
+  prefetch is still being applied (the router commits the route as nothing,
+  the bug behind #57) still shows the skeleton, through the layout's
+  fallback, and shifts nothing, and the same click on a report link never
+  leaves `<main>` empty; the phone menu opens and closes on
   Escape, a click outside and a link; with reduced motion, nothing moves.
 
 Staging runs this suite after every rebuild goes live

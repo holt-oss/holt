@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ABOUT_ROWS, aboutCells, bareNames, cells, compareHref, compareTitle, contenders, leaders, MAX, parseList, pickRepo, ROWS, savedToAdd, SUGGESTIONS } from "./compare.ts";
+import { ABOUT_ROWS, aboutCells, anyLead, bareNames, cells, compareHref, compareTitle, contenders, leaders, MAX, parseList, pickRepo, ROWS, savedToAdd, SUGGESTIONS } from "./compare.ts";
 import { humanHours } from "./format.ts";
 import type { Stats, Verdict } from "./types.ts";
 
@@ -11,6 +11,19 @@ test("parseList takes names and URLs, split by commas or spaces, without duplica
   assert.deepEqual(parseList(["a/b,c/d", "e/f g/h i/j"]), ["a/b", "c/d", "e/f", "g/h"]);
   assert.deepEqual(parseList(undefined), []);
   assert.deepEqual(parseList("not a repo"), []);
+});
+
+test("past the limit, the first four are compared and the rest can be named as left out", () => {
+  const asked = parseList("a/b,c/d,e/f,g/h,i/j,A/B,k/l", 12);
+  assert.deepEqual(asked.slice(0, MAX), parseList("a/b,c/d,e/f,g/h,i/j,A/B,k/l"));
+  assert.deepEqual(asked.slice(MAX), ["i/j", "k/l"]);
+});
+
+test("the best mark's key shows only when a number is marked", () => {
+  // One contender: nothing to be best among.
+  assert.equal(anyLead(leaders([st(), null])), false);
+  assert.equal(anyLead(leaders([st(), st()])), false);
+  assert.equal(anyLead(leaders([st(), st({ outsider_merged: 8 })])), true);
 });
 
 test("compareHref", () => {

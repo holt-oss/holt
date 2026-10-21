@@ -6,8 +6,9 @@
 // move with them). Phones: each row's label sits above its numbers, and three
 // or four columns swipe sideways, a column at a time (the page says so above).
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ABOUT_ROWS, aboutCells, cells, contenders, leaders, ROWS, type Cell, type Lead } from "@/lib/compare";
+import { ABOUT_ROWS, aboutCells, anyLead, cells, contenders, leaders, ROWS, type Cell, type Lead } from "@/lib/compare";
 import { fullStats, langColor } from "@/lib/repo-card";
 import { friendlyStage } from "@/lib/stages";
 import type { Report, StarterIssue } from "@/lib/types";
@@ -27,7 +28,15 @@ export type Column = { repo: string; removeHref: string } & (
 /** `now` is the server's clock, so "2 days ago" reads the same before and after hydration. */
 export function CompareTable({ columns, issues, label, now }: { columns: Column[]; issues: React.ReactNode[]; label: string; now: number }) {
   const [landed, setLanded] = useState<Record<string, Report>>({});
-  const onLanded = useCallback((repo: string, r: Report) => setLanded((m) => ({ ...m, [repo]: r })), []);
+  const router = useRouter();
+  // The page's sentence and key are the server's: read them again now this column has a report.
+  const onLanded = useCallback(
+    (repo: string, r: Report) => {
+      setLanded((m) => ({ ...m, [repo]: r }));
+      router.refresh();
+    },
+    [router],
+  );
   const reports = columns.map((c) => (c.kind === "report" ? c.report : landed[c.repo] ?? null));
   const lead = leaders(contenders(reports));
   const all = reports.map((r) => r && cells(r));
@@ -38,7 +47,7 @@ export function CompareTable({ columns, issues, label, now }: { columns: Column[
       <div role="table" aria-label={label} className="cmp" style={{ "--n": columns.length } as React.CSSProperties}>
         <div role="row" className="cmp-row cmp-head">
           <div role="columnheader" className="cmp-label cmp-corner">
-            <span className="text-faint"><span className="text-green">▲</span> best of these</span>
+            {anyLead(lead) && <span className="text-faint"><span className="text-green">▲</span> best of these</span>}
           </div>
           {columns.map((c, i) => (
             <ColumnHead key={c.repo} repo={reports[i]?.repo ?? c.repo} removeHref={c.removeHref} tone={reports[i]?.tone} />
@@ -151,19 +160,20 @@ export function CompareTable({ columns, issues, label, now }: { columns: Column[
 function ColumnHead({ repo, removeHref, tone }: { repo: string; removeHref: string; tone?: Report["tone"] }) {
   const [owner, name] = repo.split("/");
   return (
-    <div role="columnheader" className={`cmp-cell cmp-col-head border-t-2 ${tone ? TONE[tone].border : "border-transparent"}`}>
-      <div className="flex items-start gap-2.5">
+    <div role="columnheader" className={`cmp-cell cmp-col-head relative border-t-2 ${tone ? TONE[tone].border : "border-transparent"}`}>
+      {/* The name wraps (a narrow column would cut it to a few letters); the remove button sits in the corner, off the name's line. */}
+      <div className="flex items-start gap-2.5 pr-4">
         <span className="hidden sm:block"><RepoAvatar repo={repo} size={28} /></span>
-        <Link href={`/${repo}`} className="-my-1.5 min-w-0 flex-1 py-1.5 leading-tight hover:text-blue" title={repo}>
-          <span className="block truncate text-[0.78rem] text-faint">{owner}/</span>
-          <span className="block truncate text-[0.98rem] font-semibold tracking-tight">{name}</span>
-        </Link>
-        <Link href={removeHref} className="-mr-2.5 -mt-2.5 grid size-11 shrink-0 place-items-center text-faint transition-colors hover:text-orange" aria-label={`Remove ${repo}`}>
-          <svg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-            <path d="M4 4l8 8M12 4l-8 8" />
-          </svg>
+        <Link href={`/${repo}`} className="-my-1.5 min-w-0 flex-1 py-1.5 leading-tight [overflow-wrap:anywhere] hover:text-blue" title={repo}>
+          <span className="line-clamp-2 text-[0.78rem] text-faint">{owner}/</span>
+          <span className="line-clamp-3 text-[0.98rem] font-semibold tracking-tight">{name}</span>
         </Link>
       </div>
+      <Link href={removeHref} className="absolute right-0 top-0 grid size-11 place-items-center text-faint transition-colors hover:text-orange" aria-label={`Remove ${repo}`}>
+        <svg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+          <path d="M4 4l8 8M12 4l-8 8" />
+        </svg>
+      </Link>
     </div>
   );
 }
@@ -209,7 +219,7 @@ function LiveCheck({ repo, onLanded }: { repo: string; onLanded: (repo: string, 
       <div className="font-sans text-[0.86rem]" role="alert">
         <p className="text-orange">{state.error.message}</p>
         {(state.error.code === "upstream" || state.error.code === "internal") && (
-          <button type="button" onClick={retry} className="mt-2 min-h-11 text-green hover:underline">try again</button>
+          <button type="button" onClick={retry} className="mt-2 min-h-11 text-link">try again</button>
         )}
       </div>
     );

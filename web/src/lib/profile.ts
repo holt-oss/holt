@@ -119,7 +119,7 @@ export function personalise(results: FindResult[], fit: Fit | null): FindResult[
 /** A one-line description of a profile, for "using your profile: …" notes. */
 export function describe(p: Pick<ProfilePrefs, "languages" | "days" | "level" | "contributions">): string {
   const lang = p.languages.length ? p.languages.map((l) => LANGS.find((x) => x.toLowerCase() === l) ?? l).join(", ") : "any language";
-  const time = TIME.find((t) => t.days === p.days)?.label ?? `${p.days} days`;
+  const time = `replies within ${TIME.find((t) => t.days === p.days)?.label ?? `${p.days} days`}`;
   const who = p.level === "newcomer" ? "first-timer issues only" : "all starter issues";
   const kinds = p.contributions.length ? `, ${p.contributions.join(" and ")} first` : "";
   return `${lang} · ${time} · ${who}${kinds}`;

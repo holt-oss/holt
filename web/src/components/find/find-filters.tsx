@@ -12,13 +12,16 @@ import { SuggestInput } from "./suggest-input";
 // start with a capital (GitHub topics keep their own lowercase spelling);
 // actions (check, add, more filters, reset filters)
 // are lowercase; notes and hints in brackets or after "·" run on in lowercase.
-const TIME_SHORT: Record<number, string> = { 1: "Evening", 3: "Weekend", 7: "Week", 30: "Month" };
+// On a phone the label and all four options share one line, so the options are short there; the words stay for screen readers.
+const TIME_SHORT: Record<number, string> = { 1: "1d", 3: "3d", 7: "1w", 30: "1mo" };
 
 // Controls are 40px tall on a phone and 32px from tablets up, so the bar that holds them stays thin.
-const seg = "flex h-10 items-center justify-center whitespace-nowrap border px-2 text-[0.75rem] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue sm:h-8 sm:px-3 sm:text-[0.8rem]";
-const segOn = "border-green bg-green font-semibold text-on-accent";
+// Typeface: names (languages, topics, kinds of work) are chips in the mono face, as on the cards;
+// the phrases you read (how long, how experienced, the switch) are in the sans face.
+const seg = "flex h-10 items-center justify-center whitespace-nowrap border px-2 font-sans text-[0.75rem] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue sm:h-8 sm:px-3 sm:text-[0.84rem]";
+const segOn = "picked";
 const segOff = "border-line-strong text-muted hover:border-blue hover:text-ink";
-const chipOn = "border-blue bg-blue text-on-accent";
+const chipOn = "picked";
 const chipOff = "border-line-strong text-muted hover:border-blue hover:text-ink";
 // Languages you type in: any name GitHub knows (find-picks.ts keeps up to 10, each up to 40 characters).
 const MAX_LANGS = 10;
@@ -104,7 +107,7 @@ export function FindFilters({ picks, onChange, hf, busy = false }: {
         <div ref={langRow} className="relative flex w-full min-w-0 gap-1.5 overflow-x-auto pr-6 [mask-image:linear-gradient(to_right,#000_calc(100%-1.5rem),transparent)] [scrollbar-width:none] @5xl:w-auto @5xl:flex-1">
           {/* Below one row there's no room beside Time, so the switch leads the chips. */}
           {hf && (
-            <button type="button" role="switch" aria-checked={picks.hf} aria-label={hfLabel} onClick={() => set({ hf: !picks.hf })} className={`${chip} @5xl:hidden ${picks.hf ? "border-hf bg-hf-bg font-semibold text-hf" : chipOff}`}>
+            <button type="button" role="switch" aria-checked={picks.hf} aria-label={hfLabel} onClick={() => set({ hf: !picks.hf })} className={`${chip} @5xl:hidden ${picks.hf ? "tint-hf picked" : chipOff}`}>
               Hacktoberfest
             </button>
           )}
@@ -160,7 +163,8 @@ export function FindFilters({ picks, onChange, hf, busy = false }: {
         </div>
 
         <div className="flex w-full min-w-0 items-center gap-x-3 sm:gap-x-4 @5xl:w-auto @5xl:shrink-0">
-          <div role="radiogroup" aria-label="Time you have" className="grid min-w-0 flex-1 grid-cols-4 sm:flex sm:flex-none">
+          <span id={`${panelId}-time`} className="shrink-0 whitespace-nowrap font-sans text-[0.8rem] text-faint sm:text-[0.84rem]">Replies within</span>
+          <div role="radiogroup" aria-labelledby={`${panelId}-time`} className="-ml-1 grid min-w-0 flex-1 grid-cols-4 sm:-ml-2 sm:flex sm:flex-none">
             {TIME.map((t, i) => {
               const on = picks.days === t.days;
               return (
@@ -169,24 +173,24 @@ export function FindFilters({ picks, onChange, hf, busy = false }: {
                   type="button"
                   role="radio"
                   aria-checked={on}
-                  aria-label={t.label}
                   onClick={() => set({ days: t.days })}
                   className={`${seg} ${on ? segOn : segOff} ${i ? "-ml-px" : ""} relative ${on ? "z-10" : ""}`}
                 >
-                  {TIME_SHORT[t.days]}
+                  <span aria-hidden="true" className="sm:hidden">{TIME_SHORT[t.days]}</span>
+                  <span className="max-sm:sr-only">{t.label}</span>
                 </button>
               );
             })}
           </div>
 
           {hf && (
-            <button type="button" role="switch" aria-checked={picks.hf} onClick={() => set({ hf: !picks.hf })} className="group hidden h-8 shrink-0 items-center gap-2 text-left text-[0.8rem] @5xl:flex">
+            <button type="button" role="switch" aria-checked={picks.hf} onClick={() => set({ hf: !picks.hf })} className={`group hidden h-8 shrink-0 items-center gap-2 text-left font-sans text-[0.84rem] @5xl:flex ${picks.hf ? "font-semibold" : "text-muted hover:text-ink"}`}>
               <span
                 aria-hidden="true"
-                className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-3.5 after:rounded-full after:transition-transform group-focus-visible:outline-2 group-focus-visible:outline-blue ${picks.hf ? "border-hf bg-hf-bg after:translate-x-4 after:bg-hf" : "border-line-strong bg-panel-2 after:bg-faint"}`}
+                className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-3.5 after:rounded-full after:transition-transform group-focus-visible:outline-2 group-focus-visible:outline-blue ${picks.hf ? "tint-hf border-sel bg-sel-bg after:translate-x-4 after:bg-sel" : "border-line-strong bg-panel-2 after:bg-faint"}`}
               />
               <span>
-                {hfLabel} <span className="hidden text-faint @7xl:inline">· {hf.note}</span>
+                {hfLabel} <span className="hidden font-normal text-faint @7xl:inline">· {hf.note}</span>
               </span>
             </button>
           )}

@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { reportHref } from "./budget.ts";
 import { EXAMPLES, isExample } from "./examples.ts";
-import { arrivalGate, findGate, needsAccount, pasteHref, pasteTarget, reportAccess, signedInGate, signInHref, startGate } from "./gate.ts";
+import { arrivalGate, findReads, needsAccount, pasteHref, reportAccess, reportShows, signedInGate, signInHref, startGate } from "./gate.ts";
 import { afterSignIn } from "./home.ts";
+import { signInHeading } from "./signin.ts";
 
 const back = (href: string) => new URL(href, "https://holt.test").searchParams.get("callbackUrl");
 
@@ -37,7 +39,7 @@ test("signed out: an example report is shown in full, any other repo as a teaser
 // A card on Find or Browse links to the report page, so this is all a signed-out visitor gets from one.
 test("signed out: the teaser is rendered on the server from the verdict, its reason and the counts, and the page gives the report to nothing else", () => {
   const dir = join(import.meta.dirname, "../components/report");
-  for (const [file, fields] of [["partial-report.tsx", ["generated_at", "headline", "stats", "tone", "verdict_line"]], ["report-teaser.tsx", ["generated_at", "headline", "tone", "verdict_line"]]] as const) {
+  for (const [file, fields] of [["partial-report.tsx", ["generated_at", "headline", "repo", "stats", "tone", "verdict_line"]], ["report-teaser.tsx", ["generated_at", "headline", "tone", "verdict_line"]]] as const) {
     const src = readFileSync(join(dir, file), "utf-8");
     // A client component's props are sent to the browser whole.
     assert.doesNotMatch(src, /^["']use client["']/m, file);
@@ -59,36 +61,38 @@ test("sign-in links come back to the page they left", () => {
   assert.equal(back(href), "/octo/project?days=14");
 });
 
-test("signed out: pasting a repo goes to sign-in, then straight to its report", () => {
-  assert.equal(back(pasteHref("octo/project", false)), "/octo/project");
+test("a repo box opens the report, signed in or not: the page the URL opens", () => {
+  assert.equal(pasteHref("octo/project"), "/octo/project");
+  assert.equal(pasteHref(EXAMPLES[0].repo), `/${EXAMPLES[0].repo}`);
+  // Signed out, that page is the teaser, or the free check when there is no result yet.
+  assert.equal(reportShows({ repo: "octo/project", signedIn: false, found: "report", anonymousCheck: false }), "teaser");
+  assert.equal(reportShows({ repo: "octo/project", signedIn: false, found: "missing", anonymousCheck: true }), "check");
+  // No ticket (a bot): no check starts, only the offer to sign in.
+  assert.equal(reportShows({ repo: "octo/project", signedIn: false, found: "missing", anonymousCheck: false }), "sign-in");
 });
 
-test("after sign-in, /signin sends people on to the report or search they asked for", () => {
-  assert.equal(afterSignIn(back(pasteHref("octo/project", false))), "/octo/project");
+test("the teaser's sign-in button names the repo on /signin and comes back to its report", () => {
+  for (const days of [7, 30]) {
+    const report = reportHref("octo/project", days);
+    const callback = back(signInHref(report));
+    assert.equal(signInHeading(callback), "Sign in to check octo/project");
+    assert.equal(afterSignIn(callback), report);
+  }
   assert.equal(afterSignIn(back(signInHref("/find?lang=rust&days=7"))), "/find?lang=rust&days=7");
 });
 
-test("signed out: pasting an example opens it directly", () => {
-  assert.equal(pasteHref(EXAMPLES[0].repo, false), `/${EXAMPLES[0].repo}`);
-});
-
-test("signed in: pasting a repo opens its report, as before", () => {
-  assert.equal(pasteHref("octo/project", true), "/octo/project");
-});
-
-test("signed out: starting a check or a search is refused with a sign-in error", () => {
-  for (const gate of [startGate, findGate]) {
-    const refused = gate(null);
-    assert.ok(refused);
-    assert.equal(refused.status, 401);
-    assert.equal(refused.error.code, "unauthorized");
-    assert.match(refused.error.message, /sign in/i);
-  }
+test("signed out: starting a check is refused with a sign-in error, and Find reads the index alone", () => {
+  const refused = startGate(null);
+  assert.ok(refused);
+  assert.equal(refused.status, 401);
+  assert.equal(refused.error.code, "unauthorized");
+  assert.match(refused.error.message, /sign in/i);
+  for (const nobody of [null, undefined, ""]) assert.equal(findReads(nobody), "index");
 });
 
 test("signed in: starting a check or a search goes through", () => {
   assert.equal(startGate("user-1"), null);
-  assert.equal(findGate("user-1"), null);
+  assert.equal(findReads("user-1"), "search");
 });
 
 test("the extension's public API stays open: it never reads the session or the gate", () => {
@@ -96,22 +100,6 @@ test("the extension's public API stays open: it never reads the session or the g
     const src = readFileSync(join(import.meta.dirname, `../app/api/public/${kind}/[owner]/[repo]/route.ts`), "utf-8");
     assert.doesNotMatch(src, /@\/lib\/(session|gate)|@\/auth\b/);
   }
-});
-
-test("a paste box asks whether the repo exists before a sign-in wall, and only then", async () => {
-  const asked: string[] = [];
-  const says = (answer: boolean) => async (r: string) => (asked.push(r), answer);
-  // Signed out, a real repo: sign in first.
-  assert.equal(await pasteTarget("octo/real", false, says(true)), "/signin?callbackUrl=%2Focto%2Freal");
-  // Signed out, a typo: the report URL, which answers 404 (the not-found page).
-  assert.equal(await pasteTarget("octo/typo", false, says(false)), "/octo/typo");
-  // The check failing never blocks the way in.
-  assert.equal(await pasteTarget("octo/real", false, async () => { throw new Error("offline"); }), "/signin?callbackUrl=%2Focto%2Freal");
-  // Signed in, or an example: straight to the report (its 404 is the proxy's), no question asked.
-  asked.length = 0;
-  assert.equal(await pasteTarget("octo/typo", true, says(false)), "/octo/typo");
-  assert.equal(await pasteTarget(EXAMPLES[0].repo, false, says(false)), `/${EXAMPLES[0].repo}`);
-  assert.deepEqual(asked, []);
 });
 
 // Account pages (Compare, pre-flight, the dashboard, settings).
@@ -183,21 +171,21 @@ test("every account page asks the server who is signed in before it loads anythi
 test("Find and Browse are open: no page or part of a list asks for an account", () => {
   const src = join(import.meta.dirname, "..");
   for (const file of ["app/find/page.tsx", "app/discover/page.tsx", "app/discover/[language]/page.tsx", "components/discover/discover-view.tsx", "app/api/discover/route.ts", "app/api/find/more/route.ts"]) {
-    assert.doesNotMatch(readFileSync(join(src, file), "utf-8"), /requireUser|signedInGate|findGate/, file);
+    assert.doesNotMatch(readFileSync(join(src, file), "utf-8"), /requireUser|signedInGate/, file);
   }
   // The parts a list loads as it is scrolled read what Holt has checked, and never search GitHub or start a check.
   assert.match(readFileSync(join(src, "app/api/find/more/route.ts"), "utf-8"), /await findIndex\(/);
   for (const route of ["discover", "find/more"]) {
     assert.doesNotMatch(readFileSync(join(src, "app/api", route, "route.ts"), "utf-8"), /cachedFind|\bfind\(|startAnalysis|@\/lib\/session/, route);
   }
-  // Signed out, Find shows the search every visitor shares, and other filters wait for sign-in instead of searching.
-  assert.match(readFileSync(join(src, "app/find/page.tsx"), "utf-8"), /const searched = user \? picks : \{ \.\.\.defaultPicks\(/);
-  const view = readFileSync(join(src, "components/find/find-view.tsx"), "utf-8");
-  assert.match(view, /if \(!pending \|\| !signedIn\) return;/);
-  assert.match(view, /const locked = pending && !signedIn \? /);
-  // A search from the page itself is still refused signed out.
-  const post = readFileSync(join(src, "app/api/find/route.ts"), "utf-8");
-  assert.ok(post.indexOf("findGate(who.userId)") >= 0 && post.indexOf("findGate(who.userId)") < post.search(/cachedFind\(/));
+  // Signed out, Find shows the search every visitor shares, and other filters are answered from the index alone: no search starts.
+  assert.match(readFileSync(join(src, "app/find/page.tsx"), "utf-8"), /user \|\| shared \? await cachedFind\(.*\) : await indexFind\(picks\)/);
+  assert.match(readFileSync(join(src, "app/api/find/route.ts"), "utf-8"), /findReads\(who\.userId\) === "search" \? await cachedFind\(.*\) : await indexFind\(picks\)/);
+  const index = readFileSync(join(src, "lib/find-index.ts"), "utf-8");
+  assert.match(index, /await findIndex\(/);
+  assert.doesNotMatch(index, /cachedFind|\bfind\(|startAnalysis/);
+  // The filters never swap the list for a sign-in box.
+  assert.doesNotMatch(readFileSync(join(src, "components/find/find-view.tsx"), "utf-8"), /locked|data-signin-card/);
 });
 
 test("signed out: the data routes behind account pages answer 401 before reading anything", () => {
@@ -236,9 +224,9 @@ test("crawlers are sent to Find and the boards, and kept off the boards' facets"
   }
   assert.match(sitemap, /\/discover\/\$\{languageSlug\(/);
   const disallow: string[] = readFileSync(join(app, "robots.ts"), "utf-8").match(/"\/[^"]*"/g) ?? [];
-  assert.ok(disallow.includes('"/discover?"') && disallow.includes('"/discover/*?"'));
+  assert.ok(disallow.includes('"/discover?"') && disallow.includes('"/discover/*?"') && disallow.includes('"/find?"'));
   // Nothing that would cover /find, /discover or /discover/python themselves.
-  for (const rule of disallow) assert.doesNotMatch(rule, /^"\/(find|discover\$|discover\/?")/, rule);
+  for (const rule of disallow) assert.doesNotMatch(rule, /^"\/(find[$\/"]|discover\$|discover\/?")/, rule);
 });
 
 // A signed-out page that asks a gated route logs a 401 in the visitor's console.

@@ -64,7 +64,7 @@ export function AnalysisProgress({ repo, stage, progress, mode, kicker, note, ah
             const took = (now ? elapsed : shown[i + 1].at) - l.at;
             return (
               <li key={l.title} className={`plog-line flex gap-3 ${now ? "text-ink" : "text-muted"}`}>
-                <span aria-hidden="true" className={`w-4 shrink-0 text-center ${now ? "text-blue" : "text-green"}`}>
+                <span aria-hidden="true" className={`w-4 shrink-0 text-center ${now ? "text-blue" : "text-ink"}`}>
                   {now ? "▸" : "✓"}
                 </span>
                 <span className="min-w-0 flex-1 truncate">

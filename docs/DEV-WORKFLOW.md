@@ -44,7 +44,8 @@ the live site; the rest of each page is illustrative. Which URL shows which stat
 | `/signin`, `/settings`, `/me/repos`, `/for-you` | Signed-out versions until you sign in (below). |
 
 Other switches: `MOCK_PRO=0` (hide
-the playbook), `MOCK_PRO_OFF=1` (pre-flight "coming soon"). The full list is
+the playbook), `MOCK_PRO_OFF=1` (pre-flight "coming soon"), `MOCK_REPORT_MS=600`
+(slow report reads: the report page's loading screen). The full list is
 in [`web/README.md`](../web/README.md).
 
 Check the phone size in the browser's responsive mode. Both themes: the header

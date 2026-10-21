@@ -1,6 +1,6 @@
 // Is there a public repository at github.com/{owner}/{repo}? The proxy asks
 // before the report page starts streaming, because once it streams the status
-// is 200 whatever happens (the page has a loading.tsx). Without this check a
+// is 200 whatever happens (a slow report streams in behind its loading screen). Without this check a
 // typo got a 200 "Worth your time?" page, a soft 404.
 //
 // Only a plain 404 from GitHub counts as missing. Timeouts, rate limits and

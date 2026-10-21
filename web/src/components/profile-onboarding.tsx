@@ -22,7 +22,7 @@ export async function ProfileOnboarding({ back, open = false, className = "" }: 
           <span>
             <span id="onboard-h" className="block text-[1.15rem] font-semibold tracking-tight">What are you after?</span>
             <span className="mt-1 block font-sans text-[0.9rem] text-muted">
-              Pick your languages and how much time you have. Searches start there. Change it any time in settings.
+              Pick your languages and how long you&apos;d wait for a reply. Searches start there. Change it any time in settings.
             </span>
           </span>
           <span className="text-[0.89rem] text-blue group-open:hidden">[ set it up → ]</span>

@@ -24,7 +24,9 @@ npm run dev -- -p $PORT
   `NixOS/nixpkgs`, `psf/requests`, `pytorch/pytorch` and `vercel/next.js` are "cached" and load
   instantly, with the verdicts the real engine gave them (docs/DEV-WORKFLOW.md); any
   other repo runs a fake analysis (about 6 s, `MOCK_JOB_MS`). Repos named
-  `*/private*` or `doesnotexist/*` return `not_found`. Keep it for demos.
+  `*/private*` or `doesnotexist/*` return `not_found`. `MOCK_REPORT_MS=600`
+  makes every report take that long to read, which is how to see the report
+  page's loading screen (a report read in under 120 ms never shows one). Keep it for demos.
 - **Sign-in**: set `AUTH_GITHUB_*` / `AUTH_GOOGLE_*` for OAuth. In development
   with neither set, `/signin` offers a dev-only sign-in that creates a real
   database session.

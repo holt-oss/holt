@@ -15,18 +15,18 @@
 // Everything is in the server HTML, links included; motion is CSS
 // (globals.css, .ft-*) and never runs under reduced motion.
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { inputMood, type CatMood } from "@/lib/cat";
 import { deviceReduces, prefersReducedMotion, setMotion, toggledMotion } from "@/lib/motion";
-import { NOT_A_REPO, pasteTarget } from "@/lib/gate";
+import { NOT_A_REPO, pasteHref } from "@/lib/gate";
 import { timeAgo } from "@/lib/format";
 import { checkedLabel, type RecentChecks } from "@/lib/recent-checks";
 import { parseRepoInput } from "@/lib/repo";
 import { GITHUB_REPO_URL, LEGAL_PAGES, SITE_HOST } from "@/lib/site";
 import { useReducedMotion } from "./motion/use-seen";
-import { askExists, useBusy } from "./paste-box";
+import { useOpen } from "./paste-box";
 import { ReactiveCat } from "./reactive-cat";
 
 const SIGN_OFF = "git commit --to-the-right-repo";
@@ -43,7 +43,15 @@ function isReportPath(path: string | null): boolean {
   return parts.length === 2 && !SITE_ROUTES.has(parts[0].toLowerCase());
 }
 
-/** The footer under a report: one line of what Holt does and doesn't do, then the links. */
+/** Find a project's tabs: pages used every day, where the list is the point. */
+const WORKING_ROUTES = new Set(["find", "discover", "hacktoberfest"]);
+
+/** Reports and the working pages get the slim footer. */
+function isSlimPath(path: string | null): boolean {
+  return isReportPath(path) || WORKING_ROUTES.has((path ?? "").split("/").filter(Boolean)[0]?.toLowerCase() ?? "");
+}
+
+/** The footer under a report or a working page: one line of what Holt does and doesn't do, then the links. */
 function ReportFooter({ signedIn }: { signedIn: boolean }) {
   return (
     <footer className="site-footer mt-auto border-t border-line bg-panel">
@@ -78,13 +86,12 @@ function ReportFooter({ signedIn }: { signedIn: boolean }) {
 }
 
 export function Footer({ signedIn = false }: { signedIn?: boolean }) {
-  const router = useRouter();
   // The landing page is "/"; every other page
   // already has its own action, so only the landing ends on the form.
   const path = usePathname();
   const onLanding = path === "/";
-  // A report (/owner/repo) gets a slim footer: the page is long, and the big sign-off is for the landing.
-  const onReport = isReportPath(path);
+  // A report (/owner/repo) and the working pages get a slim footer: the page is long, and the big sign-off is for the landing.
+  const slim = isSlimPath(path);
   const root = useRef<HTMLElement>(null);
   const cat = useRef<HTMLButtonElement>(null);
   const frame = useRef(0);
@@ -94,7 +101,7 @@ export function Footer({ signedIn = false }: { signedIn?: boolean }) {
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useBusy();
+  const [busy, open] = useOpen();
   const [seen, setSeen] = useState(false);
   const [waves, setWaves] = useState(0);
   const [recent, setRecent] = useState<RecentChecks | null>(null);
@@ -151,17 +158,15 @@ export function Footer({ signedIn = false }: { signedIn?: boolean }) {
     });
   };
 
-  const go = async () => {
+  const go = () => {
     if (!ref) {
       setError(NOT_A_REPO);
       return;
     }
     setError("");
-    setBusy(true);
     const repo = `${ref.owner}/${ref.repo}`;
-    // Like the paste box: signed out, through sign-in (examples need none).
     track("paste-submit", { repo, signedIn: signedIn ? "yes" : "no", from: "footer" });
-    router.push(await pasteTarget(repo, signedIn, askExists));
+    open(pasteHref(repo));
   };
 
   const react = (m: CatMood) => ({
@@ -171,7 +176,7 @@ export function Footer({ signedIn = false }: { signedIn?: boolean }) {
     onBlur: () => setHover(null),
   });
 
-  if (onReport) return <ReportFooter signedIn={signedIn} />;
+  if (slim) return <ReportFooter signedIn={signedIn} />;
 
   return (
     <footer ref={root} onPointerMove={onMove} className="site-footer mt-auto overflow-clip border-t border-line bg-panel">
@@ -228,7 +233,7 @@ export function Footer({ signedIn = false }: { signedIn?: boolean }) {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                void go();
+                go();
               }}
               className="mt-10 grid max-w-[820px] grid-cols-[auto_minmax(0,1fr)_auto] items-stretch border border-line-strong bg-bg transition-colors focus-within:border-blue"
             >

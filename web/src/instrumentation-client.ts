@@ -1,6 +1,8 @@
 // Runs in the browser before the app hydrates (Next's instrumentation-client).
 // Wraps document.startViewTransition so a transition skipped because the tab
 // went hidden rejects with the message React knows to ignore (lib/view-transition.ts).
+// Next also calls onRouterTransitionStart here as each navigation begins.
+import { navigationStarted } from "@/lib/nav-pending";
 import { quietSkip } from "@/lib/view-transition";
 
 type VT = { ready: Promise<void>; finished: Promise<void>; updateCallbackDone: Promise<void> };
@@ -19,4 +21,11 @@ if (start) {
     }
     return t;
   } as typeof document.startViewTransition;
+}
+
+/** A navigation has started: the pending line's clock (lib/nav-pending.ts). */
+export function onRouterTransitionStart(url: string, navigationType: "push" | "replace" | "traverse") {
+  // Back and forward are answered from the router's own cache.
+  if (navigationType === "traverse") return;
+  navigationStarted(new URL(url, window.location.href).pathname, window.location.pathname);
 }

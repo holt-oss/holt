@@ -1,4 +1,4 @@
-import { nextStep, timeAgo } from "@/lib/format";
+import { issueSkill, issueTaken, NONE_FREE, nextStep, timeAgo } from "@/lib/format";
 import type { StarterIssue } from "@/lib/types";
 import { Skeleton, SkeletonRegion } from "../skeleton";
 
@@ -22,7 +22,7 @@ export function StarterIssueCard({ issue, compact = false }: { issue: StarterIss
         </a>
       </h3>
       {issue.on_it && (
-        <p className={`mt-1 font-sans text-[0.88rem] ${issue.people || issue.open_prs ? "text-amber" : "text-green"}`}>{issue.on_it}</p>
+        <p className={`mt-1 font-sans text-[0.88rem] ${issueTaken(issue) ? "text-amber" : "text-green"}`}>{issue.on_it}</p>
       )}
       {!compact && issue.why.length > 0 && (
         <ul className="mt-2 space-y-0.5 font-sans text-[0.89rem] text-muted">
@@ -34,7 +34,7 @@ export function StarterIssueCard({ issue, compact = false }: { issue: StarterIss
           ))}
         </ul>
       )}
-      <p className="mt-3 flex gap-2 border-t border-line pt-3 font-sans text-[0.9rem] text-green">
+      <p className="mt-3 flex gap-2 border-t border-line pt-3 font-sans text-[0.9rem] text-ink">
         <span aria-hidden="true">→</span>
         <span>
           <span className="sr-only">What to do next: </span>
@@ -47,32 +47,42 @@ export function StarterIssueCard({ issue, compact = false }: { issue: StarterIss
 
 /**
  * One issue as a thin row for the report: number, title, its labels, whether
- * anyone is on it, and its age, on one line from `sm` up (two on a phone). The
- * whole row is the link; the next step is in its tooltip and read out after it.
+ * anyone is on it, the skill it names, and its age, on one line from `sm` up
+ * (two on a phone). The whole row is the link; the next step is in its tooltip
+ * and read out after it. A taken issue's title is dimmed.
  */
 export function StarterIssueRow({ issue }: { issue: StarterIssue }) {
-  const taken = Boolean(issue.people || issue.open_prs);
+  const taken = issueTaken(issue);
+  const skill = issueSkill(issue);
   const step = nextStep(issue);
+  // The skill is one of the labels more often than not; it isn't said twice.
+  const labels = issue.labels.filter((l) => l.toLowerCase() !== skill?.toLowerCase()).slice(0, 2);
   return (
     // The title gets its own line, so it is never squeezed by the details;
     // whether anyone is on it, the comments and the age go under it.
     <li className="group relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 py-2 hover:bg-panel-2/50" title={step}>
       <span className="font-mono text-[0.82rem] leading-[1.45] text-blue">#{issue.number}</span>
-      <a href={issue.url} target="_blank" rel="noopener noreferrer" data-umami-event="starter-issue-click" className="min-w-0 truncate font-sans text-[0.93rem] font-medium leading-[1.4] text-ink after:absolute after:inset-0 group-hover:text-blue">
+      <a href={issue.url} target="_blank" rel="noopener noreferrer" data-umami-event="starter-issue-click" className={`min-w-0 truncate font-sans text-[0.93rem] leading-[1.4] after:absolute after:inset-0 group-hover:text-blue ${taken ? "text-muted" : "font-medium text-ink"}`}>
         {issue.title}
         <span className="sr-only"> (opens GitHub). {step}</span>
       </a>
       <p className="col-start-2 mt-0.5 flex min-w-0 flex-wrap gap-x-2 font-sans text-[0.78rem] text-faint">
         <span className={taken ? "text-amber" : "text-green"}>{issue.on_it ?? (taken ? "Someone is on it" : "Nobody on it yet")}</span>
+        {skill && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span className="text-muted">{skill}</span>
+          </>
+        )}
         <span aria-hidden="true">·</span>
         <span>
           {issue.comments} comment{issue.comments === 1 ? "" : "s"}
           {issue.created_at && <> · {timeAgo(issue.created_at)}</>}
         </span>
-        {issue.labels.length > 0 && (
+        {labels.length > 0 && (
           <>
             <span aria-hidden="true" className="hidden sm:inline">·</span>
-            <span className="hidden max-w-[16rem] truncate sm:inline">{issue.labels.slice(0, 2).join(", ")}</span>
+            <span className="hidden max-w-[16rem] truncate sm:inline">{labels.join(", ")}</span>
           </>
         )}
       </p>
@@ -107,11 +117,14 @@ export function StarterIssues({ issues, repo }: { issues: IssuesState; repo: str
     );
   }
   return (
-    <ul className="divide-y divide-line border-y border-line">
-      {issues.map((i) => (
-        <StarterIssueRow key={i.number} issue={i} />
-      ))}
-    </ul>
+    <>
+      {issues.every(issueTaken) && <p className="mb-2 font-sans text-[0.89rem] text-amber">{NONE_FREE}</p>}
+      <ul className="divide-y divide-line border-y border-line">
+        {issues.map((i) => (
+          <StarterIssueRow key={i.number} issue={i} />
+        ))}
+      </ul>
+    </>
   );
 }
 

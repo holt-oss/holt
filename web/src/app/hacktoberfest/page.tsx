@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CatFace } from "@/components/cat-face";
+import { ComparePicks } from "@/components/compare-picks/compare-picks";
+import { ChipRow } from "@/components/find/chip-row";
 import { FindFrame } from "@/components/find/find-frame";
 import { ErrorPanel } from "@/components/error-panel";
 import { FindList } from "@/components/find/find-list";
@@ -123,14 +125,14 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
           </p>
         )}
         <nav aria-label="Language">
-          <ul className="flex flex-wrap gap-2">
+          <ChipRow current={tab.id} className="flex flex-wrap gap-2">
             {LANGS.map((l) => (
               <li key={l.id}>
                 <Link
                   href={l.id === "all" ? (profile ? "/hacktoberfest?lang=all" : "/hacktoberfest") : `/hacktoberfest?lang=${l.id}`}
                   scroll={false}
                   aria-current={l.id === tab.id ? "page" : undefined}
-                  className={`chip min-h-11 gap-2 whitespace-nowrap px-4 text-[0.89rem] transition-colors ${l.id === tab.id ? "border-hf bg-hf text-bg" : "hover:border-hf hover:text-ink"}`}
+                  className={`chip min-h-11 gap-2 whitespace-nowrap px-4 text-[0.89rem] transition-colors ${l.id === tab.id ? "tint-hf picked" : "hover:border-hf hover:text-ink"}`}
                 >
                   {l.langs.length > 0 && <LangDot color={langColor(l.langs[0] ?? null)} />}
                   {l.label}
@@ -145,7 +147,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
                   scroll={false}
                   aria-current="page"
                   aria-label={`${typed.label}, remove`}
-                  className="chip min-h-11 gap-2 whitespace-nowrap border-hf bg-hf px-4 text-[0.89rem] text-bg"
+                  className="chip tint-hf picked min-h-11 gap-2 whitespace-nowrap px-4 text-[0.89rem]"
                 >
                   <LangDot color={langColor(typed.id)} />
                   {typed.label}
@@ -156,16 +158,20 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
             <li>
               <HfLangAdd />
             </li>
-          </ul>
+          </ChipRow>
         </nav>
 
         <section aria-label={`Welcoming Hacktoberfest projects: ${tab.label}`} className="mt-6">
           {!result.ok ? (
             <ErrorPanel error={result.error} retryHref={here} />
-          ) : result.data.status === "queued" ? (
-            <FindRunner key={tab.id} jobId={result.data.job_id} index={result.data.results} days={days} retryHref={here} fit={fit} saved={saved} empty={empty} more={more} />
           ) : (
-            <FindList key={tab.id} results={result.data.results} fit={fit} more={more} auto={false} days={days} saved={saved} empty={empty} />
+            <ComparePicks signedIn={Boolean(user)}>
+              {result.data.status === "queued" ? (
+                <FindRunner key={tab.id} jobId={result.data.job_id} index={result.data.results} days={days} retryHref={here} fit={fit} saved={saved} empty={empty} more={more} />
+              ) : (
+                <FindList key={tab.id} results={result.data.results} fit={fit} more={more} auto={false} days={days} saved={saved} empty={empty} />
+              )}
+            </ComparePicks>
           )}
         </section>
 
@@ -202,7 +208,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
             <ol className="mt-6 space-y-5">
               {TIPS.map(([title, body]) => (
                 <li key={title} className="flex gap-3">
-                  <span aria-hidden="true" className="text-green">→</span>
+                  <span aria-hidden="true" className="text-hf">→</span>
                   <p className="font-sans text-muted">
                     <strong className="font-semibold text-ink">{title}</strong> {body}
                   </p>
@@ -220,7 +226,7 @@ export default async function HacktoberfestPage({ searchParams }: PageProps<"/ha
           <a className="text-link" href="https://hacktoberfest.com" target="_blank" rel="noopener noreferrer">hacktoberfest.com ↗</a>.
         </p>
         <div className="mt-10 flex flex-col items-start gap-4 border-t border-line pt-10">
-          <CatFace mood="adoring" className="text-[1.5rem] text-green" />
+          <CatFace mood="adoring" className="text-[1.5rem] text-hf" />
           <p className="text-[1.2rem] font-semibold tracking-tight">Already have a repo in mind?</p>
           <Link href={user ? CHECK_HREF : "/"} className="bracket-link">[ check any repo → ]</Link>
         </div>

@@ -6,9 +6,9 @@ import { CONTRIBUTIONS, LEVELS, TIME } from "@/lib/profile";
 import type { ProfilePrefs } from "@/lib/types";
 
 const CHIP =
-  "chip min-h-11 cursor-pointer select-none px-3.5 text-[0.82rem] transition-colors sm:min-h-9 hover:border-blue has-[:checked]:border-blue has-[:checked]:bg-blue has-[:checked]:text-on-accent has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-blue";
+  "chip min-h-11 cursor-pointer select-none px-3.5 text-[0.82rem] transition-colors sm:min-h-9 hover:border-blue has-[:checked]:picked has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-blue";
 const BOX =
-  "flex min-h-11 cursor-pointer items-center justify-center border border-line-strong px-3 text-center text-[0.84rem] transition-colors hover:border-blue has-[:checked]:border-green has-[:checked]:bg-green has-[:checked]:font-semibold has-[:checked]:text-on-accent has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-blue";
+  "flex min-h-11 cursor-pointer items-center justify-center border border-line-strong px-3 text-center font-sans text-[0.88rem] transition-colors hover:border-blue has-[:checked]:picked has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-blue";
 const LEGEND = "mb-2.5 text-[0.78rem] uppercase tracking-[0.08em] text-faint";
 
 export function ProfileForm({
@@ -38,7 +38,7 @@ export function ProfileForm({
       </fieldset>
 
       <fieldset>
-        <legend className={LEGEND}>Time you have for one contribution</legend>
+        <legend className={LEGEND}>How long you&apos;d wait for a first reply</legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {TIME.map((t) => (
             <label key={t.days} className={BOX}>

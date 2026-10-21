@@ -59,7 +59,7 @@ test("only reads, and none with credentials", () => {
 });
 
 test("pages about one person, for signed-in people, or that can carry a running job, are never cacheable", () => {
-  for (const p of ["/me", "/me/repos", "/settings", "/settings/profile", "/signin", "/profile", "/alerts", "/alerts/unsubscribe", "/pricing/thanks", "/find", "/find?go=1", "/hacktoberfest", "/compare", "/preflight", "/lab/emails", "/api/find", "/API/find", "/badge/flask.svg", "/api/public/report/pallets/flask"]) {
+  for (const p of ["/me", "/me/repos", "/settings", "/settings/profile", "/signin", "/profile", "/alerts", "/alerts/unsubscribe", "/pricing/thanks", "/find", "/find?go=1", "/find?lang=python&days=7&hacktoberfest=0", "/hacktoberfest", "/compare", "/preflight", "/lab/emails", "/api/find", "/API/find", "/badge/flask.svg", "/api/public/report/pallets/flask"]) {
     assert.equal(ask(p), null, p);
   }
 });

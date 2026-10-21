@@ -515,13 +515,18 @@ language, stars, topics and description from `repo_meta`. They are read:
   report is already done, reports finishing within a few seconds share one
   query. A failure is logged (`repository details ... failed`) and the
   next report tries again;
-- **once a day for every reported repo** by `holt-prod-warm-meta.timer`
+- **once a day, the oldest first** by `holt-prod-warm-meta.timer`
   (05:00 UTC, installed by `install.sh`), which runs the copy at
   `~/.local/share/holt-prod/bin/warm-meta.sh`: the warm pass with
   `--no-reports --no-starter --no-find`, in a one-off container of the live
-  server image. It works no jobs, costs about one GraphQL point per hundred
-  repos (the summary line says how many), and stops below
-  `HOLT_WARM_MIN_POINTS`. It holds `deploy.sh`'s lock while it runs (a
+  server image. It works no jobs, reads the oldest details first for at
+  most `HOLT_META_MAX_MINUTES` (15) and leaves the rest for the next day, so
+  the whole list rolls over across several days (raise it to go faster). It costs about one GraphQL point
+  per ten repos and stops below `HOLT_WARM_MIN_POINTS`. The summary line says
+  how many points it used and how many repos are still due, and lists repos
+  not on GitHub or not read. Running out of time is not a failure; it exits
+  non-zero (the unit shows failed) when GitHub couldn't answer three queries
+  in a row or nothing could be read. It holds `deploy.sh`'s lock while it runs (a
   deploy then exits busy and the auto-deploy retries two minutes later),
   waits for a running deploy or backup (`backup.lock`) for up to 45 minutes,
   else skips the day.
@@ -529,7 +534,8 @@ language, stars, topics and description from `repo_meta`. They are read:
 ```sh
 deploy/prod/install.sh                              # (re)install both timers; needs a deploy first
 systemctl --user list-timers holt-prod-warm-meta.timer
-tail ~/.local/share/holt-prod/logs/warm-meta.log    # "repo details N read (P GitHub points)"
+tail ~/.local/share/holt-prod/logs/warm-meta.log    # "repo details N read (P GitHub points), ..."
+systemctl --user status holt-prod-warm-meta.service # failed: GitHub couldn't answer
 ~/.local/share/holt-prod/bin/warm-meta.sh           # one now
 ```
 

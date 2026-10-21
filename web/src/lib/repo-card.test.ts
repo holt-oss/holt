@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fromFind, issueSummary, langColor, languageLabel, neighbours, oddsSegments, oddsText, statPills, type CardStats } from "./repo-card.ts";
+import { fromDiscover, fromFind, fromPick, issueSummary, langColor, languageLabel, neighbours, oddsSegments, oddsText, statPills, type CardStats } from "./repo-card.ts";
+import type { DiscoverRepo, Recommendation } from "./types.ts";
 
 const stats = (over: Partial<CardStats> = {}): CardStats => ({ attempts: 71, merged: 57, noReply: 5, closedSilently: 8, closedOther: 0, stillOpen: 95, firstTimers: 3, replyHours: 46.9, ...over });
 
@@ -74,4 +75,15 @@ test("issue summary: how many, how many nobody is on, and the kinds of work", ()
   assert.equal(issueSummary([issue({}), issue({})])!.free, "all unclaimed");
   assert.deepEqual(issueSummary([issue({ people: 2 }), issue({ open_prs: 1 })])!.free, "all taken");
   assert.equal(issueSummary([issue({ people: null, open_prs: null })])!.free, "unclaimed");
+});
+
+test("a card's last line is what the repo does best on its board, when the server says", () => {
+  const stats = { outsider_attempts: 20, outsider_merged: 8, distinct_outsiders: 15, first_time_merged_authors: 6, no_reply: 2, median_first_response_hours: 3, bot_share: 0.1, still_open: 0, closed_silently: 0, closed_by_bot: 0, withdrawn: 0, too_old: 0, timing: null };
+  const card = { repo: "octo/a", description: null, language: null, languages: [], stars: null, headline: "Worth your time", tone: "good", verdict: "viable", stats, topics: [], issues: [], open_issues: null, pull_requests: null, open_pull_requests: null, contributors: null, reason: "Outside contributors get real replies here, and their work gets merged." };
+  const board = { ...card, pushed_at: null, checked_this_week: null, generated_at: null } as unknown as DiscoverRepo;
+  assert.equal(fromDiscover({ ...board, standout: "A first reply typically comes within 3 hours." }).reason, "A first reply typically comes within 3 hours.");
+  assert.equal(fromDiscover({ ...board, standout: null }).reason, card.reason);
+  const pick = { ...card, why: [], numbers_line: "", odds: null, checked_at: null } as unknown as Recommendation;
+  assert.equal(fromPick({ ...pick, standout: "Merges typically land within 2 days." }).reason, "Merges typically land within 2 days.");
+  assert.equal(fromPick({ ...pick, standout: null }).reason, card.reason);
 });

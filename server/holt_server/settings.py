@@ -146,6 +146,9 @@ class Settings(BaseSettings):
     warm_max_age_hours: float = Field(20, alias="HOLT_WARM_MAX_AGE_HOURS")
     # Stop a warm pass when any GitHub token has fewer GraphQL points left.
     warm_min_points: int = Field(1500, alias="HOLT_WARM_MIN_POINTS")
+    # A warm pass reads repo details, oldest first, for at most this long;
+    # the rest wait for the next pass. 0 = no limit.
+    meta_max_minutes: float = Field(15, ge=0, alias="HOLT_META_MAX_MINUTES")
     # Report jobs a warm pass keeps in flight at once. They run in the
     # background lane, so HOLT_BADGE_CONCURRENCY should be at least this.
     warm_parallel: int = Field(3, ge=1, alias="HOLT_WARM_PARALLEL")

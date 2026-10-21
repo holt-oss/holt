@@ -117,7 +117,7 @@ function Feedback({ storageKey: key, report }: { storageKey: string; report: Pic
         aria-pressed={on}
         disabled={busy}
         className={`inline-flex min-h-11 items-center gap-2 border px-4 text-[0.89rem] transition-colors disabled:opacity-60 ${
-          on ? (vote === "up" ? "border-green bg-green/10 text-green" : "border-orange bg-orange/10 text-orange") : "border-line-strong text-muted hover:border-ink hover:text-ink"
+          on ? "picked" : "border-line-strong text-muted hover:border-ink hover:text-ink"
         }`}
       >
         <Thumb down={vote === "down"} />

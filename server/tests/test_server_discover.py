@@ -9,7 +9,9 @@ import pytest
 from conftest import STATS, canned_report
 from holt_server import discover, github, warm
 from holt_server.db import RepoMeta, Report, StarterCache, Usage, now
+from holt_server.discover import standouts
 from holt_server.errors import ApiError
+from holt_server.schema import WELCOMING_LINE, Stats
 
 
 def add(h, *items):
@@ -98,6 +100,50 @@ def test_card_reason_does_not_point_at_starter_issues(h):
     reason = get(h)["repos"][0]["reason"]
     assert reason.startswith("Outside contributors do get merged here, but")
     assert "below" not in reason and reason.endswith("choose your first change carefully.")
+
+
+def test_a_welcoming_card_leads_with_the_number_it_ranks_best_on(h):
+    add(h,
+        report("octo/quick", outsider_merged=8, median_first_response_hours=1.0),
+        report("octo/second", outsider_merged=19, median_first_response_hours=30.0),
+        report("octo/newcomers", outsider_merged=8, median_first_response_hours=40.0,
+               first_time_merged_authors=9),
+        report("octo/plain", outsider_merged=8, median_first_response_hours=50.0))
+    lines = {c["repo"]: c["standout"] for c in get(h)["repos"]}
+    assert lines == {
+        "octo/quick": "A first reply typically comes within an hour.",
+        # The share merged is the card's bar, never its line.
+        "octo/second": "A first reply typically comes within 2 days.",
+        "octo/newcomers": "9 people got their first pull request merged here.",
+        # Last on every number: reply time, the first one, is what it says.
+        "octo/plain": "A first reply typically comes within 3 days.",
+    }
+
+
+def test_merge_speed_and_the_last_merge_can_lead_a_card():
+    def stats(**timing):
+        return Stats.model_validate({**STATS, "timing": timing})
+    cards = [(WELCOMING_LINE, s) for s in (
+        stats(merge_typical_days=0.5, last_outside_merge="2026-09-01"),
+        stats(merge_typical_days=9, last_outside_merge="2026-10-08"),
+        stats(merge_typical_days=9, last_outside_merge="2026-09-01"))]
+    assert standouts(cards) == [
+        "Merges typically land within 12 hours.",
+        "The last outside pull request was merged on 8 Oct 2026.",
+        # Nothing of its own: every number is shared or the worst here.
+        "A first reply typically comes within 3 hours.",
+    ]
+
+
+def test_a_reason_that_already_says_something_keeps_its_card(h):
+    add(h, report("octo/silent", outsider_merged=10, no_reply=10),   # "…but about half get no reply…"
+        report("octo/closed", "not_viable", outsider_merged=0))
+    for sort in ("welcoming", "stars"):
+        assert [c["standout"] for c in get(h, sort=sort)["repos"]] == [None] * (1 + (sort == "stars"))
+    no_numbers = Stats.model_validate({**STATS, "median_first_response_hours": None,
+                                       "outsider_attempts": 0, "outsider_merged": 0,
+                                       "first_time_merged_authors": 0})
+    assert standouts([(WELCOMING_LINE, no_numbers)]) == [None]
 
 
 def issue(number, people=0):
@@ -390,9 +436,10 @@ def test_warm_pass_reads_details_of_reported_repos_once_a_day(h):
     assert fake.calls[1:] == [["octo/gone"]]  # only the one GitHub didn't know
 
 
-def test_details_are_read_a_hundred_at_a_time():
-    items = [f"o/r{i}" for i in range(250)]
-    assert [len(b) for b in discover.batches(items)] == [100, 100, 50]
+def test_details_are_read_ten_at_a_time():
+    items = [f"o/r{i}" for i in range(25)]
+    assert [len(b) for b in discover.batches(items)] == [10, 10, 5] == [
+        github.DETAILS_BATCH, github.DETAILS_BATCH, 5]
 
 
 def test_details_rate_limit_stops_the_pass(h):
@@ -460,7 +507,7 @@ def test_details_query_is_one_request_with_one_alias_per_repo():
     assert out["octo/gone"] is None and out["octo/secret"] is None
 
 
-def test_details_when_every_repo_is_gone():
+def test_details_when_every_repo_is_gone_or_unanswered():
     from holt.evidence.errors import RepoNotFound, UpstreamError
 
     def gone(v):
@@ -472,10 +519,12 @@ def test_details_when_every_repo_is_gone():
     def broken(v):
         raise UpstreamError("HTTP 502")
 
-    lookup, _ = lookup_with(broken)
-    with pytest.raises(ApiError) as err:
-        lookup._details(["octo/one"])
-    assert err.value.code == "upstream"
+    # One GitHub can't answer for, even alone, is left out: not missing, not read.
+    lookup, transport = lookup_with(broken)
+    assert lookup._details(["octo/one", "octo/two"]) == {}
+    assert [v for _, v in transport.sent] == [
+        {"o0": "octo", "n0": "one", "o1": "octo", "n1": "two"},
+        {"o0": "octo", "n0": "one"}, {"o0": "octo", "n0": "two"}]
     with pytest.raises(ValueError):
         lookup._details([f"o/r{i}" for i in range(github.DETAILS_BATCH + 1)])
 

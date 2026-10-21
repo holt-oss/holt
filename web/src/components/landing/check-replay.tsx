@@ -136,7 +136,7 @@ function WebMode({ replay, at, animate, hidden }: { replay: Replay; at: number; 
           const now = at === i + 1 && at < 4;
           return (
             <li key={s} className={`flex gap-3 ${show(at > i)} ${now ? "text-ink" : "text-muted"}`}>
-              <span className={`w-4 text-center ${now ? "text-blue" : "text-green"}`}>{now ? "▸" : "✓"}</span>
+              <span className={`w-4 text-center ${now ? "text-blue" : "text-ink"}`}>{now ? "▸" : "✓"}</span>
               {s}
             </li>
           );
@@ -145,7 +145,7 @@ function WebMode({ replay, at, animate, hidden }: { replay: Replay; at: number; 
       <div className={`ls-card relative mt-4 overflow-hidden border border-line-strong bg-bg ${show(landed)}`} data-landed={animate && landed}>
         <span className={`ls-card-bar absolute inset-y-0 left-0 w-1 ${TONE_BG[replay.tone]}`} />
         <div className="p-4 pl-6">
-          <p className="text-[0.75rem] uppercase tracking-[0.08em] text-faint">verdict · rules report · {replay.days}-day budget</p>
+          <p className="text-[0.75rem] uppercase tracking-[0.08em] text-faint">verdict</p>
           <p className={`ls-card-headline display mt-2 text-[clamp(1.7rem,3.2vw,2.6rem)] ${TONE_TEXT[replay.tone]}`}>
             {replay.headline}
             <span className="text-ink">.</span>

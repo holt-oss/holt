@@ -29,12 +29,14 @@ test("landing: pasting an example's GitHub URL ends on the report with a verdict
   await expect(page.getByText(VERDICT).first()).toBeVisible({ timeout: 180_000 });
 });
 
-test("landing, signed out: pasting any other repo goes to sign-in, then back to its report", async ({ page }) => {
+test("landing, signed out: pasting any other repo opens its report, with sign-in for the rest", async ({ page }) => {
   await page.goto("/");
   const box = page.getByLabel("GitHub repository or URL");
   await box.fill("octocat/Hello-World");
   await page.locator("form").filter({ has: box }).getByRole("button", { name: /check this repo/i }).click();
-  await expect(page).toHaveURL(/\/signin\?callbackUrl=%2Foctocat%2FHello-World$/);
+  await expect(page).toHaveURL(/\/octocat\/Hello-World$/);
+  // Under the verdict (from the index or the free check), or in its place for a test browser: sign in, and back here.
+  await expect(page.locator("a[href='/signin?callbackUrl=%2Foctocat%2FHello-World']").first()).toBeVisible({ timeout: 180_000 });
 });
 
 test("URL trick: /github.com/owner/repo redirects to the report", async ({ page, request }) => {
@@ -47,7 +49,7 @@ test("URL trick: /github.com/owner/repo redirects to the report", async ({ page,
 });
 
 test("find, signed out: the default search lists a repo with an issue link", async ({ page }) => {
-  // Signed out, /find shows the shared default search; other filters ask for sign-in.
+  // Signed out, /find shows the shared default search.
   await page.goto("/find");
   const results = page.getByRole("region", { name: "Results" });
   const issue = results.locator('a[href^="https://github.com/"][href*="/issues/"]').first();
@@ -61,17 +63,31 @@ test("find, signed out: the default search lists a repo with an issue link", asy
   await expect(results.locator('a[href^="/"]').first()).toBeVisible();
 });
 
-test("find, signed out: other filters ask for sign-in and start no search", async ({ page }) => {
-  const searches: string[] = [];
-  page.on("request", (r) => {
-    if (r.method() === "POST" && new URL(r.url()).pathname === "/api/find") searches.push(r.url());
+test("find, signed out: picking a language on a small phone lists repos, from Holt's index alone", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const answers: { status: string; job_id?: string }[] = [];
+  page.on("response", async (r) => {
+    if (r.request().method() === "POST" && new URL(r.url()).pathname === "/api/find") answers.push(await r.json());
   });
+  await page.goto("/find");
+  await page.getByRole("button", { name: "Python", exact: true }).click();
+  await expect(page).toHaveURL(/\/find\?lang=python/);
+  const results = page.getByRole("region", { name: "Results" });
+  await expect(results).toHaveAttribute("aria-busy", "false");
+  // Cards, or "none match" on a thin index: never a sign-in box in place of the list.
+  const cards = results.locator('a[href^="/"]:not([href^="/signin"])');
+  const none = results.getByText(/No repos match/);
+  await expect(cards.first().or(none)).toBeVisible();
+  if (await cards.count()) await expect(results.getByRole("link", { name: /sign in/ })).toHaveCount(0);
+  // The index answered: a search of GitHub would come back queued, with a job.
+  expect(answers.map((a) => [a.status, a.job_id])).toEqual([["done", undefined]]);
+});
+
+test("find, signed out: a page opened with filters shows its list, not sign-in", async ({ page }) => {
   await page.goto("/find?go=1&lang=python&days=7");
-  const signIn = page.getByRole("region", { name: "Results" }).getByRole("link", { name: /sign in to search/ });
-  await expect(signIn).toHaveAttribute("href", /^\/signin\?callbackUrl=%2Ffind%3F/);
-  await page.mouse.wheel(0, 4000);
-  await page.waitForTimeout(1500);
-  expect(searches).toEqual([]);
+  await expect(page).toHaveURL(/\/find\?/);
+  const results = page.getByRole("region", { name: "Results" });
+  await expect(results.locator('a[href^="/"]:not([href^="/signin"])').first().or(results.getByText(/No repos match/))).toBeVisible();
 });
 
 // Browse is open: every board, order, language and topic, and the parts a list loads as it is scrolled.
@@ -155,7 +171,14 @@ test("signed out, the data routes behind those pages answer 401", async ({ reque
   for (const path of ["/api/preflight", "/api/preflight-jobs/x/events", "/api/merge-plan-jobs/x/events", "/api/playbook-jobs/x/events"]) {
     expect((await request.get(path)).status(), path).toBe(401);
   }
-  expect((await request.post("/api/find", { data: { q: "lang=python" } })).status()).toBe(401);
+});
+
+test("signed out, Find's filters are answered at once: no search job is started", async ({ request }) => {
+  const res = await request.post("/api/find", { data: { q: "lang=python&days=7&hacktoberfest=0" } });
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  expect(body.status).toBe("done");
+  expect(body.job_id).toBeUndefined();
 });
 
 test("Hacktoberfest pill: × hides it, and it stays hidden after a reload", async ({ page }, testInfo) => {

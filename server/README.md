@@ -96,7 +96,7 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | `HOLT_BADGE_RATE_TOTAL` | `60` | The same, across all clients. |
 | `HOLT_BADGE_CONCURRENCY` | `1` (production: `3`) | Background lane: workers of their own, on top of `HOLT_JOB_CONCURRENCY`, for badge refreshes and warm-pass jobs. They take a waiting person's job before any badge work. `0` turns badge and warm work off. |
 | `HOLT_FIND_CACHE_HOURS` | `6` | How long a finished `/v1/find` search is served to anyone asking the same thing. |
-| `HOLT_WARM_INTERVAL_HOURS` | `0` (off) | Run a warm pass in the API process every N hours (one process at a time; Postgres advisory lock). Each pass also refreshes Discover's repository details (`repo_meta`) once a day, about one GraphQL point per hundred repos. |
+| `HOLT_WARM_INTERVAL_HOURS` | `0` (off) | Run a warm pass in the API process every N hours (one process at a time; Postgres advisory lock). Each pass also refreshes Discover's repository details (`repo_meta`) once a day, about one GraphQL point per ten repos. |
 | `HOLT_CONTRIBUTIONS_REFRESH_HOURS` | `24` | Re-read connected users' public pull requests (My Contributions) every N hours in the API process; stops when GitHub points drop below `HOLT_WARM_MIN_POINTS`. `0` = off. |
 | `HOLT_PR_WATCH` | `0` (off) | The switch for PR watch. `1` starts the checker and the mailer in the API process and lets people turn alerts on. Off, nothing checks pull requests, makes alerts or sends email. See [PR watch](#pr-watch). |
 | `HOLT_PR_WATCH_MINUTES` | `30` | Minutes between checks of watched pull requests. |
@@ -107,6 +107,7 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | `HOLT_WARM_SEEDS` | the list shipped in the package (`holt_server/seeds/repos.txt`) | The warm pass's seed list. |
 | `HOLT_WARM_MAX_AGE_HOURS` | `20` | A warm pass without `--tier` skips repos whose report is younger than this. A tier pass never uses it. |
 | `HOLT_WARM_MIN_POINTS` | `1500` | A warm pass stops when any GitHub token has fewer GraphQL points left, counting 20 for each report still in flight. |
+| `HOLT_META_MAX_MINUTES` | `15` | A warm pass reads repository details for Discover, oldest first, for at most this long; the rest wait for the next pass. `0` = no limit. |
 | `HOLT_WARM_PARALLEL` | `3` | Report jobs a warm pass keeps in flight at once (`--parallel N` for one pass). They run in the background lane, so keep `HOLT_BADGE_CONCURRENCY` at least this. |
 | `HOLT_REFRESH_WEEKLY_HOURS`, `HOLT_REFRESH_MONTHLY_HOURS` | `168`, `720` | The refresh tiers' ages: `warm --tier weekly` and `--tier monthly` skip repos whose report is younger than this (`deploy/prod/compose.yml` passes both to the server). `warm --stale-only` reuses a snapshot up to its repo's tier age. |
 | `HOLT_MAX_PAGES` | `8` | Pull-request pages crawled per analysis (25 PRs a page). |

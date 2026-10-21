@@ -5,13 +5,14 @@ import { FindView } from "@/components/find/find-view";
 import { PageTransition } from "@/components/motion/page-transition";
 import { getProfile, savedNames } from "@/lib/api";
 import { cachedFind } from "@/lib/find-cached";
-import { defaultPicks, findQuery, PICKS_COOKIE, resolvePicks } from "@/lib/find-picks";
+import { indexFind } from "@/lib/find-index";
+import { defaultPicks, findQuery, PICKS_COOKIE, resolvePicks, searchKey } from "@/lib/find-picks";
 import { caller, currentUser } from "@/lib/session";
 import { hacktoberfestSwitch } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Find a project",
-  description: "Projects that reply to and merge outside contributors, with specific issues to start on. Filter by language and how much time you have.",
+  description: "Projects that reply to and merge outside contributors, with specific issues to start on. Filter by language and how fast maintainers reply.",
   alternates: { canonical: "/find" },
 };
 
@@ -25,19 +26,19 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
   // An explicit choice (URL, last picks) wins; otherwise the switch starts on only in October.
   const hf = hacktoberfestSwitch();
   const { picks, source } = resolvePicks({ params: sp, cookie: jar.get(PICKS_COOKIE)?.value, profile, hfWindow: Boolean(hf), hfOn: hf?.on ?? false });
-  // Signed out, the page shows the default search, which every visitor shares
-  // (so it's almost always cached); other picks ask for sign-in (FindView).
-  const searched = user ? picks : { ...defaultPicks(hf?.on ?? false), level: picks.level, types: picks.types };
-  const result = await cachedFind(findQuery(searched), await caller(user));
+  // Signed out, the default search is the one every visitor shares (so it's
+  // almost always cached); other picks are answered from Holt's index alone.
+  const shared = searchKey(picks) === searchKey(defaultPicks(hf?.on ?? false));
+  const result = user || shared ? await cachedFind(findQuery(picks), await caller(user)) : await indexFind(picks);
 
   return (
     <PageTransition>
       <FindFrame tab="find" title="Find a project" signedIn={Boolean(user)}>
         <FindView
           notice={sp.profile === "saved" && (
-            <p role="status" className="mt-5 border border-green/50 bg-green/10 px-4 py-2.5 font-sans text-[0.9rem] text-green">Profile saved.</p>
+            <p role="status" className="mt-5 border border-line-strong bg-ink/5 px-4 py-2.5 font-sans text-[0.9rem] text-ink">Profile saved.</p>
           )}
-          initialPicks={picks} searched={searched} initial={result} source={source} hf={hf} saved={saved} signedIn={Boolean(user)} profile={profile} />
+          initialPicks={picks} initial={result} source={source} hf={hf} saved={saved} signedIn={Boolean(user)} profile={profile} />
       </FindFrame>
     </PageTransition>
   );

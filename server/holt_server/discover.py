@@ -40,6 +40,7 @@ import base64
 import binascii
 import logging
 import time
+from bisect import bisect_left, bisect_right
 from collections import Counter
 from collections.abc import Callable
 from datetime import datetime, timedelta
@@ -60,7 +61,10 @@ from holt_server.db import (
 from holt_server.deps import internal, services
 from holt_server.errors import ApiError
 from holt_server.github import DETAILS_BATCH
-from holt_server.schema import Model, StarterIssue, Stats, VerdictView, odds_for, verdict_line
+from holt_server.schema import (
+    WELCOMING_LINE, Model, StarterIssue, Stats, VerdictView, _date, odds_for,
+    verdict_line, wait_phrase,
+)
 from holt_server.services import Services
 
 log = logging.getLogger("holt_server.discover")
@@ -116,6 +120,10 @@ class DiscoverRepo(VerdictView):
     pushed_at: str | None = None
     # The report's one-line reason (the same sentence the report shows).
     reason: str
+    # What this repo does best among the repos on its board, in one sentence
+    # (`standouts`). Only where `reason` is the sentence every "Worth your
+    # time" repo shares, and only on a board; null otherwise.
+    standout: str | None = None
     stats: Stats
     # People who checked it on Holt in the last 7 days; null below TRENDING_MIN.
     checked_this_week: int | None = None
@@ -322,14 +330,15 @@ async def starter_issues(svc: Services, keys: list[str]) -> dict[str, list[dict]
 
 
 def card_issues(raw: list[dict]) -> list[StarterIssue]:
-    """The first CARD_ISSUES that parse, nobody-on-it first (stable)."""
+    """The first CARD_ISSUES that parse, nobody-on-it first (stable); taken
+    ones only when few are free (`starter.offered`)."""
     issues = []
     for i in raw:
         try:
             issues.append(StarterIssue.model_validate(i))
         except ValueError:
             continue
-    return sorted(issues, key=lambda i: bool(i.people or i.open_prs))[:CARD_ISSUES]
+    return starter.offered(issues)[:CARD_ISSUES]
 
 
 async def checked_this_week(svc: Services) -> dict[str, int]:
@@ -428,6 +437,70 @@ def rank(cards: list[DiscoverRepo], sort: Sort) -> list[DiscoverRepo]:
     return sorted(cards, key=lambda c: (-(c.stars or 0), c.repo.lower()))
 
 
+def _pr_days(days: float) -> str:
+    return wait_phrase(days * 24)
+
+
+def _first_timers(n: int) -> str:
+    return (f"{n} {'person' if n == 1 else 'people'} got their first pull request "
+            "merged here.")
+
+
+def _merged_on(day: str) -> str | None:
+    d = _date(day)
+    return f"The last outside pull request was merged on {d[0]} {d[1]} {d[2]}." if d else None
+
+
+def _days_ago(day: str | None) -> int | None:
+    """Smaller for a later date."""
+    at = _parse_ts(day)
+    return -at.toordinal() if at else None
+
+
+# What a card can lead with: (the number, smaller is better; its sentence).
+# Reply time is first: it wins a tie, and it is what a card says when the repo
+# is in the better half of the board on nothing. The share merged isn't one:
+# the card's bar marks it and the welcoming board is in its order, so every
+# card at the top would lead with it. Only numbers the report counted, never
+# a model.
+STANDOUTS: tuple[tuple[Callable[[Stats], Any], Callable[[Stats], str | None]], ...] = (
+    (lambda s: s.median_first_response_hours,
+     lambda s: f"A first reply typically comes within {wait_phrase(s.median_first_response_hours)}."),
+    (lambda s: -s.first_time_merged_authors or None,
+     lambda s: _first_timers(s.first_time_merged_authors)),
+    (lambda s: s.timing.merge_typical_days if s.timing else None,
+     lambda s: f"Merges typically land within {_pr_days(s.timing.merge_typical_days)}."),
+    (lambda s: _days_ago(s.timing.last_outside_merge) if s.timing else None,
+     lambda s: _merged_on(s.timing.last_outside_merge)),
+)
+
+
+def _places(values: list[Any]) -> list[float | None]:
+    """Where each value stands among the ones that aren't None, from 0 (the
+    smallest) towards 1. Equal values share the middle of their places, so a
+    number half the board has is nobody's strong point."""
+    have = sorted(v for v in values if v is not None)
+    return [None if v is None
+            else (bisect_left(have, v) + bisect_right(have, v) - 1) / 2 / len(have)
+            for v in values]
+
+
+def standouts(cards: list[tuple[str, Stats]]) -> list[str | None]:
+    """For each (reason, stats) on one board, in order: the number where the
+    repo stands best among them, as a sentence. None for a repo whose reason
+    already says something of its own, or with none of the numbers."""
+    places = [_places([value(s) for _, s in cards]) for value, _ in STANDOUTS]
+    out: list[str | None] = []
+    for n, (reason, s) in enumerate(cards):
+        best = min(((p[n], i) for i, p in enumerate(places) if p[n] is not None), default=None)
+        if reason != WELCOMING_LINE or best is None:
+            out.append(None)
+            continue
+        lead = 0 if best[0] >= 0.5 and places[0][n] is not None else best[1]
+        out.append(STANDOUTS[lead][1](s))
+    return out
+
+
 class Board(NamedTuple):
     """One sort and filter's whole board, in order. Shared between requests:
     read it, never change it."""
@@ -483,8 +556,11 @@ async def _rank_board(svc: Services, sort: Sort, language: str | None, topic: st
     chosen = [c for c in cards
               if (language is None or (c.language or "").lower() == language)
               and (topic is None or topic in {t.lower() for t in c.topics})]
+    ranked = rank(chosen, sort)
+    lines = standouts([(c.reason, c.stats) for c in ranked])
     return Board(
-        repos=rank(chosen, sort),
+        repos=[c if line is None else c.model_copy(update={"standout": line})
+               for c, line in zip(ranked, lines)],
         # The language as GitHub spells it, when a repo has it.
         language=next((name for name in counts if name.lower() == language), language),
         languages=[LanguageCount(name=name, repos=n)
@@ -572,7 +648,7 @@ async def discover(request: Request,
 async def stale_meta(svc: Services, extra: list[str] = ()) -> list[str]:
     """Repositories with a rules report, in a find stored in the last
     META_MAX_AGE_HOURS, or in `extra`, whose details are missing or older than
-    that."""
+    that: the missing first, then the oldest."""
     cutoff = now() - timedelta(hours=META_MAX_AGE_HOURS)
     async with svc.db.session() as s:
         reported = (await s.execute(
@@ -591,8 +667,12 @@ async def stale_meta(svc: Services, extra: list[str] = ()) -> list[str]:
     names = {key: repo for key, repo in reported}
     for repo in [*found, *extra]:
         names.setdefault(repos.key(repo), repo)
-    return [repo for key, repo in names.items()
-            if key not in fetched or key in old_shape or utc(fetched[key]) < cutoff]
+    stale = [(key, repo) for key, repo in names.items()
+             if key not in fetched or key in old_shape or utc(fetched[key]) < cutoff]
+    missing = [repo for key, repo in stale if key not in fetched or key in old_shape]
+    old = sorted(((utc(fetched[key]), repo) for key, repo in stale
+                  if key in fetched and key not in old_shape), key=lambda t: t[0])
+    return missing + [repo for _, repo in old]
 
 
 async def with_meta(s, results: list[dict[str, Any]]) -> list[dict[str, Any]]:

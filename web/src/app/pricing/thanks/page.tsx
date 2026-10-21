@@ -34,7 +34,7 @@ export default async function ThanksPage({ searchParams }: PageProps<"/pricing/t
   let heading: React.ReactNode;
   let body: React.ReactNode;
   if (order?.status === "paid") {
-    heading = <>Thank you. <span className="text-green">{order.days ? "Pro is on." : "Paid."}</span></>;
+    heading = <>Thank you. <span className="text-blue">{order.days ? "Pro is on." : "Paid."}</span></>;
     body = (
       <p className="prose-sans text-[1.05rem]">
         You paid {formatPrice(order.amount, order.currency)} for {order.name}. {by} emails you a receipt.

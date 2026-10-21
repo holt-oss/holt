@@ -7,7 +7,7 @@ import { PageTransition } from "@/components/motion/page-transition";
 import { EXAMPLES_PATH } from "@/lib/examples";
 import { afterSignIn } from "@/lib/home";
 import { currentUser } from "@/lib/session";
-import { signInNotice } from "@/lib/signin";
+import { SIGN_IN_HEADING, signInHeading, signInNotice } from "@/lib/signin";
 import { ProviderButtons, type Provider } from "./provider-buttons";
 
 export const metadata: Metadata = { title: "Sign in", robots: { index: false } };
@@ -41,6 +41,8 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
   if (await currentUser()) redirect(callbackUrl);
   const configured = new Set(oauthProviders.map((p) => p.id));
   const notice = signInNotice(sp.error);
+  // Worded from the callback (lib/signin.ts); a longer heading is set smaller.
+  const heading = signInHeading(sp.callbackUrl);
 
   const providers: Provider[] = PROVIDERS.map((p) => ({
     ...p,
@@ -60,8 +62,8 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
         <div className="wrap relative flex min-h-[78dvh] items-center justify-center py-10 sm:py-16">
           <section aria-labelledby="signin-title" className="w-full max-w-md border border-line-strong bg-panel p-6 shadow-card sm:p-9 lg:max-w-[27rem]">
             <CatFace mood={notice?.tone === "error" ? "startled" : "adoring"} blink={!notice} className="text-[1.7rem]" />
-            <h1 id="signin-title" className="display mt-5 text-[2.3rem] sm:text-[2.7rem]">
-              Sign in to Holt
+            <h1 id="signin-title" className={`display mt-5 [overflow-wrap:anywhere] ${heading === SIGN_IN_HEADING ? "text-[2.3rem] sm:text-[2.7rem]" : "text-[1.7rem] sm:text-[2rem]"}`}>
+              {heading}
             </h1>
             <p className="prose-sans mt-3 text-[1rem]">
               Holt keeps the repos you save and shows where your open PRs stand.
@@ -119,7 +121,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
 
 function LockIcon() {
   return (
-    <svg viewBox="0 0 16 16" className="mt-[0.3em] size-3.5 shrink-0 text-green" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+    <svg viewBox="0 0 16 16" className="mt-[0.3em] size-3.5 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
       <rect x="3" y="7" width="10" height="7" />
       <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
     </svg>

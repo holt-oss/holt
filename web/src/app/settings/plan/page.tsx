@@ -36,7 +36,7 @@ export default async function PlanSettings() {
             {pro ? (
               e.plan_expires_at && <p className="mt-1 text-[0.87rem] text-muted">until {shortDate(e.plan_expires_at)}</p>
             ) : (
-              <p className="mt-1 text-[0.87rem]"><Link href="/pricing" className="text-green transition-opacity hover:opacity-75">see Pro →</Link></p>
+              <p className="mt-1 text-[0.87rem]"><Link href="/pricing" className="text-link">see Pro →</Link></p>
             )}
           </div>
           {left != null && (
@@ -52,7 +52,7 @@ export default async function PlanSettings() {
         <Block id="purchases" title="Purchases" className="mt-8">
           {purchases.length === 0 ? (
             <p className="prose-sans text-[0.95rem]">
-              Nothing bought yet. <Link href="/pricing#passes" className="text-green transition-opacity hover:opacity-75">See Pro passes</Link>.
+              Nothing bought yet. <Link href="/pricing#passes" className="text-link">See Pro passes</Link>.
             </p>
           ) : (
             <ul className="divide-y divide-line border-b border-line">
@@ -62,7 +62,7 @@ export default async function PlanSettings() {
                     <span className="font-semibold">{o.name}</span>
                     <span className="text-muted"> · {formatPrice(o.amount, o.currency)} · {shortDate(o.paid_at ?? o.created_at)}</span>
                   </span>
-                  <span className={o.status === "paid" ? "text-green" : o.status === "held" ? "text-amber" : "text-muted"}>
+                  <span className={o.status === "paid" ? "text-ink" : o.status === "held" ? "text-amber" : "text-muted"}>
                     {STATUS_LABEL[o.status]}
                   </span>
                 </li>
@@ -70,7 +70,7 @@ export default async function PlanSettings() {
             </ul>
           )}
           {onSale && purchases.length > 0 && (
-            <p className="mt-4 text-[0.89rem]"><Link href="/pricing#passes" className="text-green transition-opacity hover:opacity-75">add another pass →</Link></p>
+            <p className="mt-4 text-[0.89rem]"><Link href="/pricing#passes" className="text-link">add another pass →</Link></p>
           )}
         </Block>
       )}

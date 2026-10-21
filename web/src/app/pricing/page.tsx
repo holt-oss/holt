@@ -25,7 +25,7 @@ const Items = ({ items, mergePlans }: { items: PlanItem[]; mergePlans: boolean }
   <ul className="mt-5 flex-1 space-y-3.5 font-sans text-[0.92rem]">
     {items.map((i) => (
       <li key={i.id} className="flex gap-2.5">
-        <span aria-hidden="true" className="text-green">✓</span>
+        <span aria-hidden="true" className="text-ink">✓</span>
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-ink">
             {i.title}
@@ -52,7 +52,7 @@ export default async function PricingPage({ searchParams }: PageProps<"/pricing"
       <PageHead>
         <p className="rail mb-4 flex gap-2"><strong className="m-0">pricing</strong></p>
         <h1 className="display max-w-3xl text-[clamp(1.9rem,4.5vw,3rem)]">
-          Finding a project is free. <span className="text-green">Pro keeps watch for you.</span>
+          Finding a project is free. <span className="text-blue">Pro keeps watch for you.</span>
         </h1>
         <p className="prose-sans mt-5 max-w-2xl text-[0.98rem]">
           Holt checks whether a repo merges outsiders&apos; pull requests before you write one. Pro watches your PRs, repos and
@@ -73,7 +73,7 @@ export default async function PricingPage({ searchParams }: PageProps<"/pricing"
             <Link href="/" className="btn-primary mt-6 w-full">check a repo →</Link>
           </li>
 
-          <li className={`flex flex-col p-6 ${selling ? "border border-green bg-panel shadow-card" : "border border-dashed border-line-strong bg-panel/60"}`}>
+          <li className={`flex flex-col p-6 ${selling ? "border border-ink bg-panel shadow-card" : "border border-dashed border-line-strong bg-panel/60"}`}>
             <div className="flex items-center justify-between gap-3">
               <p className="text-[0.85rem] uppercase tracking-[0.08em] text-faint">Pro</p>
               {!selling && <span className="chip border-amber/60 text-amber">coming soon</span>}
