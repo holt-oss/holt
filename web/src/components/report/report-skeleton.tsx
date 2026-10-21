@@ -1,6 +1,7 @@
 // The report page's shape while it loads: same grid, gaps and line heights as
 // the real page (see [owner]/[repo]/page.tsx and report-view.tsx), so the
 // swap to content doesn't move anything.
+import { LoadingTransition } from "../motion/page-transition";
 import { Skeleton, SkeletonRegion, SkeletonText } from "../skeleton";
 import { StarterIssuesSkeleton } from "./starter-issues";
 
@@ -118,11 +119,24 @@ export function ReportHeaderSkeleton() {
 export function ReportSkeleton() {
   return (
     <div className="relative">
-      
       <SkeletonRegion label="Loading the report…" className="report-wide relative py-8 sm:py-12">
         <ReportHeaderSkeleton />
         <ReportBodySkeleton />
       </SkeletonRegion>
     </div>
+  );
+}
+
+/**
+ * The report page's loading screen. The route has no loading.tsx (a ready
+ * verdict would wait behind it): the page sends this itself when its data is
+ * slow, already visible (`immediate`), and route-fallback.tsx shows it when
+ * the router has nothing else to show.
+ */
+export function ReportLoading({ immediate = false }: { immediate?: boolean }) {
+  return (
+    <LoadingTransition immediate={immediate}>
+      <ReportSkeleton />
+    </LoadingTransition>
   );
 }

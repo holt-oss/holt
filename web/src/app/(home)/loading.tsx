@@ -2,7 +2,9 @@ import { LoadingTransition } from "@/components/motion/page-transition";
 import { Skeleton, SkeletonRegion, SkeletonText } from "@/components/skeleton";
 
 // The landing hero's shape. Rarely seen: the page has nothing to wait for but
-// the session, and skeletons stay invisible for their first 100ms.
+// the session, and skeletons stay invisible for their first 300ms. In a route
+// group with the page so it is the landing page's only: a loading.tsx at the
+// app root wraps every route, and a report must not have one (see its page).
 export default function Loading() {
   return (
     <LoadingTransition>

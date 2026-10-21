@@ -1,0 +1,10 @@
+/* The footer stays hidden under an empty <main>: for the moment between the
+   router committing a route as nothing and the fallback mounting (React holds
+   it until the view transition is ready), a footer sitting right under the
+   header would then be pushed down the page, a layout shift. globals.css
+   means to do this with `main:not(:has(*))` inside a `:has()`; browsers drop
+   a nested :has(), so that rule never applied. Comment nodes (React's
+   Suspense markers) don't stop :empty from matching. */
+body:has(main:empty) > footer {
+  display: none;
+}

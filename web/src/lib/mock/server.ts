@@ -20,6 +20,8 @@ export { playbookState, unlockPlaybook } from "./playbook";
 export { preflightState, startPreflight } from "./preflight";
 
 const JOB_MS = Number(process.env.MOCK_JOB_MS || 6500);
+/** Holds every report read back this long: a slow API, for the report page's loading screen. */
+const REPORT_MS = Number(process.env.MOCK_REPORT_MS || 0);
 const WELCOME_CREDITS = Number(process.env.NEXT_PUBLIC_FREE_AI_QUOTA || 3);
 const CLAIM_EVERY_DAYS = 7;
 const DAY_MS = 86_400_000;
@@ -249,6 +251,7 @@ export async function discover(sort: DiscoverSort, language: string | null, topi
 export async function getReport(repoIn: string, mode: Mode, days: number): Promise<Result<Report>> {
   const v = validate(repoIn);
   if (!v.ok) return v;
+  if (REPORT_MS) await new Promise((r) => setTimeout(r, REPORT_MS));
   const r = state().cache.get(key(v.data, mode, days)) ?? (mode === "rules" ? anotherBudget(v.data, days) : undefined);
   // Like the real server, `about` is read fresh when a report is served, never stored with it: a report cached earlier shows the current fields.
   return r ? { ok: true, data: { ...r, about: mockAbout(r.repo) } } : err(404, "not_found", "No report yet for this repository.");

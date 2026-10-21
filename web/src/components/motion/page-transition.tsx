@@ -19,10 +19,14 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
  * footer meanwhile (globals.css), so it appears once under the real page
  * instead of jumping when the skeleton's height gives way to the page's.
  */
-export function LoadingTransition({ children }: { children: React.ReactNode }) {
+export function LoadingTransition({ children, immediate = false }: {
+  children: React.ReactNode;
+  /** Its skeletons show at once, without the usual wait (globals.css `--sk-delay`): for a loading screen sent only once the page is known to be slow. */
+  immediate?: boolean;
+}) {
   return (
     <ViewTransition enter="page-in" exit="sk-out" default="none">
-      <div data-route-loading>{children}</div>
+      <div data-route-loading style={immediate ? ({ "--sk-delay": "0ms" } as React.CSSProperties) : undefined}>{children}</div>
     </ViewTransition>
   );
 }

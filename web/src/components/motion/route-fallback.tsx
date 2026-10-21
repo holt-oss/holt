@@ -10,11 +10,13 @@
 // anyone can click.
 //
 // While <main> has no element in it, this renders the loading skeleton of the
-// route in the address bar (the same one its loading.tsx would show) and drops
-// it as soon as the page arrives. React applies both updates only once the
-// router's view transition is ready, 10-30ms after the DOM changed; globals.css
-// covers the gap (the footer stays hidden under an empty <main>, and the
-// fallback is display:none as soon as it has a sibling), so nothing shifts.
+// route in the address bar (the same one its loading.tsx would show; a report
+// has none and sends its own, see the report page) and drops it as soon as the
+// page arrives. React applies both updates only once the
+// router's view transition is ready, 10-30ms after the DOM changed; CSS covers
+// the gap (route-fallback.css: the footer stays hidden under an empty <main>;
+// globals.css: the fallback is display:none as soon as it has a sibling), so
+// nothing shifts.
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import CompareLoading from "@/app/compare/loading";
@@ -27,17 +29,17 @@ import ReposLoading from "@/app/me/repos/loading";
 import PricingLoading from "@/app/pricing/loading";
 import SettingsLoading from "@/app/settings/loading";
 import SigninLoading from "@/app/signin/loading";
-import ReportLoading from "@/app/[owner]/[repo]/loading";
-import RootLoading from "@/app/loading";
-import { PageHeadSkeleton } from "../page-head-skeleton";
-import { Skeleton, SkeletonRegion } from "../skeleton";
-import { LoadingTransition } from "./page-transition";
+import LandingLoading from "@/app/(home)/loading";
+import { PageLoading } from "../page-head-skeleton";
+import { ReportLoading } from "../report/report-skeleton";
+import { Skeleton } from "../skeleton";
+import "./route-fallback.css";
 
 const MAIN_ID = "content";
 
 /** Static routes with a loading.tsx. Anything else two segments deep is a report. */
 const ROUTES: Record<string, React.ReactElement> = {
-  "/": <RootLoading />,
+  "/": <LandingLoading />,
   "/compare": <CompareLoading />,
   "/find": <FindLoading />,
   "/hacktoberfest": <HacktoberfestLoading />,
@@ -48,14 +50,6 @@ const ROUTES: Record<string, React.ReactElement> = {
   "/pricing": <PricingLoading />,
   "/signin": <SigninLoading />,
 };
-
-const GENERIC = (
-  <LoadingTransition>
-    <SkeletonRegion>
-      <PageHeadSkeleton />
-    </SkeletonRegion>
-  </LoadingTransition>
-);
 
 /** Settings pages share a layout, and its loading.tsx only covers the section. */
 const SETTINGS = (
@@ -82,7 +76,7 @@ function loadingFor(pathname: string): React.ReactElement {
   const known = ROUTES[pathname];
   if (known) return known;
   if (pathname === "/settings" || pathname.startsWith("/settings/")) return SETTINGS;
-  return pathname.split("/").filter(Boolean).length === 2 ? <ReportLoading /> : GENERIC;
+  return pathname.split("/").filter(Boolean).length === 2 ? <ReportLoading /> : <PageLoading />;
 }
 
 function subscribe(onChange: () => void) {
