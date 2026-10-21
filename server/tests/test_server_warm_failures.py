@@ -7,6 +7,7 @@ under it, answered by `httpx.MockTransport`. Nothing reaches GitHub."""
 from __future__ import annotations
 
 import asyncio
+import json
 import threading
 from datetime import timedelta
 
@@ -343,3 +344,257 @@ def test_a_secondary_limit_mid_pass_is_waited_out_and_the_pass_finishes(h, monke
     assert (result.reports_run, result.reports_failed, result.stopped) == (3, 0, None)
     assert result.pauses == 1 and failures(h) == {}
     assert any("waiting 5 minutes" in line for line in lines) and pauses.waits == [300]
+
+
+# --- the daily details pass, the real lookup under it, GitHub faked ---------------------
+
+
+def too_heavy(aliases: list[str]) -> httpx.Response:
+    """What GitHub sent on 19 Oct 2026 for a details query of a hundred
+    repositories: 200 OK, every repository null, RESOURCE_LIMITS_EXCEEDED for
+    each (the first on a field), and no rateLimit."""
+    message = "Resource limits for this query exceeded."
+    return httpx.Response(200, json={
+        "data": {**dict.fromkeys(aliases), "rateLimit": None},
+        "errors": [{"type": "RESOURCE_LIMITS_EXCEEDED", "message": message,
+                    "path": [a, "openPrs"] if i == 0 else [a]} for i, a in enumerate(aliases)]})
+
+
+def node(repo: str, **kw) -> dict:
+    return {"nameWithOwner": repo, "isPrivate": False, "stargazerCount": 42,
+            "primaryLanguage": {"name": "Go"}, "pushedAt": "2026-10-18T10:00:00Z",
+            "pullRequests": {"totalCount": 300}, "openPrs": {"totalCount": 7}, **kw}
+
+
+class DetailsGitHub:
+    """Details queries (GraphQL) and contributor lists (REST, empty). A query
+    of more than `fits` repositories is too heavy; `gone` ones are null with
+    NOT_FOUND beside the others' data; `half_read` ones come back with a field
+    nulled by RESOURCE_LIMITS_EXCEEDED unless asked for alone; a query with
+    one of `fails` in it, or any when `status` isn't 200, gets a 502 (or
+    `status`)."""
+
+    def __init__(self, fits: int = github.DETAILS_BATCH, gone=(), half_read=(),
+                 fails=()) -> None:
+        self.fits, self.gone, self.half_read = fits, set(gone), set(half_read)
+        self.fails = set(fails)
+        self.status = 200
+        self.queries: list[list[str]] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json=[])
+        v = json.loads(request.content)["variables"]
+        repos = [f"{v[f'o{i}']}/{v[f'n{i}']}" for i in range(len(v) // 2)]
+        self.queries.append(repos)
+        if self.status != 200 or self.fails & set(repos):
+            return httpx.Response(self.status if self.status != 200 else 502)
+        aliases = [f"r{i}" for i in range(len(repos))]
+        if len(repos) > self.fits:
+            return too_heavy(aliases)
+        data: dict = {"rateLimit": {"cost": 1, "remaining": 4000, "resetAt": "2099-01-01T00:00:00Z"}}
+        errors = []
+        for alias, repo in zip(aliases, repos, strict=True):
+            if repo in self.gone:
+                data[alias] = None
+                errors.append({"type": "NOT_FOUND", "path": [alias], "message":
+                               f"Could not resolve to a Repository with the name '{repo}'."})
+            elif repo in self.half_read and len(repos) > 1:
+                data[alias] = node(repo, openPrs=None)
+                errors.append({"type": "RESOURCE_LIMITS_EXCEEDED", "path": [alias, "openPrs"],
+                               "message": "Resource limits for this query exceeded."})
+            else:
+                data[alias] = node(repo)
+        return httpx.Response(200, json={"data": data, **({"errors": errors} if errors else {})})
+
+
+def details_lookup(h, monkeypatch, gh: DetailsGitHub) -> github.GitHubLookup:
+    monkeypatch.setattr(gql, "BACKOFF_BASE_S", 0)
+    h.svc.pool = github.TokenPool(["tok"], clock=Clock())
+    lookup = github.GitHubLookup(h.svc.pool, httpx.Client(transport=httpx.MockTransport(gh)))
+
+    async def remaining():
+        return 5000
+
+    lookup.remaining = remaining
+    h.svc.lookup = lookup
+    return lookup
+
+
+def meta_rows(h) -> dict:
+    from holt_server.db import RepoMeta
+
+    async def q():
+        async with h.svc.db.session() as s:
+            return {m.repo_key: m for m in (await s.execute(select(RepoMeta))).scalars()}
+    return h.client.portal.call(q)
+
+
+def details_pass(h, repos, **kw):
+    return h.client.portal.call(lambda: warm.warm_once(
+        h.svc, seeds=repos, reports=False, starter=False, finds=False, **kw))
+
+
+def test_a_query_github_cant_finish_is_asked_again_in_halves(h, monkeypatch):
+    gh = DetailsGitHub(fits=3)
+    lookup = details_lookup(h, monkeypatch, gh)
+    repos = [f"octo/r{i}" for i in range(10)]
+    out = lookup._details(repos)
+    assert sorted(out) == repos and all(d and d["stars"] == 42 for d in out.values())
+    assert gh.queries[0] == repos and max(len(q) for q in gh.queries[1:]) <= 5
+    assert sorted(r for q in gh.queries if len(q) <= 3 for r in q) == repos
+
+
+def test_a_field_github_gave_up_on_is_read_again_never_stored_empty(h, monkeypatch):
+    gh = DetailsGitHub(half_read={"octo/big"})
+    lookup = details_lookup(h, monkeypatch, gh)
+    out = lookup._details(["octo/one", "octo/big", "octo/two"])
+    assert out["octo/big"]["open_pull_requests"] == 7
+    assert gh.queries == [["octo/one", "octo/big", "octo/two"], ["octo/big"]]
+
+
+def test_missing_repos_beside_unfinished_ones_are_told_apart(h, monkeypatch):
+    # Every alias null, one NOT_FOUND among the errors: not all of them are gone.
+    gh = DetailsGitHub(fits=1, gone={"gone/away"})
+    lookup = details_lookup(h, monkeypatch, gh)
+    out = lookup._details(["octo/one", "gone/away", "octo/two"])
+    assert out == {"octo/one": out["octo/one"], "gone/away": None, "octo/two": out["octo/two"]}
+    assert out["octo/one"]["stars"] == 42 and out["octo/two"]["stars"] == 42
+
+
+def test_a_partly_failed_batch_saves_the_good_repos_and_lists_the_missing(h, monkeypatch):
+    gh = DetailsGitHub(fits=github.DETAILS_BATCH, gone={"gone/away", "Deleted/Repo"})
+    details_lookup(h, monkeypatch, gh)
+    good = [f"octo/r{i}" for i in range(12)]
+    result = details_pass(h, [*good[:5], "gone/away", *good[5:], "Deleted/Repo"])
+
+    assert result.meta_run == 12 and result.meta_failed is None and result.meta_unread == []
+    assert sorted(result.meta_missing) == ["Deleted/Repo", "gone/away"]
+    rows = meta_rows(h)
+    assert set(rows) == set(good) and rows["octo/r0"].open_pull_requests == 7
+    assert "repo details 12 read" in result.summary()
+    assert "0 not read, 2 not on GitHub" in result.summary()
+
+
+def test_queries_github_never_answers_fail_the_pass_after_three(h, monkeypatch):
+    gh = DetailsGitHub()
+    gh.status = 502
+    details_lookup(h, monkeypatch, gh)
+    repos = [f"octo/r{i}" for i in range(github.DETAILS_BATCH * 5)]
+    result = details_pass(h, repos)
+
+    assert result.meta_run == 0 and meta_rows(h) == {}
+    asked = {r for q in gh.queries for r in q}
+    assert asked == set(repos[:github.DETAILS_BATCH * warm.META_FAILURES_IN_A_ROW])
+    assert result.meta_failed.startswith("GitHub couldn't answer 3 details queries in a row")
+    assert any(f.startswith("repo details: GitHub couldn't answer") for f in result.failures)
+
+
+def test_one_repo_github_cant_answer_for_is_listed_and_the_rest_saved(h, monkeypatch):
+    details_lookup(h, monkeypatch, DetailsGitHub(fails={"huge/repo"}))
+    result = details_pass(h, ["octo/one", "huge/repo", "octo/two"])
+    assert result.meta_run == 2 and result.meta_unread == ["huge/repo"]
+    assert result.meta_failed is None
+
+
+def test_a_details_pass_that_read_nothing_exits_non_zero(h, monkeypatch, capsys, tmp_path):
+    gh = DetailsGitHub(fits=0)  # every query too heavy, even alone
+    details_lookup(h, monkeypatch, gh)
+    failed = details_pass(h, ["octo/one", "octo/two"])
+    assert failed.meta_failed == "none of the 2 repos GitHub was asked about could be read"
+
+    async def fake_warm_once(svc, **kw):
+        return failed
+
+    class FakeServices:
+        def __init__(self, settings):
+            self.settings = settings
+            self.db = type("DB", (), {"migrate": _noop, "dispose": _noop})()
+            self.http = type("HTTP", (), {"close": lambda self: None})()
+
+    monkeypatch.setattr(warm, "warm_once", fake_warm_once)
+    monkeypatch.setattr("holt_server.services.Services", FakeServices)
+    (tmp_path / "seeds.txt").write_text("octo/one\nocto/two\n", encoding="utf-8")
+    seeds = ["--seeds", str(tmp_path / "seeds.txt")]
+    assert warm.main(["--no-reports", "--no-starter", "--no-find", *seeds]) == warm.META_FAILED
+    out = capsys.readouterr().out
+    assert "repo details 0 read" in out and "2 not read" in out
+    assert "failed: repo details: none of the 2 repos" in out
+    assert "GitHub couldn't answer for octo/one, octo/two" in out
+
+    monkeypatch.setattr(warm, "warm_once", lambda svc, **kw: _result(warm.Result()))
+    assert warm.main(["--no-reports", "--no-starter", "--no-find", *seeds]) == 0
+
+
+async def _noop(*_a, **_k):
+    return None
+
+
+async def _result(result):
+    return result
+
+
+def test_the_details_pass_asks_github_as_background_work(h, monkeypatch):
+    gh = DetailsGitHub(fails={"huge/repo"})
+    details_lookup(h, monkeypatch, gh)
+    details_pass(h, ["huge/repo"])
+    # Two tries, as a warm report, not the four a person's check gets.
+    assert gh.queries == [["huge/repo"]] * github.BACKGROUND_ATTEMPTS
+    assert github.background.get() is False
+
+
+def test_a_pass_reads_details_for_at_most_its_time_and_leaves_the_rest_due(
+        h, monkeypatch, pauses, capsys, tmp_path):
+    gh = DetailsGitHub()
+    details_lookup(h, monkeypatch, gh)
+    h.svc.settings.meta_max_minutes = 10
+    real = gh.__class__.__call__
+
+    def slow(self, request):  # every details query takes five minutes
+        if request.method == "POST":
+            pauses.now += 300
+        return real(self, request)
+
+    monkeypatch.setattr(DetailsGitHub, "__call__", slow)
+    repos = [f"octo/r{i:02}" for i in range(github.DETAILS_BATCH * 5)]
+    lines: list[str] = []
+    result = details_pass(h, repos, say=lines.append)
+
+    assert result.meta_run == github.DETAILS_BATCH * 2 and result.meta_failed is None
+    assert result.meta_due == github.DETAILS_BATCH * 3
+    assert f"{github.DETAILS_BATCH * 3} still due" in result.summary()
+    assert any("10 minutes used (HOLT_META_MAX_MINUTES)" in line for line in lines)
+    assert set(meta_rows(h)) == set(repos[:github.DETAILS_BATCH * 2])
+
+    # Cut short by its time is not a failure: the run exits 0.
+    async def fake_warm_once(svc, **kw):
+        return result
+
+    class FakeServices:
+        def __init__(self, settings):
+            self.settings = settings
+            self.db = type("DB", (), {"migrate": _noop, "dispose": _noop})()
+            self.http = type("HTTP", (), {"close": lambda self: None})()
+
+    monkeypatch.setattr(warm, "warm_once", fake_warm_once)
+    monkeypatch.setattr("holt_server.services.Services", FakeServices)
+    (tmp_path / "seeds.txt").write_text("octo/r00\n", encoding="utf-8")
+    assert warm.main(["--no-reports", "--no-starter", "--no-find",
+                      "--seeds", str(tmp_path / "seeds.txt")]) == 0
+
+
+def test_details_are_read_missing_first_then_oldest(h, monkeypatch):
+    from holt_server import discover
+    from holt_server.db import RepoMeta
+    from sqlalchemy import null
+
+    async def go():
+        async with h.svc.db.session() as s:
+            for repo, days in (("octo/yesterday", 1), ("octo/last-week", 7), ("octo/old-shape", 2)):
+                s.add(RepoMeta(repo_key=repo, repo=repo, fetched_at=now() - timedelta(days=days),
+                               links=null() if repo == "octo/old-shape" else []))
+            await s.commit()
+        return await discover.stale_meta(h.svc, ["octo/yesterday", "octo/new", "octo/old-shape",
+                                                 "octo/last-week"])
+    assert h.client.portal.call(go) == ["octo/new", "octo/old-shape", "octo/last-week",
+                                        "octo/yesterday"]

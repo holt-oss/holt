@@ -60,9 +60,13 @@ README_PATHS = ("README.md", "README.rst", "readme.md")
 README_FIELDS = "".join(
     f'  readme{i}: object(expression: "HEAD:{path}") {{ ... on Blob {{ text }} }}\n'
     for i, path in enumerate(README_PATHS))
-# Repositories per details query. GitHub charges about one point for a query
-# of up to a hundred small lookups.
-DETAILS_BATCH = 100
+# Repositories per details query, about a point each. GitHub stops working on
+# a query after about ten seconds, and the fragment below (README text,
+# counts, release) takes about half a second a repository: from 1 Oct 2026 a
+# hundred came back with every repository null (RESOURCE_LIMITS_EXCEEDED),
+# fifty half empty, and twenty-five sometimes 502. Ten take about five seconds.
+# A query GitHub can't finish anyway is asked again in halves (`_details`).
+DETAILS_BATCH = 10
 DETAILS_FIELDS = """
   nameWithOwner description stargazerCount pushedAt isArchived isFork isPrivate
   primaryLanguage { name }
@@ -644,7 +648,8 @@ class GitHubLookup:
         """Description, language, stars, topics, last push and the rest of the
         report's "About" (repo_meta) for up to
         `DETAILS_BATCH` repositories, in one GraphQL query. Keyed by the
-        requested `owner/repo`; None for one that is missing or private."""
+        requested `owner/repo`; None for one that is missing or private. One
+        GitHub couldn't read, even asked for alone, is left out."""
         return await asyncio.to_thread(self._details_with_people, repos)
 
     def _details_with_people(self, repos: list[str]) -> dict[str, dict[str, Any] | None]:
@@ -795,12 +800,65 @@ class GitHubLookup:
                 for it in items if isinstance(it, dict) and it.get("full_name") and not it.get("private")]
 
     def _details(self, repos: list[str]) -> dict[str, dict[str, Any] | None]:
-        from holt.evidence.errors import RepoNotFound
-
         if len(repos) > DETAILS_BATCH:
             raise ValueError(f"at most {DETAILS_BATCH} repositories per query")
+        out: dict[str, dict[str, Any] | None] = {}
+        self._read_details(repos, out)
+        return out
+
+    def _read_details(self, repos: list[str], out: dict[str, dict[str, Any] | None]) -> None:
+        """Read `repos` into `out`. When GitHub can't finish the query (it
+        answers 502, or 200 with the repositories null and
+        RESOURCE_LIMITS_EXCEEDED), the ones it didn't answer are asked again
+        in smaller queries; one that fails alone is left out of `out`."""
+        from holt.evidence.errors import RepoNotFound, UpstreamError
+
         if not repos:
-            return {}
+            return
+        try:
+            data, errors = self._details_query(repos)
+        except (UpstreamError, RepoNotFound) as exc:
+            # Every repository came back null. With NOT_FOUND among the errors
+            # the engine calls that RepoNotFound, though the rest may only be
+            # unfinished; alone, it means what it says.
+            if len(repos) == 1:
+                if isinstance(exc, RepoNotFound):
+                    out[repos[0]] = None
+                else:
+                    log.warning("repository details: GitHub couldn't answer for %s (%s)",
+                                repos[0], exc.detail[:200])
+                return
+            half = (len(repos) + 1) // 2
+            self._read_details(repos[:half], out)
+            self._read_details(repos[half:], out)
+            return
+        # An alias with an error other than NOT_FOUND wasn't read, or was read
+        # in part (RESOURCE_LIMITS_EXCEEDED nulls fields too): never stored.
+        failed = {str(path[0]) for e in errors
+                  if e.get("type") != "NOT_FOUND" and (path := e.get("path"))}
+        unread = []
+        for i, repo in enumerate(repos):
+            if f"r{i}" in failed:
+                unread.append(repo)
+                continue
+            node = data.get(f"r{i}")
+            out[repo] = None if not node or node.get("isPrivate") else _details(node)
+        if not unread:
+            return
+        if len(repos) == 1:
+            log.warning("repository details: GitHub couldn't answer for %s (%s)", repos[0],
+                        "; ".join(str(e.get("message", "")) for e in errors)[:200])
+        elif len(unread) < len(repos):
+            self._read_details(unread, out)
+        else:
+            half = (len(unread) + 1) // 2
+            self._read_details(unread[:half], out)
+            self._read_details(unread[half:], out)
+
+    def _details_query(self, repos: list[str]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """One details query: its data, and the errors GitHub sent beside it."""
+        from holt.evidence.errors import RepoNotFound, UpstreamError
+
         params, parts, variables = [], [], {}
         for i, repo in enumerate(repos):
             owner, _, name = repo.partition("/")
@@ -815,19 +873,13 @@ class GitHubLookup:
         transport = self.pool.transport(self.http)
         try:
             data = transport.query(document, timeout=LOOKUP_TIMEOUT_S * 2, **variables)
-        except RepoNotFound:
-            data = {}  # every one of them is gone
-        except ApiError:
+        except (ApiError, UpstreamError, RepoNotFound):
             raise
         except Exception as exc:  # noqa: BLE001
             raise translate(exc, repos[0]) from exc
         finally:
             self.points_used += getattr(transport, "points_used", 0) or 0
-        out: dict[str, dict[str, Any] | None] = {}
-        for i, repo in enumerate(repos):
-            node = data.get(f"r{i}")
-            out[repo] = None if not node or node.get("isPrivate") else _details(node)
-        return out
+        return data, list(getattr(transport, "partial_errors", None) or [])
 
     async def remaining(self) -> int:
         """The fewest GraphQL points left on any working token (checking is free).
