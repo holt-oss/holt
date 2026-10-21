@@ -54,6 +54,7 @@ export type Tone = Report["tone"];
 export type ApiErrorCode = ApiError["code"];
 export type Credits = S.Credits;
 export type Pass = S.PassOffer;
+export type PassPrice = S.PassPrice;
 export type PassFeature = S.PassFeature;
 export type Passes = S.Passes;
 export type Checkout = S.Checkout;

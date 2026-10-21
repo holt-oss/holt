@@ -94,9 +94,10 @@ class Settings(BaseSettings):
     # Features, plans and passes (pricing.py). Empty: the packaged
     # holt_server/pricing.json, where no pass is on sale.
     pricing_file: str = Field("", alias="HOLT_PRICING_FILE")
-    # Pass checkout (payments.py). Off unless this is 1 AND the Razorpay keys
-    # are set: with it off, no pass is offered and no order can be created.
-    # Orders already paid for are still confirmed.
+    # Pass checkout (payments.py). Off unless this is 1 AND a processor is
+    # set up (Razorpay for INR, Dodo Payments for USD; either works without
+    # the other): with it off, no pass is offered and no order can be
+    # created. Orders already paid for are still confirmed.
     payments_enabled: bool = Field(False, alias="HOLT_PAYMENTS_ENABLED")
     # 1 puts every pass in the pricing file on sale, whatever its `on_sale`
     # says: for trying checkout on staging with Razorpay test keys. Ignored
@@ -106,6 +107,19 @@ class Settings(BaseSettings):
     razorpay_key_secret: str = Field("", alias="RAZORPAY_KEY_SECRET")
     # Set in the Razorpay dashboard with the webhook URL. Empty: webhooks refused.
     razorpay_webhook_secret: str = Field("", alias="RAZORPAY_WEBHOOK_SECRET")
+    # Dodo Payments, the merchant of record for USD (payments_dodo.py). USD
+    # is offered for a pass only with the key, the webhook secret (`whsec_…`,
+    # from the endpoint in Dodo's dashboard) and that pass's product id.
+    dodo_api_key: str = Field("", alias="DODO_API_KEY", repr=False)
+    # "test" or "live": which of Dodo's hosts the key belongs to. Anything
+    # else leaves Dodo off.
+    dodo_env: str = Field("test", alias="DODO_ENV")
+    dodo_webhook_secret: str = Field("", alias="DODO_WEBHOOK_SECRET", repr=False)
+    # The one-time product in Dodo's dashboard that each pass sells (`pdt_…`),
+    # priced in USD at the pass's `usd_cents`.
+    dodo_product_pro_1m: str = Field("", alias="DODO_PRODUCT_PRO_1M")
+    dodo_product_pro_3m: str = Field("", alias="DODO_PRODUCT_PRO_3M")
+    dodo_product_pro_12m: str = Field("", alias="DODO_PRODUCT_PRO_12M")
     # User ids (comma-separated) that may read /v1/admin/*. Empty: nobody.
     admin_users: str = Field("", alias="HOLT_ADMIN_USERS")
     # New work (jobs, starter-issue lookups) per hour.
@@ -182,6 +196,13 @@ class Settings(BaseSettings):
     def sell_every_pass(self) -> bool:
         """Whether HOLT_PASSES_ON_SALE applies here: never in production."""
         return self.passes_on_sale and self.env != "production"
+
+    @property
+    def dodo_products(self) -> dict[str, str]:
+        """Pass id -> Dodo product id, for the passes that have one."""
+        products = {"pro_1m": self.dodo_product_pro_1m, "pro_3m": self.dodo_product_pro_3m,
+                    "pro_12m": self.dodo_product_pro_12m}
+        return {pid: p.strip() for pid, p in products.items() if p.strip()}
 
     @property
     def token_list(self) -> list[str]:

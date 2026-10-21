@@ -1,13 +1,15 @@
 "use client";
 
-// One pass's buy button: start an order on the server, take the payment in
-// Razorpay Checkout, hand what Checkout returns back to the server, then show
-// the thank-you page. Nothing here starts Pro: the server checks Razorpay's
-// signature and asks Razorpay about the payment first. With payments off the
-// server refuses the order and the page never renders this button.
+// One pass's buy button: start an order on the server, then take the payment.
+// In rupees: in Razorpay Checkout, handing what it returns back to the server
+// before the thank-you page. In dollars: on Dodo Payments' own checkout page,
+// which sends the buyer back to the thank-you page. Nothing here starts Pro:
+// the server checks with the processor first. With payments off the server
+// refuses the order and the page never renders this button.
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Currency } from "@/lib/payments";
 import type { ApiError, Checkout, OrderConfirmed, RazorpaySuccess } from "@/lib/types";
 
 type Phase =
@@ -67,6 +69,8 @@ export async function post<T>(url: string, body: unknown): Promise<{ ok: true; d
 
 export interface BuyPassProps {
   pass: string;
+  /** INR pays in Razorpay Checkout on this page; USD goes to Dodo Payments' checkout. */
+  currency: Currency;
   label: string;
   signedIn: boolean;
   prefill?: { name?: string | null; email?: string | null };
@@ -75,7 +79,7 @@ export interface BuyPassProps {
   primary?: boolean;
 }
 
-export function BuyPass({ pass, label, signedIn, prefill, autoStart, primary }: BuyPassProps) {
+export function BuyPass({ pass, currency, label, signedIn, prefill, autoStart, primary }: BuyPassProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ t: "idle" });
   const started = useRef(false);
@@ -98,12 +102,20 @@ export function BuyPass({ pass, label, signedIn, prefill, autoStart, primary }: 
 
   const start = useCallback(async () => {
     setPhase({ t: "starting" });
-    const r = await post<Checkout>("/api/orders", { pass });
+    const r = await post<Checkout>("/api/orders", { pass, currency });
     if (!r.ok) {
       setPhase({ t: "failed", message: r.message });
       return;
     }
     const order = r.data;
+    if (order.provider === "dodo") {
+      if (!order.checkout_url?.startsWith("https://")) {
+        setPhase({ t: "failed", message: "That didn't work. Try again in a minute." });
+        return;
+      }
+      window.location.assign(order.checkout_url);
+      return;
+    }
     try {
       await loadRazorpay();
     } catch {
@@ -127,7 +139,17 @@ export function BuyPass({ pass, label, signedIn, prefill, autoStart, primary }: 
     // Checkout shows the failure itself and lets them retry; this is for after it closes.
     rzp.on("payment.failed", (e) => setPhase({ t: "failed", message: e.error?.description || "The payment didn't go through. You haven't been charged." }));
     rzp.open();
-  }, [pass, prefill, confirm]);
+  }, [pass, currency, prefill, confirm]);
+
+  // Back from Dodo's page without paying: the browser may show this page as
+  // it was left, still "opening checkout…".
+  useEffect(() => {
+    const back = (e: PageTransitionEvent) => {
+      if (e.persisted) setPhase((p) => (p.t === "starting" ? { t: "idle" } : p));
+    };
+    window.addEventListener("pageshow", back);
+    return () => window.removeEventListener("pageshow", back);
+  }, []);
 
   useEffect(() => {
     if (autoStart && signedIn && !started.current) {
@@ -139,7 +161,7 @@ export function BuyPass({ pass, label, signedIn, prefill, autoStart, primary }: 
   const cls = `${primary ? "btn-primary" : "btn-ghost"} mt-6 w-full`;
   if (!signedIn) {
     return (
-      <Link href={`/signin?callbackUrl=${encodeURIComponent(`/pricing?buy=${pass}`)}`} className={cls}>
+      <Link href={`/signin?callbackUrl=${encodeURIComponent(`/pricing?buy=${pass}&currency=${currency.toLowerCase()}`)}`} className={cls}>
         sign in to buy →
       </Link>
     );

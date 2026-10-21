@@ -124,7 +124,7 @@ find "$STATE" -maxdepth 1 -type d -name 'run.*' -mmin +1440 -exec rm -rf {} + 2>
 main_sha="" preview_sha="" fingerprint=""
 
 # The policy pages' contact details, the staging sign-in keys, the paid
-# features key, the Razorpay test keys, Resend's key and the smoke run's
+# features key, the Razorpay and Dodo test keys, Resend's key and the smoke run's
 # Cloudflare Access token come from ~/.config/holt/secrets.env, the file
 # production reads; only the keys named in this script are taken from it.
 SECRETS="${HOLT_SECRETS_FILE:-$HOME/.config/holt/secrets.env}"
@@ -570,31 +570,68 @@ ai_settings() {
 }
 ai_settings
 
-# Pass checkout on staging: Razorpay TEST mode, every pass on sale
-# (HOLT_PASSES_ON_SALE; production ignores that switch and its compose never
-# sets it). On only when RAZORPAY_KEY_ID in $SECRETS is a test key
+# Pass checkout on staging: Razorpay TEST mode (INR) and Dodo Payments TEST
+# mode (USD), every pass on sale (HOLT_PASSES_ON_SALE; production ignores
+# that switch and its compose never sets it). Each is on by itself.
+#
+# Razorpay: only when RAZORPAY_KEY_ID in $SECRETS is a test key
 # (rzp_test_...) and RAZORPAY_KEY_SECRET is set: a live key is refused, so
 # staging can never take real money. STAGING_RAZORPAY_WEBHOOK_SECRET is
-# optional (the Checkout callback gives the pass without a webhook). Always
-# exported, empty when off, so nothing in .env can turn checkout on instead.
+# optional (the Checkout callback gives the pass without a webhook).
+#
+# Dodo: only when $SECRETS has DODO_API_KEY with DODO_ENV=test (or no
+# DODO_ENV), STAGING_DODO_WEBHOOK_SECRET and at least one DODO_PRODUCT_PRO_*.
+# DODO_ENV=live is refused, and compose.yml fixes the server on Dodo's test
+# host, where a live key doesn't work. Dodo's webhook can't get through
+# Cloudflare Access either: the buyer's return gives the pass.
+#
+# Always exported, empty when off, so nothing in .env can turn checkout on
+# instead.
 payment_settings() {
+    local razorpay=0 dodo=0 dodo_env
     RAZORPAY_KEY_ID="$(secret RAZORPAY_KEY_ID)"
     RAZORPAY_KEY_SECRET="$(secret RAZORPAY_KEY_SECRET)"
     RAZORPAY_WEBHOOK_SECRET="$(secret STAGING_RAZORPAY_WEBHOOK_SECRET)"
-    HOLT_PAYMENTS_ENABLED=0 HOLT_PASSES_ON_SALE=0
     if [[ -z "$RAZORPAY_KEY_ID" || -z "$RAZORPAY_KEY_SECRET" ]]; then
         log "passes: off (no RAZORPAY_KEY_ID/SECRET in $SECRETS)"
     elif [[ "$RAZORPAY_KEY_ID" != rzp_test_* ]]; then
         log "passes: off (RAZORPAY_KEY_ID is not a test key; staging only takes rzp_test_ keys)"
     else
-        HOLT_PAYMENTS_ENABLED=1 HOLT_PASSES_ON_SALE=1
+        razorpay=1
         log "passes: on sale (Razorpay test mode)"
     fi
-    if (( ! HOLT_PAYMENTS_ENABLED )); then
+    if (( ! razorpay )); then
         RAZORPAY_KEY_ID="" RAZORPAY_KEY_SECRET="" RAZORPAY_WEBHOOK_SECRET=""
     fi
+
+    DODO_API_KEY="$(secret DODO_API_KEY)"
+    DODO_WEBHOOK_SECRET="$(secret STAGING_DODO_WEBHOOK_SECRET)"
+    DODO_PRODUCT_PRO_1M="$(secret DODO_PRODUCT_PRO_1M)"
+    DODO_PRODUCT_PRO_3M="$(secret DODO_PRODUCT_PRO_3M)"
+    DODO_PRODUCT_PRO_12M="$(secret DODO_PRODUCT_PRO_12M)"
+    dodo_env="$(secret DODO_ENV)"
+    if [[ -z "$DODO_API_KEY" ]]; then
+        log "passes in USD: off (no DODO_API_KEY in $SECRETS)"
+    elif [[ -n "$dodo_env" && "${dodo_env,,}" != test ]]; then
+        log "passes in USD: off (DODO_ENV is not test; staging only takes Dodo's test mode)"
+    elif [[ -z "$DODO_WEBHOOK_SECRET" ]]; then
+        log "passes in USD: off (no STAGING_DODO_WEBHOOK_SECRET in $SECRETS)"
+    elif [[ -z "$DODO_PRODUCT_PRO_1M$DODO_PRODUCT_PRO_3M$DODO_PRODUCT_PRO_12M" ]]; then
+        log "passes in USD: off (no DODO_PRODUCT_PRO_* in $SECRETS)"
+    else
+        dodo=1
+        log "passes in USD: on sale (Dodo test mode)"
+    fi
+    if (( ! dodo )); then
+        DODO_API_KEY="" DODO_WEBHOOK_SECRET=""
+        DODO_PRODUCT_PRO_1M="" DODO_PRODUCT_PRO_3M="" DODO_PRODUCT_PRO_12M=""
+    fi
+
+    HOLT_PAYMENTS_ENABLED=$(( razorpay || dodo )) HOLT_PASSES_ON_SALE=$(( razorpay || dodo ))
     export HOLT_PAYMENTS_ENABLED HOLT_PASSES_ON_SALE \
-        RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET
+        RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET \
+        DODO_API_KEY DODO_WEBHOOK_SECRET \
+        DODO_PRODUCT_PRO_1M DODO_PRODUCT_PRO_3M DODO_PRODUCT_PRO_12M
 }
 payment_settings
 
