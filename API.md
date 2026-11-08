@@ -12,6 +12,9 @@ handlers, server components) — a BFF. So:
   request that needs rate limiting (new analyses, find, starter issues) without
   it gets 400 `invalid_request`; the server never falls back to the BFF's own
   address.
+- Requests from the web's MCP connector (see "MCP") also carry
+  `X-Holt-Client: mcp`. Without `X-Holt-User`, they draw on the MCP buckets
+  (see Rate limits) and need no `X-Holt-Client-Ip`. Other values are ignored.
 - Base URL for web: env `HOLT_API_URL` (e.g. `http://127.0.0.1:$PORT`).
 
 Users, sessions and OAuth (GitHub + Google) live in `web/` (Auth.js). The
@@ -53,6 +56,13 @@ signed in:
   (anonymous: 10/h). Cached answers, and joining a running job, are free.
 - **read** — cache misses on reads (`/starter-issues`, `/repos/search`). Generous (anonymous:
   120/h). Viewing, reloading and sharing report pages can never use up work.
+
+The MCP connector (`X-Holt-Client: mcp`, anonymous) has one bucket of each
+kind for all its traffic, whatever the address, apart from the per-IP
+buckets: `HOLT_MCP_WORK_PER_HOUR` (default 60) and `HOLT_MCP_READ_PER_HOUR`
+(default 600). It also gets `rate_limited` for new work while the GitHub
+tokens have fewer points left than the warm pass's floor
+(`HOLT_WARM_MIN_POINTS`), so chats never use up what people on the site need.
 
 `GET /v1/reports/…` reads only the cache and is not rate limited.
 `POST /v1/feedback` has a small bucket of its own (see Feedback), and so do
@@ -1600,3 +1610,48 @@ Both routes:
   other read-only clients simple; the data is public.
 - Normalise `{owner}/{repo}` as in "Repo identifiers"; reject anything else
   with `400 invalid_repo`.
+
+## MCP (implemented by `web/`)
+
+`POST /mcp` on the public host is a remote MCP server for Claude's custom
+connectors and ChatGPT's (user guide: `docs/MCP.md`). Streamable HTTP,
+stateless (no session id), JSON responses; `GET` and `DELETE` answer `405`.
+No auth in v1: every tool reads public data, the same for every caller, so
+OAuth can go in front later without renaming a tool. CORS is open, as for
+the public proxy. Built on `@modelcontextprotocol/sdk`
+(`web/src/lib/mcp-server.ts`, logic in `web/src/lib/mcp.ts`).
+
+It calls the server like any anonymous request, with `X-Holt-Client: mcp`
+(see Rate limits) and the caller's IP, always `mode: "rules"`, `days: 7`.
+It returns what the signed-out teaser and the extension already show:
+`headline`, `verdict_line`, `odds.text` and counts from `stats`, plus the
+report link. Never evidence, `about`, AI text or anything paid.
+
+Tools (each answers `structuredContent` matching its `outputSchema`, plus a
+short text):
+
+- `check_repo({repo})` — `repo` is `owner/name` or a GitHub URL. Reads `GET
+  /v1/reports/…`; with no report, or an `outdated` one, it `POST`s
+  `/v1/analyses` and polls `GET /v1/analyses/{job_id}` for up to 25 s.
+  Answers one row: `{repo, status, verdict, reason, odds, numbers,
+  checked_at, link, note}`. `status`: `checked`, `outdated` (the old
+  verdict while a fresh check runs or can't start), `checking` (call again),
+  `busy` (`rate_limited` from the server: no new checks from chats now),
+  `not_found`, `invalid`, `error`. `numbers`: `outside_prs`,
+  `outside_prs_merged`, `merged_percent`, `typical_first_reply` ("14 hours")
+  and `typical_first_reply_hours`, `no_reply`, `first_timers_merged`,
+  `closed_without_a_word`, `last_outside_merge`. `link` is
+  `https://githolt.com/{owner}/{repo}`.
+- `compare_repos({repos})` — 1 to 30 repos. Every cached report at once; at
+  most 5 new (or outdated) checks started per call, waited on together for
+  up to 20 s; the rest are `not_checked`. Once the server answers
+  `rate_limited`, nothing more is started and the rest are `busy`. Answers
+  `{repos: [row], call_again: [repo]}`, best first: by verdict (Worth your
+  time, Long shot, Not enough evidence, Not worth your time, Personal
+  project, A list, not code), then as Discover's `welcoming` board ranks
+  (odds, the merged share pulled toward a typical one, the reply time, how
+  many outsiders tried); rows without a verdict last, in the order asked.
+  `call_again` is what to send next time.
+- `starter_issues({repo, limit})` — `limit` 1–20, default 5. Proxies `GET
+  /v1/repos/{owner}/{repo}/starter-issues` → `{repo, status, issues:
+  [{number, title, url, labels, on_it, why, next_step}], link, note}`.

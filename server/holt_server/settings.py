@@ -115,6 +115,12 @@ class Settings(BaseSettings):
     # so viewing and reloading report pages never uses up the work bucket above.
     anon_read_rate_per_hour: int = Field(120, alias="HOLT_ANON_READ_RATE_PER_HOUR")
     user_read_rate_per_hour: int = Field(600, alias="HOLT_USER_READ_RATE_PER_HOUR")
+    # Holt's MCP connector (web/src/app/mcp): chats reach it from a handful of
+    # Anthropic and OpenAI addresses, so per-IP limits mean little there. All
+    # of its traffic shares one bucket of each kind, apart from the site's.
+    # 0 = no limit.
+    mcp_work_per_hour: int = Field(60, ge=0, alias="HOLT_MCP_WORK_PER_HOUR")
+    mcp_read_per_hour: int = Field(600, ge=0, alias="HOLT_MCP_READ_PER_HOUR")
     # How long starter issues for a repository are served from the cache.
     starter_cache_hours: float = Field(1, alias="HOLT_STARTER_CACHE_HOURS")
     # Rules checks queued by public badge requests: per client IP, and in total.

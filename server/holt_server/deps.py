@@ -28,18 +28,39 @@ async def internal(
         raise ApiError("unauthorized", "This API is only for the Holt website.")
 
 
+# `X-Holt-Client` values the server knows. Anything else is ignored.
+MCP = "mcp"
+
+
 class Caller:
-    def __init__(self, user_id: str | None, ip: str | None) -> None:
+    def __init__(self, user_id: str | None, ip: str | None, client: str | None = None) -> None:
         self.user_id = user_id
         self.ip = ip
+        # "mcp": an anonymous request from the web's MCP connector. Its limits
+        # are one bucket for every chat, not per IP (see `rate_key`).
+        self.client = client if client == MCP and not user_id else None
+
+    @property
+    def mcp(self) -> bool:
+        return self.client == MCP
 
     @property
     def rate_key(self) -> str:
-        return f"user:{self.user_id}" if self.user_id else f"ip:{self.ip}"
+        if self.user_id:
+            return f"user:{self.user_id}"
+        return "mcp" if self.mcp else f"ip:{self.ip}"
 
     def limit(self, svc: Services) -> int:
         s = svc.settings
-        return s.user_rate_per_hour if self.user_id else s.anon_rate_per_hour
+        if self.user_id:
+            return s.user_rate_per_hour
+        return s.mcp_work_per_hour if self.mcp else s.anon_rate_per_hour
+
+    def read_limit(self, svc: Services) -> int:
+        s = svc.settings
+        if self.user_id:
+            return s.user_read_rate_per_hour
+        return s.mcp_read_per_hour if self.mcp else s.anon_read_rate_per_hour
 
 
 async def caller(
@@ -47,12 +68,13 @@ async def caller(
     _: None = Depends(internal),
     x_holt_user: str | None = Header(default=None),
     x_holt_client_ip: str | None = Header(default=None),
+    x_holt_client: str | None = Header(default=None),
 ) -> Caller:
     user_id = (x_holt_user or "").strip()[:200] or None
     # No fallback to the socket address: that is the BFF's, and every anonymous
     # visitor would share one bucket.
     ip = (x_holt_client_ip or "").strip()[:64] or None
-    return Caller(user_id, ip)
+    return Caller(user_id, ip, (x_holt_client or "").strip().lower() or None)
 
 
 def signed_in(who: Caller) -> str:

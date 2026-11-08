@@ -69,16 +69,22 @@ router = APIRouter(prefix="/v1", responses={"default": {"model": schema.ErrorBod
 
 def rate_limit(svc: Services, who: Caller, bucket: str = "work") -> None:
     """Count one request. `work` is new analyses and find; `read` is cache
-    misses on reads. Separate counters: reading never uses up work."""
-    if not who.user_id and not who.ip:
+    misses on reads. Separate counters: reading never uses up work. The MCP
+    connector's requests share one bucket of each (`Caller.rate_key`)."""
+    if not who.user_id and not who.ip and not who.mcp:
         raise ApiError("invalid_request",
                        "Anonymous requests must say who is asking (X-Holt-Client-Ip).")
     if bucket == "read":
-        s = svc.settings
-        limit = s.user_read_rate_per_hour if who.user_id else s.anon_read_rate_per_hour
-        svc.read_limiter.hit(who.rate_key, limit)
-    else:
-        svc.limiter.hit(who.rate_key, who.limit(svc))
+        svc.read_limiter.hit(who.rate_key, who.read_limit(svc))
+        return
+    if who.mcp:
+        # Chats come second to people on the site: below the warm pass's
+        # floor of GitHub points, the connector starts nothing new.
+        left = svc.pool.points_left()
+        if left is not None and left < svc.settings.warm_min_points:
+            raise ApiError("rate_limited", "Holt is busy right now. Try again later.",
+                           retry_after=600)
+    svc.limiter.hit(who.rate_key, who.limit(svc))
 
 
 # --- account ------------------------------------------------------------------
@@ -393,10 +399,11 @@ async def create_analysis(body: AnalysisIn, request: Request,
         raise ApiError("ai_unavailable", "AI reports aren't switched on yet. "
                        "The free quick report has the full verdict and evidence.")
 
-    rate_limit(svc, who)
-
+    # Joining a check that is already running is free (API.md, "Rate limits").
     if existing := await join_active(svc, key, body.mode, body.days):
         return queued(existing.id)
+
+    rate_limit(svc, who)
 
     canonical = await svc.canonical(repo)
     job = Job(kind="analysis", repo=canonical, repo_key=key, mode=body.mode,

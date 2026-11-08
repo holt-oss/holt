@@ -294,6 +294,7 @@ export function Footer({ signedIn = false }: { signedIn?: boolean }) {
             <FLink href={GITHUB_REPO_URL} {...react("adoring")}>holt-oss/holt</FLink>
             <FLink href={`${GITHUB_REPO_URL}/blob/main/CONTRIBUTING.md`} {...react("adoring")}>Contributing</FLink>
             <FLink href={`${GITHUB_REPO_URL}/blob/main/docs/USAGE.md`} {...react("adoring")}>The CLI</FLink>
+            <FLink href={`${GITHUB_REPO_URL}/blob/main/docs/MCP.md`} {...react("adoring")}>In Claude &amp; ChatGPT</FLink>
           </Group>
           <Group title="Legal">
             {LEGAL_PAGES.map((p) => (

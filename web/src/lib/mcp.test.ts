@@ -1,0 +1,362 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { CHECK_WAIT_MS, checkRepo, COMPARE_STARTS, COMPARE_WAIT_MS, compareRepos, mergedShare, type McpDeps, starterIssues } from "./mcp.ts";
+import { mcpServer } from "./mcp-server.ts";
+import type { AnalysisStart, ApiError, JobStatus, Report, Result, StarterIssue, Stats, Verdict } from "./types.ts";
+
+const SITE = "https://githolt.com";
+
+const HEADLINE: Record<Verdict, string> = {
+  viable: "Worth your time",
+  long_shot: "Long shot",
+  not_viable: "Not worth your time",
+  insufficient_evidence: "Not enough evidence",
+  personal: "Personal project",
+  catalogue: "A list, not code",
+};
+
+function stats(over: Partial<Stats> = {}): Stats {
+  return {
+    outsider_attempts: 100, outsider_merged: 20, distinct_outsiders: 70, first_time_merged_authors: 9, no_reply: 10,
+    median_first_response_hours: 14, bot_share: 0, still_open: 5, closed_silently: 3, closed_by_bot: 0, withdrawn: 1, too_old: 0,
+    timing: null, ...over,
+  };
+}
+
+function report(repo: string, verdict: Verdict = "viable", o: { stats?: Partial<Stats>; odds?: "good" | "fair" | "long" | null; outdated?: boolean } = {}): Report {
+  const odds = o.odds === undefined ? (verdict === "viable" ? "good" : null) : o.odds;
+  return {
+    repo, mode: "rules", days: 7, verdict, headline: HEADLINE[verdict], tone: "good",
+    verdict_line: `Reason for ${repo}.`, numbers_line: "numbers", first_timer_line: null, next_step: "next",
+    stat_line: null, counted: [], how_long: [],
+    odds: odds ? { level: odds, tone: "good", text: `${odds} odds` } : null,
+    bottom_line: null, summary: null, stats: stats(o.stats), decided_by: [], rule_codes: [], unknowns: [], landing: [], never_landed: [],
+    evidence: [{ id: "pr:x#1:opened", url: "https://github.com/x/1", kind: "onboarding", value: "substantive", text: "secret evidence", quote: null }],
+    evidence_until: null, generated_at: "2026-11-01T00:00:00Z", sample: null, asks: [], budget_independent: true, cost: null,
+    holt_users: null, about: null, outdated: o.outdated ?? false,
+  } as unknown as Report;
+}
+
+const err = (status: number, code: string, message = "nope"): Result<never> => ({ ok: false, status, error: { code, message } as ApiError });
+
+interface Fake {
+  deps: McpDeps;
+  started: string[];
+  slept: number;
+}
+
+/**
+ * A mocked server and clock. `cached`: what GET /v1/reports answers. `start`:
+ * what POST /v1/analyses answers (default: queue a job). `polls`: how many
+ * polls a job takes to finish (Infinity: never), and the report it ends with.
+ */
+function fake(o: {
+  cached?: Record<string, Report>;
+  start?: (repo: string) => Result<AnalysisStart>;
+  polls?: (repo: string) => number;
+  done?: (repo: string) => Report | { error: ApiError };
+  issues?: (repo: string, limit: number) => Result<{ repo: string; issues: StarterIssue[] }>;
+} = {}): Fake {
+  let t = 1_000_000;
+  const jobs = new Map<string, { repo: string; polls: number }>();
+  const f: Fake = {
+    started: [],
+    slept: 0,
+    deps: {
+      siteUrl: SITE,
+      now: () => t,
+      sleep: async (ms) => {
+        t += ms;
+        f.slept += ms;
+      },
+      getReport: async (repo) => {
+        const r = o.cached?.[repo.toLowerCase()];
+        return r ? { ok: true, data: r } : err(404, "not_found");
+      },
+      startAnalysis: async (repo) => {
+        f.started.push(repo);
+        if (o.start) return o.start(repo);
+        const id = `job_${jobs.size}`;
+        jobs.set(id, { repo, polls: 0 });
+        return { ok: true, data: { status: "queued", job_id: id } };
+      },
+      jobStatus: async (id): Promise<Result<JobStatus>> => {
+        const j = jobs.get(id);
+        if (!j) return err(404, "not_found");
+        j.polls++;
+        if (j.polls < (o.polls?.(j.repo) ?? 2)) return { ok: true, data: { status: "running", stage: "Reading pull requests", progress: 0.4, report: null, error: null } };
+        const end = o.done?.(j.repo) ?? report(j.repo);
+        if ("error" in end) return { ok: true, data: { status: "error", stage: null, progress: 1, report: null, error: end.error } };
+        return { ok: true, data: { status: "done", stage: "Done", progress: 1, report: end, error: null } };
+      },
+      starterIssues: async (repo, limit) => (o.issues ? o.issues(repo, limit) : err(404, "not_found")),
+    },
+  };
+  return f;
+}
+
+// --- check_repo ---------------------------------------------------------------------
+
+test("check_repo: a cached report answers at once, with no new check", async () => {
+  const f = fake({ cached: { "pallets/flask": report("pallets/flask", "viable", { stats: { timing: { last_outside_merge: "2026-10-30" } as Stats["timing"] } }) } });
+  const a = await checkRepo(f.deps, { repo: "https://github.com/pallets/flask/pulls" });
+  assert.equal(a.isError, false);
+  assert.deepEqual(f.started, []);
+  const r = a.structured;
+  assert.equal(r.status, "checked");
+  assert.equal(r.verdict, "Worth your time");
+  assert.equal(r.reason, "Reason for pallets/flask.");
+  assert.equal(r.odds, "good odds");
+  assert.equal(r.link, "https://githolt.com/pallets/flask");
+  assert.deepEqual(r.numbers, {
+    outside_prs: 100, outside_prs_merged: 20, merged_percent: 20, typical_first_reply: "14 hours", typical_first_reply_hours: 14,
+    no_reply: 10, first_timers_merged: 9, closed_without_a_word: 3, last_outside_merge: "2026-10-30",
+  });
+  // Nothing from the full report: no evidence in the answer.
+  assert.doesNotMatch(JSON.stringify(a), /secret evidence/);
+  assert.match(a.text, /^pallets\/flask: Worth your time\./);
+  assert.match(a.text, /20 of 100 outside pull requests merged \(20%\)/);
+  assert.match(a.text, /https:\/\/githolt\.com\/pallets\/flask$/);
+});
+
+test("check_repo: a cold repo is checked, and the answer waits for it", async () => {
+  const f = fake({ polls: () => 3 });
+  const a = await checkRepo(f.deps, { repo: "octo/cold" });
+  assert.deepEqual(f.started, ["octo/cold"]);
+  assert.equal(a.structured.status, "checked");
+  assert.equal(a.structured.verdict, "Worth your time");
+  assert.ok(f.slept < CHECK_WAIT_MS);
+});
+
+test("check_repo: a check still running after the wait says to call again", async () => {
+  const f = fake({ polls: () => Infinity });
+  const a = await checkRepo(f.deps, { repo: "octo/slow" });
+  assert.equal(a.isError, false);
+  assert.equal(a.structured.status, "checking");
+  assert.equal(a.structured.verdict, null);
+  assert.match(a.structured.note ?? "", /call again/i);
+  assert.equal(a.structured.link, "https://githolt.com/octo/slow");
+  // Bounded: never past the wait.
+  assert.ok(f.slept <= CHECK_WAIT_MS, `slept ${f.slept}`);
+  assert.ok(f.slept >= CHECK_WAIT_MS - 2_000);
+});
+
+test("check_repo: over the MCP budget is 'busy' with the link, not an error dump", async () => {
+  const f = fake({ start: () => err(429, "rate_limited", "You've checked a lot of repositories in the last hour. Please wait a bit, or sign in for a higher limit.") });
+  const a = await checkRepo(f.deps, { repo: "octo/cold" });
+  assert.equal(a.isError, false);
+  assert.equal(a.structured.status, "busy");
+  assert.match(a.structured.note ?? "", /Holt is busy/);
+  // The server's own words (meant for the site) don't leak through.
+  assert.doesNotMatch(a.text, /sign in/i);
+  assert.match(a.text, /https:\/\/githolt\.com\/octo\/cold/);
+});
+
+test("check_repo: a bad repo name is refused without calling the server", async () => {
+  const f = fake();
+  for (const repo of ["not a repo", "", "https://example.com/x", "octo/.."]) {
+    const a = await checkRepo(f.deps, { repo });
+    assert.equal(a.isError, true, repo);
+    assert.equal(a.structured.status, "invalid");
+    assert.match(a.text, /owner\/name/);
+  }
+  assert.deepEqual(f.started, []);
+});
+
+test("check_repo: a repo GitHub doesn't have is an answer, not a failure", async () => {
+  const f = fake({ start: () => err(404, "not_found") });
+  const a = await checkRepo(f.deps, { repo: "octo/missing" });
+  assert.equal(a.isError, false);
+  assert.equal(a.structured.status, "not_found");
+});
+
+test("check_repo: a check that fails on GitHub's side is an error with a plain message", async () => {
+  const f = fake({ done: () => ({ error: { code: "upstream", message: "GitHub didn't answer in time." } as ApiError }) });
+  const a = await checkRepo(f.deps, { repo: "octo/flaky" });
+  assert.equal(a.isError, true);
+  assert.equal(a.structured.status, "error");
+  assert.equal(a.structured.note, "GitHub didn't answer in time.");
+});
+
+test("check_repo: an outdated report starts a fresh check and shows the old verdict meanwhile", async () => {
+  const f = fake({ cached: { "octo/old": report("octo/old", "long_shot", { outdated: true }) }, polls: () => Infinity });
+  const a = await checkRepo(f.deps, { repo: "octo/old" });
+  assert.deepEqual(f.started, ["octo/old"]);
+  assert.equal(a.structured.status, "outdated");
+  assert.equal(a.structured.verdict, "Long shot");
+  assert.match(a.text, /older version of Holt/);
+});
+
+test("check_repo: an outdated report whose fresh check finishes in time shows the new verdict", async () => {
+  const f = fake({ cached: { "octo/old": report("octo/old", "long_shot", { outdated: true }) }, done: (r) => report(r, "viable") });
+  const a = await checkRepo(f.deps, { repo: "octo/old" });
+  assert.equal(a.structured.status, "checked");
+  assert.equal(a.structured.verdict, "Worth your time");
+});
+
+// --- compare_repos ------------------------------------------------------------------
+
+test("compare_repos: 30 repos in mixed states, best first, a few new checks per call", async () => {
+  const cached: Record<string, Report> = {};
+  const add = (r: Report) => (cached[r.repo.toLowerCase()] = r);
+  add(report("a/viable-fair", "viable", { odds: "fair", stats: { outsider_merged: 60 } }));
+  add(report("a/viable-good-small", "viable", { odds: "good", stats: { outsider_attempts: 8, outsider_merged: 6 } }));
+  add(report("a/viable-good-big", "viable", { odds: "good", stats: { outsider_attempts: 105, outsider_merged: 60 } }));
+  add(report("a/long", "long_shot", { odds: "long" }));
+  add(report("a/not", "not_viable"));
+  add(report("a/thin", "insufficient_evidence"));
+  add(report("a/mine", "personal"));
+  add(report("a/list", "catalogue"));
+  add(report("a/outdated", "long_shot", { outdated: true }));
+  const repos = [
+    "a/list", "a/mine", "a/not", "a/thin", "a/long", "a/viable-fair", "a/viable-good-small", "a/viable-good-big",
+    "a/outdated", "not a repo", "A/Viable-Fair",
+    // Cold: the first COMPARE_STARTS get checks, one never finishes, one doesn't exist.
+    ...Array.from({ length: 19 }, (_, i) => `cold/r${i}`),
+  ];
+  assert.equal(repos.length, 30);
+  const f = fake({
+    cached,
+    polls: (r) => (r === "cold/r2" ? Infinity : 2),
+    start: undefined,
+    done: (r) => report(r, "long_shot", { odds: "fair" }),
+  });
+  const realStart = f.deps.startAnalysis;
+  f.deps.startAnalysis = async (r) => (r === "cold/r3" ? (f.started.push(r), err(404, "not_found")) : realStart(r));
+
+  const a = await compareRepos(f.deps, { repos });
+  const rows = a.structured.repos;
+  // One row per distinct repo (the duplicate in other casing is dropped), the invalid one included.
+  assert.equal(rows.length, 29);
+  // At most COMPARE_STARTS new checks; the outdated one counted among them.
+  assert.equal(f.started.length, COMPARE_STARTS);
+  assert.deepEqual(f.started, ["a/outdated", "cold/r0", "cold/r1", "cold/r2", "cold/r3"]);
+  assert.ok(f.slept <= COMPARE_WAIT_MS);
+
+  const order = rows.map((r) => r.repo);
+  // Verdict first; among "Worth your time", the odds, then the merged share
+  // with a small sample pulled toward typical (60 of 105 beats 6 of 8).
+  assert.deepEqual(order.slice(0, 3), ["a/viable-good-big", "a/viable-good-small", "a/viable-fair"]);
+  assert.ok(mergedShare({ outsider_merged: 60, outsider_attempts: 105 }) > mergedShare({ outsider_merged: 6, outsider_attempts: 8 }));
+  // Then the long shots: fair odds (the finished cold checks) before long.
+  const verdicts = rows.filter((r) => r.verdict).map((r) => r.verdict);
+  const rank = ["Worth your time", "Long shot", "Not enough evidence", "Not worth your time", "Personal project", "A list, not code"];
+  assert.deepEqual([...verdicts].sort((x, y) => rank.indexOf(x!) - rank.indexOf(y!)), verdicts);
+  assert.equal(rows.find((r) => r.repo === "a/outdated")!.status, "checked"); // its refresh finished
+  assert.equal(rows.find((r) => r.repo === "cold/r0")!.status, "checked");
+  assert.equal(rows.find((r) => r.repo === "cold/r2")!.status, "checking");
+  assert.equal(rows.find((r) => r.repo === "cold/r3")!.status, "not_found");
+  assert.equal(rows.find((r) => r.repo === "cold/r4")!.status, "not_checked");
+  // Without a verdict, after every verdict; the invalid entry last.
+  const firstEmpty = rows.findIndex((r) => !r.verdict);
+  assert.ok(rows.slice(firstEmpty).every((r) => !r.verdict));
+  assert.equal(rows.at(-1)!.status, "invalid");
+  // What to ask again for: the running one and those not started.
+  assert.deepEqual(a.structured.call_again, ["cold/r2", ...Array.from({ length: 15 }, (_, i) => `cold/r${i + 4}`)]);
+  assert.match(a.text, /^1\. a\/viable-good-big: Worth your time\./);
+  assert.match(a.text, /Call compare_repos again in a minute with: cold\/r2, cold\/r4/);
+  assert.doesNotMatch(JSON.stringify(a), /secret evidence/);
+});
+
+test("compare_repos: once the budget is used up, nothing more is started and the rest are 'busy'", async () => {
+  const f = fake({ cached: { "a/old": report("a/old", "viable", { outdated: true }) }, start: () => err(429, "rate_limited") });
+  const a = await compareRepos(f.deps, { repos: ["c/one", "c/two", "a/old", "c/three"] });
+  assert.deepEqual(f.started, ["c/one"]);
+  const by = Object.fromEntries(a.structured.repos.map((r) => [r.repo, r]));
+  assert.equal(by["c/one"].status, "busy");
+  assert.equal(by["c/three"].status, "busy");
+  // An outdated report is still worth showing, marked as such.
+  assert.equal(by["a/old"].status, "outdated");
+  assert.equal(by["a/old"].verdict, "Worth your time");
+  assert.equal(a.structured.repos[0].repo, "a/old");
+  assert.deepEqual(a.structured.call_again, []);
+});
+
+test("compare_repos: all cached is all at once", async () => {
+  const f = fake({ cached: { "a/b": report("a/b", "long_shot"), "c/d": report("c/d") } });
+  const a = await compareRepos(f.deps, { repos: ["a/b", "c/d"] });
+  assert.deepEqual(f.started, []);
+  assert.equal(f.slept, 0);
+  assert.deepEqual(a.structured.repos.map((r) => r.repo), ["c/d", "a/b"]);
+  assert.deepEqual(a.structured.call_again, []);
+});
+
+// --- starter_issues -----------------------------------------------------------------
+
+const issue = (n: number, over: Partial<StarterIssue> = {}): StarterIssue =>
+  ({ number: n, title: `Issue ${n}`, url: `https://github.com/a/b/issues/${n}`, labels: ["good first issue"], comments: 0, created_at: null, open_prs: 0, people: 0, on_it: "Nobody on it yet", why: ["labelled good first issue"], areas: ["code"], beginner: true, ...over }) as StarterIssue;
+
+test("starter_issues: the server's list, cut to the limit, with a next step each", async () => {
+  let asked = 0;
+  const f = fake({ issues: (repo, limit) => ((asked = limit), { ok: true, data: { repo: "a/B", issues: [issue(1), issue(2, { open_prs: 1, on_it: "1 open pull request" }), issue(3)] } }) });
+  const a = await starterIssues(f.deps, { repo: "a/b", limit: 2 });
+  assert.equal(asked, 2);
+  assert.equal(a.structured.status, "ok");
+  assert.equal(a.structured.repo, "a/B");
+  assert.equal(a.structured.link, "https://githolt.com/a/B");
+  assert.equal(a.structured.issues.length, 2);
+  assert.match(a.structured.issues[1].next_step, /open pull request/);
+  assert.match(a.text, /#2 Issue 2 \(1 open pull request\)/);
+  // Out of range limits are clamped.
+  await starterIssues(f.deps, { repo: "a/b", limit: 500 });
+  assert.equal(asked, 20);
+  await starterIssues(f.deps, { repo: "a/b" });
+  assert.equal(asked, 5);
+});
+
+test("starter_issues: busy, not shipped and bad names are plain answers", async () => {
+  const busy = await starterIssues(fake({ issues: () => err(429, "rate_limited") }).deps, { repo: "a/b" });
+  assert.equal(busy.structured.status, "busy");
+  assert.equal(busy.isError, false);
+  const off = await starterIssues(fake({ issues: () => err(501, "not_implemented") }).deps, { repo: "a/b" });
+  assert.equal(off.structured.status, "unavailable");
+  const bad = await starterIssues(fake().deps, { repo: "nope" });
+  assert.equal(bad.structured.status, "invalid");
+  assert.equal(bad.isError, true);
+});
+
+// --- through the SDK --------------------------------------------------------------
+
+test("the MCP server lists three read-only tools and its answers match their output schemas", async () => {
+  const f = fake({
+    cached: { "pallets/flask": report("pallets/flask") },
+    polls: (r) => (r === "octo/slow" ? Infinity : 2),
+    issues: () => ({ ok: true, data: { repo: "pallets/flask", issues: [issue(7)] } }),
+  });
+  const server = mcpServer(f.deps);
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await server.connect(a);
+  const client = new Client({ name: "test", version: "0" });
+  await client.connect(b);
+  try {
+    const { tools } = await client.listTools();
+    assert.deepEqual(tools.map((t) => t.name).sort(), ["check_repo", "compare_repos", "starter_issues"]);
+    for (const t of tools) {
+      assert.equal(t.annotations?.readOnlyHint, true, t.name);
+      assert.equal(t.annotations?.destructiveHint, false, t.name);
+      assert.ok(t.outputSchema, t.name);
+      assert.ok((t.description ?? "").length > 80, t.name);
+    }
+    assert.match(client.getInstructions() ?? "", /don't swap in a verdict of your own/);
+    // The client checks structuredContent against each tool's outputSchema.
+    const one = await client.callTool({ name: "check_repo", arguments: { repo: "pallets/flask" } });
+    assert.equal((one.structuredContent as { verdict: string }).verdict, "Worth your time");
+    assert.equal((one.content as { type: string }[])[0].type, "text");
+    const slow = await client.callTool({ name: "check_repo", arguments: { repo: "octo/slow" } });
+    assert.equal((slow.structuredContent as { status: string }).status, "checking");
+    const bad = await client.callTool({ name: "check_repo", arguments: { repo: "nope" } });
+    assert.equal(bad.isError, true);
+    const many = await client.callTool({ name: "compare_repos", arguments: { repos: ["pallets/flask", "octo/new", "nope"] } });
+    assert.equal((many.structuredContent as { repos: unknown[] }).repos.length, 3);
+    const iss = await client.callTool({ name: "starter_issues", arguments: { repo: "pallets/flask", limit: 3 } });
+    assert.equal((iss.structuredContent as { issues: unknown[] }).issues.length, 1);
+    // More than 30 repos is refused by the input schema.
+    const tooMany = await client.callTool({ name: "compare_repos", arguments: { repos: Array.from({ length: 31 }, (_, i) => `a/r${i}`) } });
+    assert.equal(tooMany.isError, true);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});

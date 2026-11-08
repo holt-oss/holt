@@ -21,6 +21,8 @@ const BASE = (process.env.HOLT_API_URL || "http://127.0.0.1:8000").replace(/\/$/
 export interface Caller {
   userId?: string | null;
   ip?: string | null;
+  /** "mcp": the MCP connector (app/mcp). Its new work draws on one server-side bucket for every chat (API.md, "MCP"). */
+  client?: "mcp";
 }
 
 function headers(caller?: Caller): HeadersInit {
@@ -30,6 +32,7 @@ function headers(caller?: Caller): HeadersInit {
   };
   if (caller?.userId) h["X-Holt-User"] = caller.userId;
   if (caller?.ip) h["X-Holt-Client-Ip"] = caller.ip;
+  if (caller?.client) h["X-Holt-Client"] = caller.client;
   return h;
 }
 

@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@radix-ui/react-collapsible": "^1.1.20",
     "@radix-ui/react-tooltip": "^1.2.16",
     "drizzle-orm": "^0.45.3",
@@ -27,7 +28,8 @@
     "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
