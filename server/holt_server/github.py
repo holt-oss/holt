@@ -287,13 +287,20 @@ class TokenPool:
         low = (st.reset_at or 0.0) if (st.remaining or 0) < LOW_POINTS else 0.0
         return max(st.out_until, low)
 
+    @staticmethod
+    def _count_known(st: Any, now: float) -> bool:
+        """Whether a token's last reported count still holds: one whose reset
+        time has passed is out of date, however many points it said."""
+        return st.remaining is not None and not (st.reset_at is not None and st.reset_at <= now)
+
     def points_left(self) -> int | None:
         """GraphQL points left across the tokens usable now, as GitHub last
-        reported them (no call); None while any usable token's count is unknown."""
+        reported them (no call); None while any usable token's count is unknown
+        or out of date."""
         with self._lock:
             now = self._clock()
             usable = [self._state[i] for i in range(len(self._tokens)) if self._usable(i, now)]
-            if any(st.remaining is None for st in usable):
+            if not all(self._count_known(st, now) for st in usable):
                 return None
             return sum(st.remaining or 0 for st in usable)
 
@@ -305,8 +312,7 @@ class TokenPool:
             now = self._clock()
             out = []
             for st in self._state:
-                known = st.remaining is not None and not (
-                    st.reset_at is not None and st.reset_at <= now)
+                known = self._count_known(st, now)
                 low = known and st.remaining < LOW_POINTS
                 out.append(TokenView(remaining=st.remaining if known else None,
                                      reset_at=st.reset_at if known else None,

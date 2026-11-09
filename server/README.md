@@ -87,6 +87,9 @@ curl -sN localhost:20130/v1/analyses/<job_id>/events -H "$K"   # stage ... done
 | `HOLT_USER_RATE_PER_HOUR` | `60` | The same, per signed-in user. |
 | `HOLT_ANON_READ_RATE_PER_HOUR` | `120` | Read bucket, per IP: starter-issue lookups that miss the cache. Separate from the work bucket above, so page views never block analyses. |
 | `HOLT_USER_READ_RATE_PER_HOUR` | `600` | The same, per signed-in user. |
+| `HOLT_MCP_WORK_PER_HOUR` | `60` | Work bucket for the MCP connector (`X-Holt-Client: mcp`): new analyses per hour across every chat together, apart from the per-IP buckets. It also starts nothing while GitHub points are below `HOLT_WARM_MIN_POINTS`. `0` = no limit. |
+| `HOLT_MCP_WORK_PER_IP_PER_HOUR` | `30` | The most of that bucket one address (or IPv6 /64) may use per hour, so one caller can't use it all. Fits one person's 30-repo compare. Chats behind one provider address share it; requests with no address share one count. `0` = no limit. |
+| `HOLT_MCP_READ_PER_HOUR` | `600` | The same for starter-issue lookups that miss the cache. |
 | `HOLT_STARTER_CACHE_HOURS` | `1` | How long starter issues per repository are served from the cache. |
 | `HOLT_BADGE_RATE_PER_IP` | `20` | Rules checks a single client can trigger per hour by loading badges (client = `CF-Connecting-IP`, else the socket address). |
 | `HOLT_BADGE_RATE_TOTAL` | `60` | The same, across all clients. |

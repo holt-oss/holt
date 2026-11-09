@@ -10,6 +10,7 @@ maintainers' research, strategy, design and ops notes are kept privately.
 | [USAGE.md](USAGE.md) | The command line, from install to reading an answer |
 | [COMMANDS.md](COMMANDS.md) | Every command and flag, with real output |
 | [../extension/README.md](../extension/README.md) | The browser extension: build it, load it, what it sends |
+| [MCP.md](MCP.md) | Holt in Claude and ChatGPT: add it as a connector, then ask about your repos in a chat |
 | [../SUPPORT.md](../SUPPORT.md) | Where to ask for help |
 
 ## Contributing and running the code

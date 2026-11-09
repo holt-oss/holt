@@ -232,6 +232,17 @@ def test_searches_queue_nothing_when_github_points_run_low(h, finder):
     assert settle(h, 0) == []
 
 
+def test_a_points_count_past_its_reset_doesnt_stop_searches_queueing(h, finder):
+    # points_left()'s other caller: the same out-of-date count held it back too.
+    from datetime import UTC, datetime, timedelta
+
+    gone = (datetime.now(UTC) - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+    h.svc.pool.note_points(0, 600, gone)
+    h.svc.pool.note_points(1, 600, gone)
+    h.wait(find(h, languages=["go"]).json()["job_id"], kind="find")
+    assert settle(h, 3)
+
+
 def test_found_repos_without_a_report_get_one_queued(h, finder):
     # A search screens repos without storing reports, so each one it lists
     # gets a background rules report: its "report →" link then has something

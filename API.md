@@ -12,6 +12,9 @@ handlers, server components) — a BFF. So:
   request that needs rate limiting (new analyses, find, starter issues) without
   it gets 400 `invalid_request`; the server never falls back to the BFF's own
   address.
+- Requests from the web's MCP connector (see "MCP") also carry
+  `X-Holt-Client: mcp`. Without `X-Holt-User`, they draw on the MCP buckets
+  (see Rate limits) and need no `X-Holt-Client-Ip`. Other values are ignored.
 - Base URL for web: env `HOLT_API_URL` (e.g. `http://127.0.0.1:$PORT`).
 
 Users, sessions and OAuth (GitHub + Google) live in `web/` (Auth.js). The
@@ -53,6 +56,17 @@ signed in:
   (anonymous: 10/h). Cached answers, and joining a running job, are free.
 - **read** — cache misses on reads (`/starter-issues`, `/repos/search`). Generous (anonymous:
   120/h). Viewing, reloading and sharing report pages can never use up work.
+
+The MCP connector (`X-Holt-Client: mcp`, anonymous) has one bucket of each
+kind for all its traffic, whatever the address, apart from the per-IP
+buckets: `HOLT_MCP_WORK_PER_HOUR` (default 60) and `HOLT_MCP_READ_PER_HOUR`
+(default 600). Inside the work bucket, one address (or IPv6 /64) may take at
+most `HOLT_MCP_WORK_PER_IP_PER_HOUR` (default 30, one person's 30-repo
+compare); requests with no address share one such count. A request refused by
+either limit spends nothing on the other. It also gets `rate_limited` for new
+work while the GitHub tokens have fewer points left than the warm pass's floor
+(`HOLT_WARM_MIN_POINTS`), so chats never use up what people on the site need.
+A count past its reset time is out of date and doesn't hold it back.
 
 `GET /v1/reports/…` reads only the cache and is not rate limited.
 `POST /v1/feedback` has a small bucket of its own (see Feedback), and so do
@@ -1600,3 +1614,62 @@ Both routes:
   other read-only clients simple; the data is public.
 - Normalise `{owner}/{repo}` as in "Repo identifiers"; reject anything else
   with `400 invalid_repo`.
+
+## MCP (implemented by `web/`)
+
+`POST /mcp` on the public host is a remote MCP server for Claude's custom
+connectors and ChatGPT's (user guide: `docs/MCP.md`). Streamable HTTP,
+stateless (no session id), JSON responses; `GET` and `DELETE` answer `405`.
+One JSON-RPC request per POST: a batch gets `400` with code `-32600` and runs
+nothing, and a body over 64 KB gets `413`. No auth in v1: every tool reads
+public data, the same for every caller, so OAuth can go in front later without
+renaming a tool. No CORS headers: the connectors call from their own servers,
+so a web page can't drive the tools from its visitors' browsers. Built on
+`@modelcontextprotocol/sdk` (`web/src/lib/mcp-http.ts`, `mcp-server.ts`, logic
+in `mcp.ts`).
+
+It calls the server like any anonymous request, with `X-Holt-Client: mcp`
+(see Rate limits) and the caller's IP, always `mode: "rules"`, `days: 7`.
+It returns what the signed-out teaser and the extension already show:
+`headline`, `verdict_line`, `odds.text` and counts from `stats`, plus the
+report link. Never evidence, `about`, AI text or anything paid.
+
+Tools (each answers `structuredContent` matching its `outputSchema`, plus a
+short text):
+
+- `check_repo({repo})` — `repo` is `owner/name` or a GitHub URL. Reads `GET
+  /v1/reports/…`; with no report, an `outdated` one or one more than 30 days
+  old (the monthly refresh's age, `HOLT_REFRESH_MONTHLY_HOURS`), it `POST`s
+  `/v1/analyses` and polls `GET /v1/analyses/{job_id}` for up to 25 s. A report
+  under 30 days old starts nothing. Answers one row: `{repo, status, verdict,
+  reason, odds, numbers, checked_at, link, note}`, and its text gives the
+  report's date. `status`: `checked` (a report under 30 days old by this engine;
+  not a claim that it is up to the minute), `outdated` and `old` (the old verdict
+  and its date, from an older engine or from more than 30 days ago, while a
+  fresh check runs, or when it can't start or fails: `note` says which, with no
+  `isError`), `checking` (call again), `busy` (`rate_limited` from the server:
+  no new checks from chats now), `not_found` (it beats an old verdict: the repo
+  is gone or private), `invalid`, `error`. `numbers`: `outside_prs`,
+  `outside_prs_merged`, `merged_percent`, `typical_first_reply` ("14 hours")
+  and `typical_first_reply_hours`, `no_reply`, `first_timers_merged`,
+  `closed_without_a_word`, `last_outside_merge`, `still_open`,
+  `older_than_a_year`. `link` is `https://githolt.com/{owner}/{repo}`.
+- `compare_repos({repos})` — 1 to 30 repos. Every report under 30 days old at
+  once; at most 5 new (or `outdated`, or `old`) checks started per call, waited
+  on together for up to 20 s; the rest are `not_checked`, or keep their old
+  verdict. Once the server answers `rate_limited`, nothing more is started and
+  the rest are `busy`, or keep their old verdict. Old verdicts rank by that
+  verdict. Answers
+  `{repos: [row], call_again: [repo]}`, best first: by verdict (Worth your
+  time, Long shot, Not enough evidence, Not worth your time, Personal
+  project, A list, not code), then as Discover's `welcoming` board ranks
+  (odds, the merged share pulled toward a typical one, the reply time, how
+  many outsiders tried); rows without a verdict last, by status (`checking`, `not_checked`,
+  `busy`, `not_found`, `error`, `invalid`), then in the order asked.
+  `call_again` is what to send next time: running or not yet started, never
+  a check that failed or a used-up budget.
+- `starter_issues({repo, limit})` — `limit` 1–20, default 5. Free issues
+  first; taken ones can follow when fewer than 3 are free, and `on_it` says
+  which. Proxies `GET
+  /v1/repos/{owner}/{repo}/starter-issues` → `{repo, status, issues:
+  [{number, title, url, labels, on_it, why, next_step}], link, note}`.
