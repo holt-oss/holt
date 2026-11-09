@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import sys
 import types
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -121,3 +122,139 @@ def test_mcp_reads_share_their_own_bucket(make_harness, starter_calls):
     assert get(h, "/v1/repos/octo/one/starter-issues", ip="4.4.4.4").status_code == 200
     # The site's per-IP read bucket is untouched.
     assert get(h, "/v1/repos/octo/two/starter-issues", ip="3.3.3.3", mcp=False).status_code == 200
+
+
+# --- one caller can't take the whole shared bucket ---------------------------------
+
+
+@pytest.fixture
+def harness(make_harness):
+    """No jobs run, and GitHub knows every repo name: these tests start many."""
+
+    def build(**overrides):
+        h = make_harness(run_jobs=False, **overrides)
+
+        async def canonical(repo: str) -> str:
+            return repo
+
+        h.svc.canonical = canonical
+        return h
+
+    return build
+
+
+def test_one_address_cant_take_the_whole_mcp_bucket(harness):
+    h = harness(HOLT_MCP_WORK_PER_IP_PER_HOUR=2, HOLT_MCP_WORK_PER_HOUR=10)
+    assert post(h, "octo/one", ip="3.3.3.3").status_code == 202
+    assert post(h, "octo/two", ip="3.3.3.3").status_code == 202
+    r = post(h, "octo/three", ip="3.3.3.3")
+    assert r.status_code == 429
+    err = r.json()["error"]
+    assert err["code"] == "rate_limited" and err["retry_after"] > 0
+    # Everyone else still has the rest of the bucket.
+    assert post(h, "octo/three", ip="4.4.4.4").status_code == 202
+
+
+def test_the_defaults_fit_one_persons_30_repo_compare(harness):
+    h = harness()
+    assert h.svc.settings.mcp_work_per_ip_per_hour == 30
+    assert h.svc.settings.mcp_work_per_hour == 60
+    for i in range(30):
+        assert post(h, f"octo/r{i}", ip="3.3.3.3").status_code == 202, i
+    assert post(h, "octo/r30", ip="3.3.3.3").status_code == 429
+    # And half the shared bucket is left for everyone else.
+    assert post(h, "octo/r30", ip="4.4.4.4").status_code == 202
+
+
+def test_refused_by_one_limit_spends_nothing_on_the_other(harness):
+    # Over the shared bucket: the address's own count doesn't move.
+    h = harness(HOLT_MCP_WORK_PER_IP_PER_HOUR=2, HOLT_MCP_WORK_PER_HOUR=1)
+    assert post(h, "octo/one", ip="3.3.3.3").status_code == 202
+    for _ in range(3):
+        assert post(h, "octo/two", ip="4.4.4.4").status_code == 429
+    assert h.svc.limiter.count("mcp-ip:4.4.4.4") == 0
+    # Over the address's own limit: the shared bucket doesn't move.
+    h2 = harness(HOLT_MCP_WORK_PER_IP_PER_HOUR=1, HOLT_MCP_WORK_PER_HOUR=5)
+    assert post(h2, "octo/a", ip="3.3.3.3").status_code == 202
+    for _ in range(3):
+        assert post(h2, "octo/b", ip="3.3.3.3").status_code == 429
+    assert h2.svc.limiter.count("mcp") == 1
+
+
+def test_no_address_neither_bypasses_the_ceiling_nor_crashes(harness):
+    h = harness(HOLT_MCP_WORK_PER_IP_PER_HOUR=2, HOLT_MCP_WORK_PER_HOUR=10)
+    assert post(h, "octo/one", ip=None).status_code == 202
+    assert post(h, "octo/two", ip=None).status_code == 202
+    # Requests with no address share one count, at the same ceiling.
+    assert post(h, "octo/three", ip=None).status_code == 429
+    assert post(h, "octo/three", ip="4.4.4.4").status_code == 202
+
+
+def test_an_ipv6_caller_cant_rotate_around_the_ceiling(harness):
+    # One network gets a whole /64 to pick addresses from: it counts as one.
+    h = harness(HOLT_MCP_WORK_PER_IP_PER_HOUR=2, HOLT_MCP_WORK_PER_HOUR=10)
+    assert post(h, "octo/one", ip="2001:db8:1:2::1").status_code == 202
+    assert post(h, "octo/two", ip="2001:db8:1:2:aaaa::9").status_code == 202
+    assert post(h, "octo/three", ip="2001:db8:1:2:bbbb::7").status_code == 429
+    assert post(h, "octo/three", ip="2001:db8:1:3::1").status_code == 202
+    # The same IPv4 address in its IPv6 form is the same caller.
+    h2 = harness(HOLT_MCP_WORK_PER_IP_PER_HOUR=1, HOLT_MCP_WORK_PER_HOUR=10)
+    assert post(h2, "octo/x", ip="3.3.3.3").status_code == 202
+    assert post(h2, "octo/y", ip="::ffff:3.3.3.3").status_code == 429
+    # Something that isn't an address is still counted, and doesn't crash.
+    assert post(h2, "octo/z", ip="not-an-address").status_code == 202
+    assert post(h2, "octo/w", ip="not-an-address").status_code == 429
+
+
+def test_the_ceiling_is_mcp_only_and_zero_turns_it_off(harness):
+    h = harness(HOLT_MCP_WORK_PER_IP_PER_HOUR=1, HOLT_ANON_RATE_PER_HOUR=5)
+    assert post(h, "octo/one", ip="3.3.3.3").status_code == 202
+    # A person on the site from that address draws on their own bucket.
+    assert post(h, "octo/two", ip="3.3.3.3", mcp=False).status_code == 202
+    off = harness(HOLT_MCP_WORK_PER_IP_PER_HOUR=0, HOLT_MCP_WORK_PER_HOUR=3)
+    for i in range(3):
+        assert post(off, f"octo/x{i}", ip="3.3.3.3").status_code == 202
+
+
+# --- GitHub's points after their reset ---------------------------------------------
+
+
+def hour_ago() -> str:
+    return (datetime.now(UTC) - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+
+
+def in_an_hour() -> str:
+    return (datetime.now(UTC) + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+
+
+def test_a_count_past_its_reset_doesnt_hold_the_mcp_back(make_harness):
+    h = make_harness()
+    h.svc.pool.note_points(0, 600, hour_ago())
+    h.svc.pool.note_points(1, 600, hour_ago())
+    assert h.svc.pool.points_left() is None  # as states() reads it: out of date
+    assert [t.remaining for t in h.svc.pool.states()] == [None, None]
+    assert post(h, "octo/one").status_code == 202
+
+
+def test_a_count_still_inside_its_hour_holds_the_mcp_back(make_harness):
+    h = make_harness()
+    h.svc.pool.note_points(0, 600, in_an_hour())
+    h.svc.pool.note_points(1, 600, in_an_hour())
+    assert h.svc.pool.points_left() == 1200
+    assert post(h, "octo/one").status_code == 429
+
+
+def test_one_count_past_its_reset_makes_the_total_unknown(make_harness):
+    h = make_harness()
+    h.svc.pool.note_points(0, 600, hour_ago())
+    h.svc.pool.note_points(1, 600, in_an_hour())
+    assert h.svc.pool.points_left() is None
+    assert post(h, "octo/one").status_code == 202
+
+
+def test_points_left_changes_nothing_it_reads(make_harness):
+    # Like states(): a reading, so the count stays until GitHub reports a new one.
+    h = make_harness()
+    h.svc.pool.note_points(0, 600, hour_ago())
+    h.svc.pool.points_left()
+    assert h.svc.pool._state[0].remaining == 600

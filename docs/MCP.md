@@ -31,9 +31,9 @@ organisation first.
 
 | Tool | What it answers |
 |---|---|
-| `check_repo` | One repo: the verdict, why, the key numbers and the report link. A repo Holt hasn't checked lately takes about 20 seconds. |
+| `check_repo` | One repo: the verdict, why, the key numbers, the report's date and link. A repo with no report takes about 20 seconds. A report over 30 days old is checked again, and its old verdict comes back with its date while that runs. |
 | `compare_repos` | Up to 30 repos, best first. Holt starts a few new checks per call; the chat calls again for the rest. |
-| `starter_issues` | Open issues in a repo that suit a newcomer and nobody has taken. |
+| `starter_issues` | Open issues in a repo that suit a newcomer, free ones first. Some may already be taken; each one says who is on it. |
 
 The verdict is Holt's, from the same rules as the website; the chat
 only explains it. Try:
@@ -45,7 +45,10 @@ only explains it. Try:
 ## Limits
 
 Reports Holt already has are unlimited. New checks from all chats share
-an hourly budget; when it's used up the answer says Holt is busy and
-links to the report page, where you can check the repo yourself.
+an hourly budget, with a smaller limit per address inside it; chats that
+reach Holt from the same provider address share that limit too. When
+either is used up, the answer says Holt is busy, keeps any older verdict
+with its date, and links to the report page. That page may show the same
+older verdict.
 
 The details of the endpoint are in [API.md](../API.md), "MCP".

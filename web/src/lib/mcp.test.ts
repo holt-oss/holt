@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { CHECK_WAIT_MS, checkRepo, COMPARE_STARTS, COMPARE_WAIT_MS, compareRepos, mergedShare, type McpDeps, starterIssues } from "./mcp.ts";
+import { CHECK_WAIT_MS, checkRepo, COMPARE_STARTS, COMPARE_WAIT_MS, compareRepos, MAX_REPORT_AGE_DAYS, mergedShare, type McpDeps, starterIssues } from "./mcp.ts";
 import { mcpServer } from "./mcp-server.ts";
 import type { AnalysisStart, ApiError, JobStatus, Report, Result, StarterIssue, Stats, Verdict } from "./types.ts";
 
@@ -25,7 +26,7 @@ function stats(over: Partial<Stats> = {}): Stats {
   };
 }
 
-function report(repo: string, verdict: Verdict = "viable", o: { stats?: Partial<Stats>; odds?: "good" | "fair" | "long" | null; outdated?: boolean } = {}): Report {
+function report(repo: string, verdict: Verdict = "viable", o: { stats?: Partial<Stats>; odds?: "good" | "fair" | "long" | null; outdated?: boolean; at?: string } = {}): Report {
   const odds = o.odds === undefined ? (verdict === "viable" ? "good" : null) : o.odds;
   return {
     repo, mode: "rules", days: 7, verdict, headline: HEADLINE[verdict], tone: "good",
@@ -34,7 +35,7 @@ function report(repo: string, verdict: Verdict = "viable", o: { stats?: Partial<
     odds: odds ? { level: odds, tone: "good", text: `${odds} odds` } : null,
     bottom_line: null, summary: null, stats: stats(o.stats), decided_by: [], rule_codes: [], unknowns: [], landing: [], never_landed: [],
     evidence: [{ id: "pr:x#1:opened", url: "https://github.com/x/1", kind: "onboarding", value: "substantive", text: "secret evidence", quote: null }],
-    evidence_until: null, generated_at: "2026-11-01T00:00:00Z", sample: null, asks: [], budget_independent: true, cost: null,
+    evidence_until: null, generated_at: o.at ?? "2026-11-01T00:00:00Z", sample: null, asks: [], budget_independent: true, cost: null,
     holt_users: null, about: null, outdated: o.outdated ?? false,
   } as unknown as Report;
 }
@@ -59,7 +60,7 @@ function fake(o: {
   done?: (repo: string) => Report | { error: ApiError };
   issues?: (repo: string, limit: number) => Result<{ repo: string; issues: StarterIssue[] }>;
 } = {}): Fake {
-  let t = 1_000_000;
+  let t = Date.parse("2026-11-09T00:00:00Z");
   const jobs = new Map<string, { repo: string; polls: number }>();
   const f: Fake = {
     started: [],
@@ -112,11 +113,11 @@ test("check_repo: a cached report answers at once, with no new check", async () 
   assert.equal(r.link, "https://githolt.com/pallets/flask");
   assert.deepEqual(r.numbers, {
     outside_prs: 100, outside_prs_merged: 20, merged_percent: 20, typical_first_reply: "14 hours", typical_first_reply_hours: 14,
-    no_reply: 10, first_timers_merged: 9, closed_without_a_word: 3, last_outside_merge: "2026-10-30",
+    no_reply: 10, first_timers_merged: 9, closed_without_a_word: 3, last_outside_merge: "2026-10-30", still_open: 5, older_than_a_year: 0,
   });
   // Nothing from the full report: no evidence in the answer.
   assert.doesNotMatch(JSON.stringify(a), /secret evidence/);
-  assert.match(a.text, /^pallets\/flask: Worth your time\./);
+  assert.match(a.text, /^pallets\/flask: Worth your time\. Checked 1 Nov 2026\./);
   assert.match(a.text, /20 of 100 outside pull requests merged \(20%\)/);
   assert.match(a.text, /https:\/\/githolt\.com\/pallets\/flask$/);
 });
@@ -196,6 +197,204 @@ test("check_repo: an outdated report whose fresh check finishes in time shows th
   assert.equal(a.structured.verdict, "Worth your time");
 });
 
+test("every verdict says its date in the text, not only in checked_at", async () => {
+  const f = fake({ cached: { "a/b": report("a/b", "viable", { at: "2026-10-20T09:00:00Z" }), "c/d": report("c/d", "long_shot", { at: "2026-11-02T09:00:00Z" }) } });
+  const one = await checkRepo(f.deps, { repo: "a/b" });
+  assert.equal(one.structured.checked_at, "2026-10-20T09:00:00Z");
+  assert.match(one.text, /Checked 20 Oct 2026/);
+  const many = await compareRepos(f.deps, { repos: ["a/b", "c/d"] });
+  assert.match(many.text, /a\/b: Worth your time, checked 20 Oct 2026\./);
+  assert.match(many.text, /c\/d: Long shot, checked 2 Nov 2026\./);
+});
+
+test("a report past 30 days starts a check and shows the old verdict with its date meanwhile", async () => {
+  const f = fake({ cached: { "o/year": report("o/year", "viable", { at: "2025-10-01T00:00:00Z" }) }, polls: () => Infinity });
+  const a = await checkRepo(f.deps, { repo: "o/year" });
+  assert.deepEqual(f.started, ["o/year"]);
+  assert.equal(a.isError, false);
+  assert.equal(a.structured.status, "old");
+  assert.equal(a.structured.verdict, "Worth your time");
+  assert.equal(a.structured.checked_at, "2025-10-01T00:00:00Z");
+  assert.match(a.structured.note ?? "", /1 Oct 2025/);
+  assert.match(a.structured.note ?? "", /fresh check is running/);
+  assert.doesNotMatch(a.structured.note ?? "", /older version/);
+  assert.match(a.text, /Checked 1 Oct 2025/);
+});
+
+test("a report past 30 days whose check finishes in time shows the new verdict", async () => {
+  const f = fake({ cached: { "o/year": report("o/year", "viable", { at: "2025-10-01T00:00:00Z" }) }, done: (r) => report(r, "long_shot") });
+  const a = await checkRepo(f.deps, { repo: "o/year" });
+  assert.equal(a.structured.status, "checked");
+  assert.equal(a.structured.verdict, "Long shot");
+});
+
+test("30 days is the line: under it starts nothing, past it starts a check", async () => {
+  const day = 86_400_000;
+  const at = (ms: number) => new Date(Date.parse("2026-11-09T00:00:00Z") - ms).toISOString();
+  assert.equal(MAX_REPORT_AGE_DAYS, 30);
+  const under = fake({ cached: { "a/b": report("a/b", "viable", { at: at(30 * day) }) } });
+  const a = await checkRepo(under.deps, { repo: "a/b" });
+  assert.equal(a.structured.status, "checked");
+  assert.deepEqual(under.started, []);
+  const past = fake({ cached: { "a/b": report("a/b", "viable", { at: at(30 * day + 1000) }) }, polls: () => Infinity });
+  const b = await checkRepo(past.deps, { repo: "a/b" });
+  assert.equal(b.structured.status, "old");
+  assert.deepEqual(past.started, ["a/b"]);
+});
+
+test("the 30 days match the monthly refresh the server is deployed with", () => {
+  const settings = readFileSync(new URL("../../../server/holt_server/settings.py", import.meta.url), "utf-8");
+  assert.match(settings, /refresh_monthly_hours: float = Field\(720,/);
+  assert.equal(720 / 24, MAX_REPORT_AGE_DAYS);
+});
+
+test("compare_repos: old reports go through the per-call cap and the budget", async () => {
+  const cached: Record<string, Report> = {};
+  const names = Array.from({ length: 7 }, (_, i) => `o/r${i}`);
+  for (const n of names) cached[n] = report(n, "viable", { at: "2025-10-01T00:00:00Z" });
+  const f = fake({ cached, polls: () => Infinity });
+  const a = await compareRepos(f.deps, { repos: names });
+  assert.equal(f.started.length, COMPARE_STARTS);
+  assert.ok(a.structured.repos.every((r) => r.status === "old" && r.verdict === "Worth your time"));
+  // Running or not yet started: all want another call.
+  assert.deepEqual(a.structured.call_again, names);
+  assert.match(a.structured.repos.find((r) => r.repo === "o/r6")!.note ?? "", /Call again/);
+
+  const over = fake({ cached, start: () => err(429, "rate_limited") });
+  const b = await compareRepos(over.deps, { repos: names });
+  assert.deepEqual(over.started, ["o/r0"]);
+  assert.ok(b.structured.repos.every((r) => r.status === "old" && r.verdict === "Worth your time"));
+  assert.deepEqual(b.structured.call_again, []);
+});
+
+// --- a re-check that fails -------------------------------------------------------------
+
+const OLD_KINDS: [string, { outdated?: boolean; at?: string }, string][] = [
+  ["outdated", { outdated: true }, "outdated"],
+  ["past 30 days", { at: "2025-10-01T00:00:00Z" }, "old"],
+];
+
+for (const [name, kind, status] of OLD_KINDS) {
+  test(`check_repo: a failed re-check of a report ${name} keeps the old verdict, with a note and no error`, async () => {
+    const failures: Record<string, Partial<Parameters<typeof fake>[0]>> = {
+      "the start fails": { start: () => err(502, "upstream", "Holt's analysis server isn't answering right now.") },
+      "the job fails": { done: () => ({ error: { code: "upstream", message: "GitHub didn't answer in time." } as ApiError }) },
+      "the budget is used up": { start: () => err(429, "rate_limited") },
+    };
+    for (const [how, o] of Object.entries(failures)) {
+      const f = fake({ cached: { "o/r": report("o/r", "long_shot", kind) }, ...o });
+      const a = await checkRepo(f.deps, { repo: "o/r" });
+      assert.equal(a.isError, false, how);
+      assert.equal(a.structured.status, status, how);
+      assert.equal(a.structured.verdict, "Long shot", how);
+      assert.ok(a.structured.note, how);
+      assert.match(a.text, /Long shot/, how);
+    }
+  });
+
+  test(`check_repo: a re-check of a report ${name} saying not_found wins: the repo is gone or private`, async () => {
+    for (const o of [
+      { start: () => err(404, "not_found") },
+      { done: () => ({ error: { code: "not_found", message: "gone" } as ApiError }) },
+    ]) {
+      const f = fake({ cached: { "o/r": report("o/r", "viable", kind) }, ...o });
+      const a = await checkRepo(f.deps, { repo: "o/r" });
+      assert.equal(a.structured.status, "not_found");
+      assert.equal(a.structured.verdict, null);
+      assert.equal(a.isError, false);
+    }
+  });
+}
+
+test("a job that can't be found again isn't 'no such repo': the old verdict stays", async () => {
+  const f = fake({ cached: { "o/r": report("o/r", "viable", { outdated: true }) } });
+  f.deps.jobStatus = async () => err(404, "not_found", "We couldn't find that check. It may have expired.");
+  const a = await checkRepo(f.deps, { repo: "o/r" });
+  assert.equal(a.structured.status, "outdated");
+  assert.equal(a.structured.verdict, "Worth your time");
+
+  const cold = fake();
+  cold.deps.jobStatus = f.deps.jobStatus;
+  const b = await checkRepo(cold.deps, { repo: "o/cold" });
+  assert.equal(b.structured.status, "error");
+  assert.doesNotMatch(b.text, /can't find this repository/);
+});
+
+test("compare_repos: a failed re-check is ranked by its old verdict and not asked for again", async () => {
+  const f = fake({
+    cached: {
+      "o/failed": report("o/failed", "viable", { outdated: true }),
+      "o/gone": report("o/gone", "viable", { outdated: true }),
+      "o/long": report("o/long", "long_shot", { odds: "long" }),
+    },
+    start: (r) => (r === "o/gone" ? err(404, "not_found") : err(502, "upstream")),
+  });
+  const a = await compareRepos(f.deps, { repos: ["o/long", "o/gone", "o/failed"] });
+  assert.equal(a.isError, undefined);
+  assert.deepEqual(a.structured.repos.map((r) => [r.repo, r.status]), [["o/failed", "outdated"], ["o/long", "checked"], ["o/gone", "not_found"]]);
+  assert.equal(a.structured.repos[0].verdict, "Worth your time");
+  assert.deepEqual(a.structured.call_again, []);
+});
+
+test("the notes never promise the link has a newer verdict", async () => {
+  for (const kind of [{ outdated: true }, { at: "2025-10-01T00:00:00Z" }]) {
+    for (const o of [{ start: () => err(429, "rate_limited") }, { start: () => err(502, "upstream") }]) {
+      const a = await checkRepo(fake({ cached: { "o/r": report("o/r", "viable", kind) }, ...o }).deps, { repo: "o/r" });
+      assert.doesNotMatch(a.text, /current one/i);
+      assert.match(a.structured.note ?? "", /linked report may show this same older verdict/);
+    }
+  }
+});
+
+// --- what the numbers say --------------------------------------------------------------
+
+test("a repo with recent outside pull requests isn't described as having none", async () => {
+  const noDecided = report("o/new", "insufficient_evidence", { stats: { outsider_attempts: 0, outsider_merged: 0, still_open: 12, median_first_response_hours: null } });
+  const a = await checkRepo(fake({ cached: { "o/new": noDecided } }).deps, { repo: "o/new" });
+  assert.equal(a.structured.numbers?.still_open, 12);
+  assert.doesNotMatch(a.text, /no outside pull requests/);
+  assert.match(a.text, /12 outside pull requests opened in the last 14 days, too recent to count/);
+
+  const one = report("o/one", "insufficient_evidence", { stats: { outsider_attempts: 0, outsider_merged: 0, still_open: 1, median_first_response_hours: null } });
+  assert.match((await checkRepo(fake({ cached: { "o/one": one } }).deps, { repo: "o/one" })).text, /1 outside pull request opened in the last 14 days, too recent to count/);
+
+  const old = report("o/old", "insufficient_evidence", { stats: { outsider_attempts: 0, outsider_merged: 0, still_open: 0, too_old: 4, median_first_response_hours: null } });
+  const c = await checkRepo(fake({ cached: { "o/old": old } }).deps, { repo: "o/old" });
+  assert.doesNotMatch(c.text, /no outside pull requests/);
+  assert.match(c.text, /4 outside pull requests, all older than a year/);
+
+  const none = report("o/none", "insufficient_evidence", { stats: { outsider_attempts: 0, outsider_merged: 0, still_open: 0, too_old: 0, median_first_response_hours: null } });
+  assert.match((await checkRepo(fake({ cached: { "o/none": none } }).deps, { repo: "o/none" })).text, /no outside pull requests in what Holt read/);
+
+  // With decided ones too, the recent ones are named beside them.
+  const both = await checkRepo(fake({ cached: { "o/both": report("o/both", "viable", { stats: { still_open: 5 } }) } }).deps, { repo: "o/both" });
+  assert.match(both.text, /20 of 100 outside pull requests merged \(20%\).*5 more too recent to count/);
+});
+
+// --- starter_issues' promise -----------------------------------------------------------
+
+test("starter_issues says some may be taken and tells the model to pass on_it on", async () => {
+  const server = mcpServer(fake().deps);
+  const [x, y] = InMemoryTransport.createLinkedPair();
+  await server.connect(x);
+  const client = new Client({ name: "test", version: "0" });
+  await client.connect(y);
+  const { tools } = await client.listTools();
+  const d = tools.find((t) => t.name === "starter_issues")!.description ?? "";
+  assert.doesNotMatch(d, /nobody has taken/);
+  assert.match(d, /free ones first/i);
+  assert.match(d, /may already be taken/);
+  assert.match(d, /on_it/);
+  const check = tools.find((t) => t.name === "check_repo")!.description ?? "";
+  assert.doesNotMatch(check, /lately/);
+  assert.match(check, /30 days/);
+  await client.close();
+  await server.close();
+  const docs = readFileSync(new URL("../../../docs/MCP.md", import.meta.url), "utf-8");
+  assert.doesNotMatch(docs, /nobody has taken/);
+  assert.match(docs, /may already be taken/);
+});
+
 // --- compare_repos ------------------------------------------------------------------
 
 test("compare_repos: 30 repos in mixed states, best first, a few new checks per call", async () => {
@@ -255,7 +454,7 @@ test("compare_repos: 30 repos in mixed states, best first, a few new checks per 
   assert.equal(rows.at(-1)!.status, "invalid");
   // What to ask again for: the running one and those not started.
   assert.deepEqual(a.structured.call_again, ["cold/r2", ...Array.from({ length: 15 }, (_, i) => `cold/r${i + 4}`)]);
-  assert.match(a.text, /^1\. a\/viable-good-big: Worth your time\./);
+  assert.match(a.text, /^1\. a\/viable-good-big: Worth your time, checked 1 Nov 2026\./);
   assert.match(a.text, /Call compare_repos again in a minute with: cold\/r2, cold\/r4/);
   assert.doesNotMatch(JSON.stringify(a), /secret evidence/);
 });

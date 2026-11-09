@@ -120,6 +120,9 @@ class Settings(BaseSettings):
     # of its traffic shares one bucket of each kind, apart from the site's.
     # 0 = no limit.
     mcp_work_per_hour: int = Field(60, ge=0, alias="HOLT_MCP_WORK_PER_HOUR")
+    # The most of that work one address may take. Room for one person's
+    # 30-repo compare; people behind one provider address share it.
+    mcp_work_per_ip_per_hour: int = Field(30, ge=0, alias="HOLT_MCP_WORK_PER_IP_PER_HOUR")
     mcp_read_per_hour: int = Field(600, ge=0, alias="HOLT_MCP_READ_PER_HOUR")
     # How long starter issues for a repository are served from the cache.
     starter_cache_hours: float = Field(1, alias="HOLT_STARTER_CACHE_HOURS")

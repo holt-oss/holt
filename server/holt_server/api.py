@@ -84,6 +84,10 @@ def rate_limit(svc: Services, who: Caller, bucket: str = "work") -> None:
         if left is not None and left < svc.settings.warm_min_points:
             raise ApiError("rate_limited", "Holt is busy right now. Try again later.",
                            retry_after=600)
+        # One address can't take the whole bucket from every other chat.
+        svc.limiter.hit_all([(who.mcp_address_key, svc.settings.mcp_work_per_ip_per_hour),
+                             (who.rate_key, who.limit(svc))])
+        return
     svc.limiter.hit(who.rate_key, who.limit(svc))
 
 

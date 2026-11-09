@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+import ipaddress
 from typing import TYPE_CHECKING
 
 from fastapi import Depends, Header, Request
@@ -49,6 +50,22 @@ class Caller:
         if self.user_id:
             return f"user:{self.user_id}"
         return "mcp" if self.mcp else f"ip:{self.ip}"
+
+    @property
+    def mcp_address_key(self) -> str:
+        """Who counts as one caller inside the MCP bucket: the address, or one
+        IPv6 /64 (a single network can pick from all of it). Requests with no
+        address share one count, so leaving it out buys nothing."""
+        ip = self.ip or "unknown"
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            return f"mcp-ip:{ip}"
+        if addr.version == 6:
+            if addr.ipv4_mapped is None:
+                return f"mcp-ip:{ipaddress.ip_network((addr, 64), strict=False)}"
+            addr = addr.ipv4_mapped
+        return f"mcp-ip:{addr}"
 
     def limit(self, svc: Services) -> int:
         s = svc.settings
