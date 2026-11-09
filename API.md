@@ -1664,7 +1664,8 @@ short text):
   time, Long shot, Not enough evidence, Not worth your time, Personal
   project, A list, not code), then as Discover's `welcoming` board ranks
   (odds, the merged share pulled toward a typical one, the reply time, how
-  many outsiders tried); rows without a verdict last, in the order asked.
+  many outsiders tried); rows without a verdict last, by status (`checking`, `not_checked`,
+  `busy`, `not_found`, `error`, `invalid`), then in the order asked.
   `call_again` is what to send next time: running or not yet started, never
   a check that failed or a used-up budget.
 - `starter_issues({repo, limit})` — `limit` 1–20, default 5. Free issues

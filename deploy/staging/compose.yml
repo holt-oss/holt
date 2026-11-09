@@ -92,6 +92,11 @@ services:
       HOLT_ENV: ${HOLT_ENV:-staging}
       DATABASE_URL: postgresql+asyncpg://holt:${HOLT_DB_PASSWORD}@db:5432/holt
       HOLT_INTERNAL_KEY: ${HOLT_INTERNAL_KEY:?run make-env.sh}
+      # The MCP connector's budget (API.md, "Rate limits"): new checks per hour
+      # from all chats, the most one address may take, and cache misses on reads.
+      HOLT_MCP_WORK_PER_HOUR: ${HOLT_MCP_WORK_PER_HOUR:-60}
+      HOLT_MCP_WORK_PER_IP_PER_HOUR: ${HOLT_MCP_WORK_PER_IP_PER_HOUR:-30}
+      HOLT_MCP_READ_PER_HOUR: ${HOLT_MCP_READ_PER_HOUR:-600}
       HOLT_SECRET_KEY: ${HOLT_SECRET_KEY:?run make-env.sh}
       HOLT_WEB_URL: https://${STAGING_HOST:-staging.githolt.com}
       GITHUB_TOKENS: ${GITHUB_TOKENS}

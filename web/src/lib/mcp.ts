@@ -496,6 +496,7 @@ function numbersText(n: Numbers): string {
   const plural = (k: number) => `${k} outside pull request${k === 1 ? "" : "s"}`;
   if (n.outside_prs === 0) {
     // "None" only when Holt read none: decided ones are a part of what it read.
+    if (n.still_open > 0 && n.older_than_a_year > 0) return `${plural(n.still_open)} opened in the last 14 days, too recent to count, and ${n.older_than_a_year} older than a year; none in between to go on`;
     if (n.still_open > 0) return `${plural(n.still_open)} opened in the last 14 days, too recent to count; none older to go on`;
     if (n.older_than_a_year > 0) return `${plural(n.older_than_a_year)}, all older than a year; none recent to go on`;
     return "no outside pull requests in what Holt read";
@@ -525,6 +526,7 @@ function compareText(out: CompareOut): string {
       n++;
       const date = r.checked_at ? shortDate(r.checked_at) : "";
       const parts = [`${n}. ${r.repo}: ${r.verdict}${date ? `, checked ${date}` : ""}.`];
+      if (r.reason) parts.push(r.reason);
       if (r.numbers) parts.push(`${numbersText(r.numbers)}.`);
       if (r.note) parts.push(r.note);
       parts.push(r.link);

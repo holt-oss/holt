@@ -366,6 +366,12 @@ test("a repo with recent outside pull requests isn't described as having none", 
   const none = report("o/none", "insufficient_evidence", { stats: { outsider_attempts: 0, outsider_merged: 0, still_open: 0, too_old: 0, median_first_response_hours: null } });
   assert.match((await checkRepo(fake({ cached: { "o/none": none } }).deps, { repo: "o/none" })).text, /no outside pull requests in what Holt read/);
 
+  // Recent and year-old together: neither is called none.
+  const mixed = report("o/mixed", "not_viable", { stats: { outsider_attempts: 0, outsider_merged: 0, still_open: 2, too_old: 90, median_first_response_hours: null } });
+  const m = await checkRepo(fake({ cached: { "o/mixed": mixed } }).deps, { repo: "o/mixed" });
+  assert.doesNotMatch(m.text, /none older|none recent/);
+  assert.match(m.text, /2 outside pull requests opened in the last 14 days, too recent to count, and 90 older than a year; none in between to go on/);
+
   // With decided ones too, the recent ones are named beside them.
   const both = await checkRepo(fake({ cached: { "o/both": report("o/both", "viable", { stats: { still_open: 5 } }) } }).deps, { repo: "o/both" });
   assert.match(both.text, /20 of 100 outside pull requests merged \(20%\).*5 more too recent to count/);
@@ -471,6 +477,12 @@ test("compare_repos: once the budget is used up, nothing more is started and the
   assert.equal(by["a/old"].verdict, "Worth your time");
   assert.equal(a.structured.repos[0].repo, "a/old");
   assert.deepEqual(a.structured.call_again, []);
+});
+
+test("compare_repos: the text gives each verdict's reason, as check_repo's does", async () => {
+  const f = fake({ cached: { "a/b": report("a/b", "not_viable", { stats: { outsider_merged: 50 } }) } });
+  const a = await compareRepos(f.deps, { repos: ["a/b"] });
+  assert.match(a.text, /^1\. a\/b: Not worth your time, checked 1 Nov 2026\. Reason for a\/b\. 50 of 100 outside pull requests merged/);
 });
 
 test("compare_repos: all cached is all at once", async () => {
